@@ -8,8 +8,8 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { dbOn, dbSelect, dbUpsert } from './db';
-import { PALETTES, FONT_PAIRS, customPalette } from '../src/data/styleOptions';
+import { dbOn, dbSelect, dbUpsert } from './db.js';
+import { PALETTES, FONT_PAIRS, customPalette } from '../src/data/styleOptions.js';
 
 const STORE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../data/styles.json');
 type L = 'tr' | 'en' | 'de' | 'el';

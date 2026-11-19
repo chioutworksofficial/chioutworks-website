@@ -1,6 +1,6 @@
-import { T, type Lang } from '../../translations';
-import { CATALOG_UI } from './i18n/catalog';
-import { CUSTOM_UI } from './i18n/custom';
+import { T, type Lang } from '../../translations.js';
+import { CATALOG_UI } from './i18n/catalog.js';
+import { CUSTOM_UI } from './i18n/custom.js';
 
 export interface DemoText {
   name: string;

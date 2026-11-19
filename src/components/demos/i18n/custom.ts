@@ -1,4 +1,4 @@
-import type { Lang } from '../../../translations';
+import type { Lang } from '../../../translations.js';
 
 // "Custom software & design" card at the end of the showcase (slug: demoozel).
 export const CUSTOM_UI = {

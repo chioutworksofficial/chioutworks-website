@@ -1,4 +1,4 @@
-import type { Lang } from '../translations';
+import type { Lang } from '../translations.js';
 
 // Single source of truth for every public URL. Each page has a clean, localized
 // slug per language: /tr/ana-sayfa, /en/home, /de/startseite, /el/arxiki …

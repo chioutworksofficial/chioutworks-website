@@ -9,7 +9,7 @@ import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { BOT_UA } from './analytics';
+import { BOT_UA } from './analytics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FILE = path.join(__dirname, '../data/affiliate-clicks.jsonl');

@@ -1,6 +1,6 @@
-import { demoText } from '../src/components/demos/demoText';
-import { T as SITE_T } from '../src/translations';
-import { CATALOG_UI } from '../src/components/demos/i18n/catalog';
+import { demoText } from '../src/components/demos/demoText.js';
+import { T as SITE_T } from '../src/translations.js';
+import { CATALOG_UI } from '../src/components/demos/i18n/catalog.js';
 import './env.js';
 import { dbOn, dbInsert, dbUpsert, dbSelect, dbDelete, dbUpdate, kvGet, kvSet } from './db.js';
 import express from 'express';
@@ -19,7 +19,7 @@ import { registerProjects } from './projects.js';
 import { registerStyles } from './styles.js';
 import { registerNewsletter } from './newsletter.js';
 import { registerAnalytics } from './analytics.js';
-import { registerAffiliates } from './affiliates';
+import { registerAffiliates } from './affiliates.js';
 import { registerPreview } from './preview.js';
 import { languageOk, SAFE_FALLBACK } from './languageGuard.js';
 import { ids as abuseIds, recordAbuse, voiceBlocked, chatState, recordStrike, blockedMsg, adminList, adminUnlock, rateOk, globalOk, textMsgAllowed, TEXT_SESSION_MAX, insult, abuseExempt, MSG as ABUSE_MSG } from './abuse.js';
@@ -998,8 +998,10 @@ async function pruneVoice() {
     if (old.length) { await deleteVoice(old.map((x) => x.id)); console.log(`[voice] pruned ${old.length} old sessions`); }
   } catch (err) { console.error('[voice] prune failed', err); }
 }
-void pruneVoice();
-setInterval(() => void pruneVoice(), 24 * 60 * 60 * 1000).unref();
+if (!process.env.VERCEL) {
+  void pruneVoice();
+  setInterval(() => void pruneVoice(), 24 * 60 * 60 * 1000).unref();
+}
 
 // Daily job for Vercel Cron (the in-process timer above only runs on a long-lived server): keep-alive + cleanups.
 app.get('/api/cron/daily', async (req, res) => {
@@ -1541,10 +1543,11 @@ app.use((err: unknown, req: express.Request, res: express.Response, _next: expre
   res.status(500).json({ error: 'server_error' });
 });
 
-app.listen(PORT, () => {
+if (!process.env.VERCEL) app.listen(PORT, () => {
   console.log(`\x1b[32m✓\x1b[0m Chioutworks AI server running on http://localhost:${PORT}`);
   if (!process.env.GROQ_API_KEY) {
     console.warn('\x1b[33m⚠\x1b[0m  GROQ_API_KEY not set — AI will return fallback responses.');
   }
 });
 
+export default app;

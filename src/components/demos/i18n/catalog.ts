@@ -1,4 +1,4 @@
-import type { Lang } from '../../../translations';
+import type { Lang } from '../../../translations.js';
 
 // Names, card descriptions and "what this system does" bullets for the demos added
 // after the first batch. The first batch lives in translations.ts → T[lang].demos.items/features.
