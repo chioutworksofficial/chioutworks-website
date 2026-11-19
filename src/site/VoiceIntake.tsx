@@ -662,6 +662,11 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     void toCard();
   };
 
+  useEffect(() => {
+    if (phase !== 'card' || !card || styleRef) return;
+    void saveSession().then((v) => { if (v) setStyleRef({ id: v.id, secret: v.secret }); });
+  }, [phase, card, styleRef, saveSession]);
+
   const sendCard = async () => {
     if (!card) return;
     const name = [cleanName(card.firstName), cleanName(card.lastName)].filter(Boolean).join(' ');
@@ -763,13 +768,13 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
           {cardSent ? (
             <>
               <p role="status" style={{ textAlign: 'center', color: 'var(--lq-silver)', lineHeight: 1.6 }}>{t.cardSent}</p>
-              {styleRef && <StyleCta lang={lang} body={{ kind: 'voice', sessionId: styleRef.id, secret: styleRef.secret }} />}
               <button type="button" style={primary} onClick={() => { teardown(); setOpen(false); }}>{t.cardClose}</button>
             </>
           ) : !card ? (
             <p role="status" aria-live="polite" style={{ textAlign: 'center', color: 'var(--lq-silver)' }}>{t.extracting}</p>
           ) : (
             <form onSubmit={(e) => { e.preventDefault(); void sendCard(); }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {styleRef && <StyleCta newTab lang={lang} body={{ kind: 'voice', sessionId: styleRef.id, secret: styleRef.secret }} />}
               <p role="note" style={{ margin: 0, display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: 'var(--lq-white)', border: '1px solid var(--lq-line-strong)', borderRadius: 'var(--lq-radius-card)' }}><span aria-hidden>✎</span><span>{t.cardReview}</span></p>
               <p style={{ margin: 0, color: 'var(--lq-silver)', fontSize: 13.5, textAlign: 'center' }}>{t.cardHint}</p>
               {([['service', t.cardService, 'text', 120], ['business', t.cardBusiness, 'text', 100], ['city', t.cardCity, 'text', 80], ['firstName', t.cardFirst, 'text', 40], ['lastName', t.cardLast, 'text', 40], ['phone', t.cardPhone, 'tel', 40], ['email', t.cardEmail, 'email', 254]] as const).map(([k, label, type, max]) => (

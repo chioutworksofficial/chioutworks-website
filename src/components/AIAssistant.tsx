@@ -16,6 +16,7 @@ import { getBid } from '../lib/assistantConsent';
 import { hasConsent as hasCookieConsent } from '../lib/consent';
 import { hasConsent } from '../lib/assistantConsent';
 import { writeVoiceSession, clearVoiceSession, downloadTranscript } from '../lib/voiceSession';
+import { StyleCta } from '../site/pages/StylePage';
 
 // ── Chat memory (owner, 2026-11-19): always kept for this tab (sessionStorage = needed for the requested service);
 // kept 7 days in localStorage only with the "functional/comfort" cookie consent. Cleared with "Clear chat"/"Delete".
@@ -56,6 +57,7 @@ function RequestCard({ lang, sess, ui }: { lang: string; sess: { id: string; sec
     fetch(url, { headers: { 'x-voice-secret': sess.secret } }).then((r) => (r.ok ? r.json() : null)).then((j) => j && setF(j)).catch(() => {});
   }, [url, sess]);
   if (!f || !sess) return null;
+  const webRelated = /web|site|sayfa|tasar[ıi]m|design|σχεδ|ιστοσελ|ιστότοπ|ιστοτοπ/i.test(f.message ?? '');
   const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 'var(--r-input)', border: '1px solid var(--lq-line-strong)', background: 'var(--c-abyss)', color: 'var(--lq-white)', fontSize: 13, fontFamily: 'inherit' };
   const rows: [string, string][] = [['name', ui.cardName], ['email', ui.cardEmail], ['phone', ui.cardPhone], ['business', ui.cardBiz], ['city', ui.cardCity]];
   const save = async () => {
@@ -69,6 +71,7 @@ function RequestCard({ lang, sess, ui }: { lang: string; sess: { id: string; sec
   return (
     <div lang={lang} style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid var(--lq-line-strong)', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <strong style={{ fontSize: 13.5, color: 'var(--lq-white)' }}>{ui.cardTitle}</strong>
+      {webRelated && <StyleCta newTab lang={lang as Lang} body={{ kind: 'voice', sessionId: sess.id, secret: sess.secret }} />}
       {rows.map(([k, label]) => (
         <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, color: 'var(--lq-mist)' }}>{label}
           <input value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value })} style={inp} maxLength={k === 'email' ? 254 : 100} />

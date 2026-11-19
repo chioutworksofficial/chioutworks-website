@@ -283,7 +283,7 @@ export default function StylePage() {
 }
 
 /** Button shown after the intake / voice call: opens (and creates once) the personal style link. */
-export function StyleCta({ lang, body }: { lang: Lang; body: Record<string, string> }) {
+export function StyleCta({ lang, body, newTab }: { lang: Lang; body: Record<string, string>; newTab?: boolean }) {
   const t = STYLE_UI[lang];
   const [busy, setBusy] = useState(false); const [err, setErr] = useState(false);
   const go = async () => {
@@ -291,7 +291,7 @@ export function StyleCta({ lang, body }: { lang: Lang; body: Record<string, stri
     try {
       const r = await fetch('/api/style/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, lang }) });
       const j = await r.json(); if (!r.ok || !j.path) throw new Error();
-      window.location.assign(j.path);
+      if (newTab) { window.open(j.path, '_blank', 'noopener'); setBusy(false); } else window.location.assign(j.path);
     } catch { setErr(true); setBusy(false); }
   };
   return (
