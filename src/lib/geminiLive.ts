@@ -40,6 +40,17 @@ const PASS_HOLD = 0.6;         // seconds all frames pass after a loud frame (wh
 const TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const LEAD = TOUCH ? 0.28 : 0.12;   // jitter-buffer lead after silence
 
+export const END_QUIET_MS = 1500, END_CAP_MS = 15000;
+/** End condition: model turn finished, audio fully played, no new chunk for END_QUIET_MS - or the safety cap. */
+const END_WAIT_NO_AUDIO_MS = 4000;
+export function shouldEnd(o: { turnDone: boolean; playing: boolean; lastAudioAgoMs: number; inEndingMs: number; audioAfterEnd?: boolean }): boolean {
+  if (o.inEndingMs >= END_CAP_MS) return true;
+  // the model may think a moment after finish_conversation before it speaks the farewell: if no farewell audio has
+  // arrived yet, keep the call open for at least END_WAIT_NO_AUDIO_MS (owner 2026-11-19: call ended before the goodbye)
+  if (!o.audioAfterEnd && o.inEndingMs < END_WAIT_NO_AUDIO_MS) return false;
+  return o.turnDone && !o.playing && o.lastAudioAgoMs >= END_QUIET_MS;
+}
+
 export class LiveCall {
   private ws: WebSocket | null = null;
   private node: AudioWorkletNode | null = null;
@@ -49,6 +60,11 @@ export class LiveCall {
   private closing = false;
   private next = 0;
   private ending = false;
+  private endStart = 0;
+  private turnDone = false;
+  private generating = false;   // audio received since the last turnComplete
+  private lastAudio = 0;
+  private audioAfterEnd = false;
   private passUntil = 0;
   private greeting = true;   // until the first assistant turn is done: mic muted, interruptions ignored
   private gotAudio = false;
@@ -74,15 +90,15 @@ export class LiveCall {
         if (m.setupComplete && !this.ready) { this.ready = true; clearTimeout(timer); setTimeout(() => { this.greeting = false; }, 12000); this.startMic(); resolve(); return; }
         const sc = m.serverContent;
         if (sc) {
-          if (sc.interrupted && !this.greeting) { this.stopPlayback(); this.h.onInterrupted(); }
-          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) { this.gotAudio = true; this.play(p.inlineData.data); }
+          if (sc.interrupted && !this.greeting && !this.ending) { this.stopPlayback(); this.h.onInterrupted(); }
+          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) { this.gotAudio = true; this.generating = true; this.lastAudio = performance.now(); if (this.ending) this.audioAfterEnd = true; if (this.ending) this.turnDone = false; this.play(p.inlineData.data); }
           if (sc.inputTranscription?.text) this.h.onInput(sc.inputTranscription.text);
           if (sc.outputTranscription?.text) this.h.onOutput(sc.outputTranscription.text);
-          if (sc.turnComplete) { if (this.gotAudio) this.greeting = false; this.h.onTurnComplete(); }
+          if (sc.turnComplete) { this.generating = false; if (this.ending) this.turnDone = true; if (this.gotAudio) this.greeting = false; this.h.onTurnComplete(); }
         }
         if (m.toolCall?.functionCalls) {
           const calls = m.toolCall.functionCalls as { id: string; name: string; args?: { reason?: unknown } }[];
-          ws.send(JSON.stringify({ toolResponse: { functionResponses: calls.map((c) => ({ id: c.id, name: c.name, response: { result: 'ok' } })) } }));
+          ws.send(JSON.stringify({ toolResponse: { functionResponses: calls.map((c) => ({ id: c.id, name: c.name, response: { ok: true } })) } }));
           const fin = calls.find((c) => c.name === 'finish_conversation');
           if (fin) this.h.onFinish(fin.args?.reason === 'abuse' ? 'abuse' : 'done');
         }
@@ -116,7 +132,23 @@ export class LiveCall {
   speaking() { return this.next > this.ctx.currentTime; }
 
   /** Mutes the mic (silence frames only) while the call is ending. */
-  hold() { this.ending = true; }
+  hold(afterFinish = false) {
+    if (this.ending) return;
+    this.ending = true; this.audioAfterEnd = false; this.endStart = performance.now(); this.lastAudio = this.lastAudio || this.endStart;
+    this.turnDone = !afterFinish && !this.generating;   // after finish_conversation a LATER turnComplete is required
+  }
+
+  /** While ending: resolves once shouldEnd() holds, plus a 500 ms tail (hard cap END_CAP_MS). Call hold() first. */
+  whenReallyDone(): Promise<void> {
+    return new Promise((res) => {
+      const tick = () => {
+        const n = performance.now();
+        if (shouldEnd({ turnDone: this.turnDone, playing: this.speaking(), lastAudioAgoMs: n - this.lastAudio, inEndingMs: n - this.endStart, audioAfterEnd: this.audioAfterEnd })) setTimeout(res, 500);
+        else setTimeout(tick, 100);
+      };
+      tick();
+    });
+  }
 
   /** Resolves when queued model audio has finished playing (polls every 100 ms, gives up after maxMs). */
   whenPlaybackDone(maxMs = 8000): Promise<void> {

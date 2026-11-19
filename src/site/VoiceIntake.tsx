@@ -412,8 +412,10 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     if (draining.current) return;
     draining.current = true;
     const c = callRef.current;
-    callRef.current?.hold();
-    void (c ? c.whenPlaybackDone(8000) : Promise.resolve()).then(() => setTimeout(endCall, 700));
+    if (!c) { setTimeout(endCall, 700); return; }
+    c.hold(true);
+    if (abuseRef.current) { void c.whenPlaybackDone(8000).then(() => setTimeout(endCall, 700)); return; }   // abuse: old behaviour
+    void c.whenReallyDone().then(endCall);
   };
 
   const startTimerOnce = () => {
@@ -430,7 +432,9 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       finishPending.current = true;
       setNotice(t.timeUp);
       const c = callRef.current;
-      void (c ? c.whenPlaybackDone(6000) : Promise.resolve()).then(endCall);   // hard end: let audio finish (max 6 s)
+      if (!c) { endCall(); return; }
+      c.hold();   // hard end: wait for the real end of speech (capped at 15 s)
+      void c.whenReallyDone().then(endCall);
     }, 500);
   };
 
@@ -471,7 +475,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
         }
       },
       onInterrupted: () => { liveCut.current = turnsRef.current[turnsRef.current.length - 1]?.role === 'assistant'; liveRole.current = null; outBuf.current = ''; },
-      onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; if (finishPending.current) drain(); },
+      onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; if (finishPending.current && abuseRef.current) drain(); },
       onFinish: (reason) => { if (reason === 'abuse') abuseRef.current = true; finishPending.current = true; if (reason === 'abuse') setTimeout(drain, 3000); else drain(); },
       onLevel: (rms) => { const n = performance.now(); if (n - lastLevel.current > 80) { lastLevel.current = n; setLevel(Math.min(1, rms * 8)); } },
       onClosed: () => {
