@@ -46,6 +46,43 @@ const CHIP_ICON: Record<string, React.ReactNode> = {
 };
 const SHOW_MIC = false;   // owner, 2026-11-19: no mic in the text chat; "continue by voice" opens the voice dialog instead
 
+function RequestCard({ lang, sess, ui }: { lang: string; sess: { id: string; secret: string } | null; ui: { cardTitle: string; cardName: string; cardEmail: string; cardPhone: string; cardBiz: string; cardCity: string; cardNeed: string; cardSave: string; cardOk: string; cardBad: string } }) {
+  const [f, setF] = useState<Record<string, string> | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const url = sess ? `/api/voice/session/${encodeURIComponent(sess.id)}/request` : '';
+  useEffect(() => {
+    if (!sess) return;
+    fetch(url, { headers: { 'x-voice-secret': sess.secret } }).then((r) => (r.ok ? r.json() : null)).then((j) => j && setF(j)).catch(() => {});
+  }, [url, sess]);
+  if (!f || !sess) return null;
+  const inp: React.CSSProperties = { width: '100%', padding: '8px 10px', borderRadius: 'var(--r-input)', border: '1px solid var(--lq-line-strong)', background: 'var(--c-abyss)', color: 'var(--lq-white)', fontSize: 13, fontFamily: 'inherit' };
+  const rows: [string, string][] = [['name', ui.cardName], ['email', ui.cardEmail], ['phone', ui.cardPhone], ['business', ui.cardBiz], ['city', ui.cardCity]];
+  const save = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-voice-secret': sess.secret }, body: JSON.stringify(f) });
+      setMsg(r.ok ? { ok: true, t: ui.cardOk } : { ok: false, t: ui.cardBad });
+    } catch { setMsg({ ok: false, t: ui.cardBad }); }
+    setBusy(false);
+  };
+  return (
+    <div lang={lang} style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid var(--lq-line-strong)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <strong style={{ fontSize: 13.5, color: 'var(--lq-white)' }}>{ui.cardTitle}</strong>
+      {rows.map(([k, label]) => (
+        <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, color: 'var(--lq-mist)' }}>{label}
+          <input value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value })} style={inp} maxLength={k === 'email' ? 254 : 100} />
+        </label>
+      ))}
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, color: 'var(--lq-mist)' }}>{ui.cardNeed}
+        <textarea value={f.message ?? ''} onChange={(e) => setF({ ...f, message: e.target.value })} rows={3} maxLength={2000} style={inp} />
+      </label>
+      <button onClick={() => void save()} disabled={busy} style={{ padding: '9px 12px', borderRadius: 'var(--r-pill)', border: '1px solid var(--c-lilac)', background: 'color-mix(in srgb, var(--c-lilac) 14%, var(--c-abyss))', color: 'var(--lq-white)', fontSize: 12, cursor: 'pointer' }}>{ui.cardSave}</button>
+      {msg && <span role="status" style={{ fontSize: 12, color: msg.ok ? 'var(--lq-white)' : 'var(--lq-mist)' }}>{msg.t}</span>}
+    </div>
+  );
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -71,6 +108,7 @@ interface ApiResponse {
   fallback?: boolean;
   backupOffer?: boolean;
   end?: boolean;
+  requestCard?: boolean;
   blocked?: boolean;
   permanent?: boolean;
   until?: number | null;
@@ -79,6 +117,16 @@ interface ApiResponse {
 // ── UI strings (4 languages) ───────────────────────────────────────────────
 const UI = {
   en: {
+    cardTitle: "Your request details",
+    cardName: "Name",
+    cardEmail: "E-mail",
+    cardPhone: "Phone",
+    cardBiz: "Business name",
+    cardCity: "City",
+    cardNeed: "Need / notes",
+    cardSave: "Save",
+    cardOk: "Your details have been updated.",
+    cardBad: "Please enter a valid e-mail and phone number.",
     btnLabel: 'Chat with AI',
     placeholder: 'Type a message…',
     title: "Chioutworks",
@@ -121,6 +169,16 @@ const UI = {
     send: 'Send',
   },
   de: {
+    cardTitle: "Ihre Anfragedaten",
+    cardName: "Name",
+    cardEmail: "E-Mail",
+    cardPhone: "Telefon",
+    cardBiz: "Firmenname",
+    cardCity: "Stadt",
+    cardNeed: "Anliegen / Notizen",
+    cardSave: "Speichern",
+    cardOk: "Ihre Angaben wurden aktualisiert.",
+    cardBad: "Bitte geben Sie eine gültige E-Mail und Telefonnummer an.",
     btnLabel: 'KI-Gespräch',
     placeholder: 'Nachricht eingeben…',
     title: "Chioutworks",
@@ -163,6 +221,16 @@ const UI = {
     send: 'Senden',
   },
   tr: {
+    cardTitle: "Talep bilgileriniz",
+    cardName: "Ad soyad",
+    cardEmail: "E-posta",
+    cardPhone: "Telefon",
+    cardBiz: "İşletme adı",
+    cardCity: "Şehir",
+    cardNeed: "İhtiyaç / notlar",
+    cardSave: "Kaydet",
+    cardOk: "Bilgileriniz güncellendi.",
+    cardBad: "Lütfen geçerli bir e-posta ve telefon girin.",
     btnLabel: 'YZ ile Sohbet',
     placeholder: 'Mesaj yazın…',
     title: "Chioutworks",
@@ -205,6 +273,16 @@ const UI = {
     send: 'Gönder',
   },
   el: {
+    cardTitle: "Τα στοιχεία του αιτήματός σας",
+    cardName: "Όνομα",
+    cardEmail: "E-mail",
+    cardPhone: "Τηλέφωνο",
+    cardBiz: "Επωνυμία επιχείρησης",
+    cardCity: "Πόλη",
+    cardNeed: "Ανάγκη / σημειώσεις",
+    cardSave: "Αποθήκευση",
+    cardOk: "Τα στοιχεία σας ενημερώθηκαν.",
+    cardBad: "Εισάγετε έγκυρο e-mail και τηλέφωνο.",
     btnLabel: 'Συνομιλία με ΤΝ',
     placeholder: 'Γράψτε μήνυμα…',
     title: "Chioutworks",
@@ -287,6 +365,7 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
   const [micGranted, setMicGranted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [appointmentDone, setAppointmentDone] = useState(false);
+  const [card, setCard] = useState(false);   // chat ended with a saved request: show the editable request card
   const [ended, setEnded] = useState(false);   // server ended the chat (goodbye / block): input stays off
   const [, setPause] = useState<{ permanent: boolean; until: number | null } | null>(null);   // server-side pause/close (never persisted)
   const locked = appointmentDone || ended;
@@ -400,16 +479,39 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
     setIsSpeaking(false);
   };
 
+  // ── Session (server-side transcript, same store as the voice dialog; kind 'text') ──
+  msgsRef.current = messages;
+  const saveSession = useCallback((): Promise<{ id: string; secret: string } | null> => {
+    if (deletedRef.current) return Promise.resolve(null);
+    const turns = msgsRef.current.map((m) => ({ role: m.role, text: m.content, at: m.at ?? Date.now() })).slice(0, 30);
+    if (!turns.some((x) => x.role === 'user')) return Promise.resolve(sessRef.current);
+    chainRef.current = chainRef.current.then(async () => {
+      try {
+        const r = await fetch('/api/voice/session', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lang, turns, startedAt: startedRef.current, endedAt: Date.now(), consent: true, kind: 'text', ...(sessRef.current ?? {}) }),
+        });
+        if (!r.ok || deletedRef.current) return null;
+        const j = await r.json() as { id: string; secret: string };
+        sessRef.current = j;
+        writeVoiceSession(j.id, j.secret);
+        return j;
+      } catch { return null; }
+    });
+    return chainRef.current as Promise<{ id: string; secret: string } | null>;
+  }, [lang]);
+
   // ── Fetch reply from server ────────────────────────────────────────────
   const fetchReply = useCallback(
     async (msgs: ChatMessage[]) => {
       setLoading(true);
       setError(null);
       try {
+        const sess = devDemo ? null : await saveSession();   // the server links a saved request to this chat session
         const res = await fetch('/api/assistant/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: msgs, language: lang, bid: getBid(), backup: backupRef.current }),
+          body: JSON.stringify({ messages: msgs, language: lang, bid: getBid(), backup: backupRef.current, hour: new Date().getHours(), ...(sess ? { sess: { id: sess.id, secret: sess.secret } } : {}) }),
         });
 
         const data: ApiResponse = await res.json().catch(() => ({}));
@@ -478,13 +580,14 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
           speak(data.message);
         }
         if (data.end) setEnded(true);
+        if (data.requestCard) setCard(true);
       } catch {
         setError(ui.errorFallback);
       } finally {
         setLoading(false);
       }
     },
-    [lang, ui.errorFallback, speak, vt.chatBlocked]
+    [lang, ui.errorFallback, speak, vt.chatBlocked, saveSession]
   );
 
   // ── Send message ───────────────────────────────────────────────────────
@@ -566,27 +669,6 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
 
   // ── TTS toggle ─────────────────────────────────────────────────────────
 
-  // ── Session (server-side transcript, same store as the voice dialog; kind 'text') ──
-  msgsRef.current = messages;
-  const saveSession = useCallback((): Promise<{ id: string; secret: string } | null> => {
-    if (deletedRef.current) return Promise.resolve(null);
-    const turns = msgsRef.current.map((m) => ({ role: m.role, text: m.content, at: m.at ?? Date.now() })).slice(0, 30);
-    if (!turns.some((x) => x.role === 'user')) return Promise.resolve(sessRef.current);
-    chainRef.current = chainRef.current.then(async () => {
-      try {
-        const r = await fetch('/api/voice/session', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lang, turns, startedAt: startedRef.current, endedAt: Date.now(), consent: true, kind: 'text', ...(sessRef.current ?? {}) }),
-        });
-        if (!r.ok || deletedRef.current) return null;
-        const j = await r.json() as { id: string; secret: string };
-        sessRef.current = j;
-        writeVoiceSession(j.id, j.secret);
-        return j;
-      } catch { return null; }
-    });
-    return chainRef.current as Promise<{ id: string; secret: string } | null>;
-  }, [lang]);
 
   useEffect(() => {
     if (!consented || messages.length === 0 || devDemo) return;
@@ -605,7 +687,7 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
 
   const closePanel = () => { void saveSession(); setOpen(false); };
   // New chat: keep the stored transcript, start a fresh conversation in the panel
-  const newChat = () => { void saveSession(); sessRef.current = null; forgetChat(); backupRef.current = false; setBackupAsk(null); setMessages([]); setError(null); setEnded(false); setPause(null); setConfirmDel(false); setTab('chat'); startedRef.current = Date.now(); if (!devDemo) void checkStatus(); };
+  const newChat = () => { void saveSession(); sessRef.current = null; forgetChat(); backupRef.current = false; setBackupAsk(null); setMessages([]); setError(null); setEnded(false); setCard(false); setPause(null); setConfirmDel(false); setTab('chat'); startedRef.current = Date.now(); if (!devDemo) void checkStatus(); };
   const toVoice = () => { void saveSession(); setOpen(false); window.dispatchEvent(new CustomEvent('cw:open-voice')); };
 
   const deleteChat = async () => {
@@ -895,6 +977,8 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
                   {error}
                 </div>
               )}
+
+              {card && <RequestCard lang={lang} sess={sessRef.current} ui={ui} />}
 
               {ended && (
                 <div role="status" style={{ padding: '10px 14px', borderRadius: 12, border: '1px solid var(--lq-line-strong)', color: 'var(--lq-mist)', fontSize: 12.5, lineHeight: 1.5, display: 'flex', flexDirection: 'column', gap: 8 }}>

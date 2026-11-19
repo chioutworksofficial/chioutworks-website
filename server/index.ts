@@ -727,23 +727,29 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
       const vs = await getVoice(voiceLink.id) as VoiceSession | null;
       if (vs) { vs.contactSubmitted = true; vs.contactId = rec.id; vs.contact = { name: rec.name, email: rec.email, phone: rec.phone, message: rec.message }; await saveVoice(vs); }
     }
-    const notify = process.env.QUOTE_NOTIFY_EMAIL;
-    if (process.env.RESEND_API_KEY && process.env.DEMO_EMAIL_FROM && notify) {
-      const body = [`New contact (${rec.lang})`, `Name: ${rec.name}`, `Email: ${rec.email || '-'}`, `Phone: ${rec.phone || '-'}`, ...(rec.business ? [`Business: ${rec.business}`] : []), ...(rec.city ? [`City: ${rec.city}`] : []), `Reply: ${rec.replyPreference}`, `Start: ${rec.preferredStart || '-'}`, `Call time: ${rec.callTime || '-'}`, '', rec.message || '(no message)'].join('\n');
-      fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: process.env.DEMO_EMAIL_FROM, to: [notify], ...(rec.email ? { reply_to: rec.email } : {}), subject: `Contact: ${rec.name}`, text: body }),
-      }).catch((e) => console.error('[contact] notify failed', e));
-    } else {
-      console.log('[contact] new message received');   // no personal data in logs
-    }
+    notifyOwnerOfRequest(rec, 'Contact');
     return res.json({ ok: true });
   } catch (err) {
     console.error('[contact] failed', err);
     return res.status(500).json({ ok: false, error: 'server' });
   }
 });
+
+/** Owner e-mail per new request (form, voice card, text chat). Only when the e-mail service is configured;
+ *  never logs personal data. (owner 2026-11-19: chat requests must notify like form requests) */
+function notifyOwnerOfRequest(rec: any, label: string) {
+  const notify = process.env.QUOTE_NOTIFY_EMAIL;
+  if (process.env.RESEND_API_KEY && process.env.DEMO_EMAIL_FROM && notify) {
+    const body = [`New contact (${rec.lang})`, `Name: ${rec.name}`, `Email: ${rec.email || '-'}`, `Phone: ${rec.phone || '-'}`, ...(rec.business ? [`Business: ${rec.business}`] : []), ...(rec.city ? [`City: ${rec.city}`] : []), `Reply: ${rec.replyPreference}`, `Start: ${rec.preferredStart || '-'}`, `Call time: ${rec.callTime || '-'}`, '', rec.message || '(no message)'].join('\n');
+    fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: process.env.DEMO_EMAIL_FROM, to: [notify], ...(rec.email ? { reply_to: rec.email } : {}), subject: `${label}: ${rec.name}`, text: body }),
+    }).catch((e) => console.error('[contact] notify failed', e));
+  } else {
+    console.log('[contact] new message received');   // no personal data in logs
+  }
+}
 
 // Owner adds a person by hand (details given by phone, in person, etc.); then creates an intake link from it as usual
 app.post('/api/admin/quote-requests', async (req, res) => {
@@ -905,6 +911,7 @@ interface VoiceSession {
   consentAt?: string;
   consentVersion?: string;
   kind?: 'voice' | 'text';
+  closeAsked?: boolean;   // text chat: request saved and the closing question was asked
   deleted?: boolean;
   contact?: { name: string; email: string; phone: string; message: string };
   firstName?: string;
@@ -980,6 +987,32 @@ app.post('/api/voice/session', sessionLimiter, async (req, res) => {
     console.error('[voice] save failed', err);
     return res.status(500).json({ error: 'server' });
   }
+});
+
+// Request card of a text chat: the visitor reads/corrects ONLY the request linked to their own session (id + secret).
+const cardRequest = async (req: express.Request) => {
+  const s = await getVoice(String(req.params.id));
+  if (!s || s.deleted || s.kind !== 'text' || !s.contactId || !safeEq(s.secret, req.header('x-voice-secret'))) return null;
+  const r = await getRequest(s.contactId) as any;
+  return r && r.voiceSessionId === s.id ? { s, r } : null;
+};
+const cardOut = (r: any) => ({ name: r.name ?? '', email: r.email ?? '', phone: r.phone ?? '', business: r.business ?? '', city: r.city ?? '', message: r.message ?? '' });
+app.get('/api/voice/session/:id/request', sessionLimiter, async (req, res) => {
+  const c = await cardRequest(req);
+  return c ? res.json(cardOut(c.r)) : res.status(404).json({ error: 'not_found' });
+});
+app.patch('/api/voice/session/:id/request', sessionLimiter, async (req, res) => {
+  const c = await cardRequest(req);
+  if (!c) return res.status(404).json({ error: 'not_found' });
+  const str = (v: unknown, n: number) => String(v ?? '').replace(/[<>\u0000-\u001f]/g, ' ').trim().slice(0, n);
+  const name = str(req.body?.name, 80), email = str(req.body?.email, 254).toLowerCase(), phone = str(req.body?.phone, 40);
+  if (!name || !EMAIL_RE.test(email) || phone.replace(/\D/g, '').length < 7) return res.status(400).json({ error: 'invalid' });
+  Object.assign(c.r, { name, email, phone, business: str(req.body?.business, 100), city: str(req.body?.city, 80), message: str(req.body?.message, 2000), updatedByVisitorAt: new Date().toISOString() });
+  try {
+    await saveRequest(c.r);
+    c.s.contact = { name, email, phone, message: c.r.message }; await saveVoice(c.s);
+    return res.json(cardOut(c.r));
+  } catch (err) { console.error('[voice] card update failed'); return res.status(500).json({ error: 'server' }); }
 });
 
 // Read-only transcript for the visitor: only with the matching secret (404 unknown id, 403 wrong secret).
@@ -1326,6 +1359,23 @@ const words = (t: string) => new Set(t.toLowerCase().normalize('NFC').replace(/[
 const nearSame = (a: string, b: string) => { const A = words(a), B = words(b); if (A.size < 4 || B.size < 4) return false; let n = 0; for (const w of A) if (B.has(w)) n++; return n / (A.size + B.size - n) >= 0.7; };
 const leaksInternals = (t: string) => LEAK_RE.test(t) || /\bgoogle\S*\s+(?:\S+\s+)?(?:model|yapay\s+zek|ai\b|ki\b|ki-|τεχνητ)/i.test(t);
 
+
+// ── Text chat: save the request, ask the closing question, farewell by local hour (owner, 2026-11-19) ──
+const CHAT_SAVED: Record<string, string> = {
+  tr: 'Talebiniz alındı. Eklemek istediğiniz bir şey var mı? Yoksa sohbeti burada sonlandırıp sizi talep bilgilerinize yönlendireyim; değiştirmek ya da düzeltmek istediğiniz bir şey olursa oradan yapabilirsiniz.',
+  en: 'Your request has been received. Is there anything you would like to add? Otherwise I will end the chat here and take you to your request details; if you want to change or correct anything, you can do it there.',
+  de: 'Ihre Anfrage ist eingegangen. Möchten Sie noch etwas ergänzen? Sonst beende ich den Chat hier und leite Sie zu Ihren Anfragedaten weiter; falls Sie etwas ändern oder korrigieren möchten, können Sie das dort tun.',
+  el: 'Το αίτημά σας ελήφθη. Θέλετε να προσθέσετε κάτι; Αλλιώς θα ολοκληρώσω εδώ τη συνομιλία και θα σας μεταφέρω στα στοιχεία του αιτήματός σας· αν θέλετε να αλλάξετε ή να διορθώσετε κάτι, μπορείτε να το κάνετε εκεί.',
+};
+const CHAT_MORE: Record<string, string> = { tr: 'Eklemek istediğiniz başka bir şey var mı?', en: 'Is there anything else you would like to add?', de: 'Möchten Sie sonst noch etwas ergänzen?', el: 'Θέλετε να προσθέσετε κάτι άλλο;' };
+const CHAT_ACK: Record<string, string> = { tr: 'Teşekkürler, notunuzu talebinize ekledim.', en: 'Thank you, I added that to your request.', de: 'Danke, ich habe das Ihrer Anfrage hinzugefügt.', el: 'Ευχαριστώ, το πρόσθεσα στο αίτημά σας.' };
+const CHAT_BYE: Record<string, [string, string, string]> = {
+  tr: ['İyi günler!', 'İyi akşamlar!', 'İyi geceler!'], en: ['Have a nice day!', 'Have a nice evening!', 'Good night!'],
+  de: ['Einen schönen Tag noch!', 'Einen schönen Abend noch!', 'Gute Nacht!'], el: ['Καλή σας μέρα!', 'Καλό σας βράδυ!', 'Καληνύχτα!'],
+};
+const farewell = (lang: string, hour: unknown) => { const h = Number.isInteger(hour) ? Number(hour) : 12; const b = CHAT_BYE[lang] ?? CHAT_BYE.en; return h >= 5 && h <= 16 ? b[0] : h >= 17 && h <= 21 ? b[1] : b[2]; };
+const NO_MORE_RE = /^\s*(hayır|hayir|yok|yok teşekkürler|teşekkürler|teşekkür ederim|sağ ol|tamam|bu kadar|no|nope|nothing|no thanks|thanks|thank you|that'?s all|nein|nichts|danke|nein danke|das war's|όχι|οχι|τίποτα|ευχαριστώ|ευχαριστω|αυτά|αυτα)[\s.!]*$/i;
+
 app.post('/api/assistant/chat', async (req, res) => {
   // Validate body
   const { messages, language } = req.body as {
@@ -1447,6 +1497,45 @@ app.post('/api/assistant/chat', async (req, res) => {
       return raw.replace(/\[\[OFF\]\]/g, '').trim();
     };
     let offFlag = false;
+    // Saved-request state of this chat: session id + secret (capability) sent by the client
+    const sIn = (req.body?.sess ?? {}) as { id?: unknown; secret?: unknown };
+    let chatSess: VoiceSession | null = null;
+    if (typeof sIn.id === 'string' && sIn.id.length <= 64) { const v = await getVoice(sIn.id); if (v && !v.deleted && v.kind === 'text' && safeEq(v.secret, sIn.secret)) chatSess = v; }
+    if (chatSess?.contactId) {
+      const rec = await getRequest(chatSess.contactId) as any;
+      if (rec && chatSess.closeAsked && rec.voiceSessionId === chatSess.id) {
+        let done: boolean | null = null;
+        try { const v = (await ask('Strict classification. Reply with exactly one word. DONE if the visitor\'s last message declines, has nothing to add, thanks, or says goodbye. ADD if it contains any new information, correction, question or request.')).trim().toUpperCase(); done = v.startsWith('DONE') ? true : v.startsWith('ADD') ? false : null; } catch { /* keyword fallback */ }
+        if (done === null) done = NO_MORE_RE.test(lastUser);
+        if (done) return res.json({ message: farewell(lang, req.body?.hour), action: null, end: true, requestCard: true });
+        rec.message = `${rec.message || ''}\n${lastUser}`.trim().slice(0, 2000);
+        await saveRequest(rec);
+        groqMsgs.push({ role: 'system' as const, content: 'The visitor\'s request is already saved and what they just wrote was added to it. Reply with ONE short sentence that acknowledges it. No question, no request for contact details.' });
+        let m = shapeReply(await ask(), lang);
+        if (!m || !languageOk(m, lang) || pluralOrInvented(m, lang) || leaksInternals(m)) m = CHAT_ACK[lang] ?? CHAT_ACK.en;
+        return res.json({ message: `${m} ${CHAT_MORE[lang] ?? CHAT_MORE.en}`, action: null });
+      }
+    } else if (chatSess) {
+      // Contact details complete (valid e-mail + phone of 7+ digits + a name) -> save the request once
+      const ut = sanitized.filter((m) => m.role === 'user').map((m) => m.content).join('\n');
+      const em = ut.match(/[^\s@,;<>()]+@[^\s@,;<>()]+\.[^\s@,;<>()]{2,}/)?.[0]?.toLowerCase();
+      const ph = em ? ut.replace(/[^\s@,;<>()]+@[^\s@,;<>()]+/g, ' ').match(/\+?\d[\d\s().-]{5,}\d/g)?.map((x) => x.trim()).find((x) => x.replace(/\D/g, '').length >= 7) : undefined;
+      if (em && ph && EMAIL_RE.test(em)) {
+        let ex: any = {};
+        try { ex = JSON.parse((await ask('Return ONLY compact JSON {"name":"","business":"","city":"","need":""} extracted from the visitor\'s messages (need = what they want, one short sentence in their language). Use an empty string for anything not stated. No other text.')).match(/\{[\s\S]*\}/)?.[0] ?? '{}'); } catch { /* no extraction */ }
+        const str = (v: unknown, n: number) => String(v ?? '').replace(/[<>\u0000-\u001f]/g, ' ').trim().slice(0, n);
+        const name = str(ex.name, 80) || `${chatSess.firstName ?? ''} ${chatSess.lastName ?? ''}`.trim();
+        if (name) {
+          const rec = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), kind: 'contact', source: 'chat' as RequestSource, name, business: str(ex.business, 100), city: str(ex.city, 80), address: '', phone: ph.slice(0, 40), email: em.slice(0, 254), message: str(ex.need, 1000) || ut.slice(0, 1000), replyPreference: 'written', lang, page: 'assistant', voiceSessionId: chatSess.id };
+          await saveRequest(rec);
+          chatSess.contactSubmitted = true; chatSess.contactId = rec.id; chatSess.closeAsked = true; chatSess.contact = { name: rec.name, email: rec.email, phone: rec.phone, message: rec.message };
+          await saveVoice(chatSess);
+          notifyOwnerOfRequest(rec, 'Chat');
+          console.log('[assistant/chat] request saved');   // no personal data in logs
+          return res.json({ message: CHAT_SAVED[lang] ?? CHAT_SAVED.en, action: null });
+        }
+      }
+    }
     let message = await ask();
     if (!languageOk(message, lang)) {
       guardRejects++; console.warn(`[language-guard] rejected reply (total ${guardRejects})`);
