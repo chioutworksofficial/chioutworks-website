@@ -705,6 +705,8 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
     kind: 'contact',
     source,
     name,
+    business: str(req.body?.business, 100),
+    city: str(req.body?.city, 80),
     address: str(req.body?.address, 200),
     phone,
     email,
@@ -726,7 +728,7 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
     }
     const notify = process.env.QUOTE_NOTIFY_EMAIL;
     if (process.env.RESEND_API_KEY && process.env.DEMO_EMAIL_FROM && notify) {
-      const body = [`New contact (${rec.lang})`, `Name: ${rec.name}`, `Email: ${rec.email || '-'}`, `Phone: ${rec.phone || '-'}`, `Reply: ${rec.replyPreference}`, `Start: ${rec.preferredStart || '-'}`, `Call time: ${rec.callTime || '-'}`, '', rec.message || '(no message)'].join('\n');
+      const body = [`New contact (${rec.lang})`, `Name: ${rec.name}`, `Email: ${rec.email || '-'}`, `Phone: ${rec.phone || '-'}`, ...(rec.business ? [`Business: ${rec.business}`] : []), ...(rec.city ? [`City: ${rec.city}`] : []), `Reply: ${rec.replyPreference}`, `Start: ${rec.preferredStart || '-'}`, `Call time: ${rec.callTime || '-'}`, '', rec.message || '(no message)'].join('\n');
       fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
@@ -1187,7 +1189,7 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
   if (slot.ok === false) return res.status(503).json({ error: 'full', ticket: slot.ticket, position: slot.position, retryAfter: 5 });
   if (!resumed && !mintAllowed([`ip:${req.ip ?? 'anon'}`, ...(typeof b.bid === 'string' && b.bid ? [`bid:${b.bid.slice(0, 64)}`] : [])])) { pool.release(slot.id); return res.status(429).json({ error: 'rate_limited' }); }
   const vin = b.visitor ?? {};
-  const visitor = { firstName: personName(vin.firstName), salutation: (vin.salutation === 'm' || vin.salutation === 'f' ? vin.salutation : 'none') as 'm' | 'f' | 'none', hasLastName: Boolean(personName(vin.lastName)) };
+  const visitor = { firstName: personName(vin.firstName), salutation: (vin.salutation === 'm' || vin.salutation === 'f' ? vin.salutation : 'none') as 'm' | 'f' | 'none', hasLastName: Boolean(personName(vin.lastName)), hour: Number.isInteger(vin.hour) && vin.hour >= 0 && vin.hour <= 23 ? (vin.hour as number) : undefined };
   try {
     const instruction = buildLiveInstruction(lang, loadKnowledge(), loadPersona(), visitor, resumed ? cleanTurns(b.transcript) : []);
     const t = await mintToken(lang, instruction);
@@ -1210,7 +1212,7 @@ app.post('/api/voice/live-end', liveLimiter, async (req, res) => {
 });
 
 // Extract request fields from the transcript (Gemini text with a strict schema; Groq as fallback; regex as last resort), then validate.
-const EXTRACT_PROMPT = 'Extract the visitor\'s request details from this conversation between a website voice assistant and a visitor. Return ONLY JSON with keys: service (what they are interested in, max 120 chars), firstName, lastName, phone, email, notes (1-3 short sentences summarising the need, in the conversation language). Use "" for anything not clearly stated by the VISITOR. Never invent data. Names stay exactly as spoken, e-mail addresses may be spoken as "at"/"dot" - normalise them.';
+const EXTRACT_PROMPT = 'Extract the visitor\'s request details from this conversation between a website voice assistant and a visitor. Return ONLY JSON with keys: service (what they are interested in, max 120 chars), business (business or company name as the visitor confirmed it, original spelling), city (city and country as said, e.g. "Frankfurt, Deutschland"), firstName, lastName, phone, email, notes (1-3 short sentences summarising the need, in the conversation language). Use "" for anything not clearly stated by the VISITOR. Never invent data. Names stay exactly as spoken, e-mail addresses may be spoken as "at"/"dot" - normalise them.';
 const PHONE_RE = /(\+?\d[\d\s().-]{6,}\d)/;
 const MAIL_RE = /[^\s@]+@[^\s@]+\.[^\s@]{2,}/;
 function validateExtract(o: any) {
@@ -1218,7 +1220,7 @@ function validateExtract(o: any) {
   const email = s(o?.email, 254).toLowerCase().replace(/\s/g, '');
   const phone = s(o?.phone, 40).replace(/[^\d+\s()-]/g, '').trim();
   return {
-    service: s(o?.service, 120), firstName: personName(o?.firstName), lastName: personName(o?.lastName),
+    service: s(o?.service, 120), business: s(o?.business, 100), city: s(o?.city, 80), firstName: personName(o?.firstName), lastName: personName(o?.lastName),
     phone: (phone.match(/\d/g) ?? []).length >= 6 ? phone : '', email: EMAIL_RE.test(email) ? email : '', notes: s(o?.notes, 600),
   };
 }
@@ -1227,19 +1229,24 @@ app.post('/api/voice/extract', extractLimiter, async (req, res) => {
   if (req.body?.consent !== true || req.body?.consentVersion !== VOICE_CONSENT_VERSION) return res.status(400).json({ error: 'consent_required' });
   const turns = cleanTurns(req.body?.transcript);
   if (!turns.some((t) => t.role === 'user')) return res.status(400).json({ error: 'empty' });
-  const convo = turns.map((t) => `${t.role === 'user' ? 'Visitor' : 'Assistant'}: ${t.text}`).join('\n');
+  const convo = turns.map((t) => `${t.role === 'user' ? 'Visitor' : 'Assistant'}: ${t.text}
+Language: write every field in the visitor's language. Speech recognition sometimes writes a similar-sounding word from another language (e.g. "coiffure"/"coiffeur" in a Turkish call means "kuaför"; in German "Friseur"; in Greek "κομμωτήριο"). Always use the correct word of the visitor's language for business types and services; keep proper names (business names) exactly as the visitor confirmed them.`).join('\n');
   let raw: any = null;
   try {
-    if (process.env.GEMINI_API_KEY) {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_TEXT_MODEL || 'gemini-3.8-flash'}:generateContent`, {
-        method: 'POST', headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(20000),
+    // Model chain (owner 2026-11-19): the light model answers in < 1 s while the larger free-tier models are often
+    // overloaded (503) or time out; extraction is a small job. Try each until one returns JSON.
+    const chain = [...new Set([process.env.GEMINI_TEXT_MODEL, 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.8-flash'].filter(Boolean))] as string[];
+    for (const model of process.env.GEMINI_API_KEY ? chain : []) {
+      if (raw) break;
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST', headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY!, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(12000),
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: EXTRACT_PROMPT }] },
           contents: [{ role: 'user', parts: [{ text: convo }] }],
-          generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: { type: 'OBJECT', properties: Object.fromEntries(['service', 'firstName', 'lastName', 'phone', 'email', 'notes'].map((k) => [k, { type: 'STRING' }])), required: ['service', 'firstName', 'lastName', 'phone', 'email', 'notes'] } },
+          generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: { type: 'OBJECT', properties: Object.fromEntries(['service', 'business', 'city', 'firstName', 'lastName', 'phone', 'email', 'notes'].map((k) => [k, { type: 'STRING' }])), required: ['service', 'business', 'city', 'firstName', 'lastName', 'phone', 'email', 'notes'] } },
         }),
-      });
-      if (r.ok) raw = JSON.parse(((await r.json()) as any).candidates?.[0]?.content?.parts?.[0]?.text ?? 'null');
+      }).catch(() => null);
+      if (r?.ok) { try { raw = JSON.parse(((await r.json()) as any).candidates?.[0]?.content?.parts?.[0]?.text ?? 'null'); } catch { raw = null; } }
     }
   } catch { raw = null; }
   if (!raw && getGroq() && req.body?.groqOk === true) {   // backup provider only with the optional consent

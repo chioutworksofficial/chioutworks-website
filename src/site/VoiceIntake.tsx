@@ -34,7 +34,7 @@ function ackName(lang: Lang, v: Visitor): string {
 
 interface Turn { role: 'user' | 'assistant'; text: string; at: number }
 type Phase = 'consent' | 'preparing' | 'queue' | 'blocked' | 'live' | 'card' | 'idle' | 'listening' | 'thinking' | 'speaking';
-interface Card { service: string; firstName: string; lastName: string; phone: string; email: string; notes: string }
+interface Card { service: string; business: string; city: string; firstName: string; lastName: string; phone: string; email: string; notes: string }
 const LIVE_SECONDS = 120;
 const LANG_EN: Record<string, string> = { tr: 'Turkish', de: 'German', el: 'Greek', en: 'English' };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -393,7 +393,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     } catch { /* an empty card is still editable */ }
     if (sid !== sessionRef.current) return;
     const v = visitorRef.current;
-    const merged: Card = { service: f.service ?? '', firstName: v.firstName || f.firstName || '', lastName: v.lastName || f.lastName || '', phone: f.phone ?? '', email: f.email ?? '', notes: f.notes ?? '' };
+    const merged: Card = { service: f.service ?? '', business: f.business ?? '', city: f.city ?? '', firstName: v.firstName || f.firstName || '', lastName: v.lastName || f.lastName || '', phone: f.phone ?? '', email: f.email ?? '', notes: f.notes ?? '' };
     visitorRef.current = { ...v, firstName: merged.firstName, lastName: merged.lastName };
     void saveSession();
     setCard(merged); setCardBusy(false);
@@ -486,7 +486,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     if (reconnected.current) { await startFallback(t.fallbackNote); return; }
     reconnected.current = true;
     setReconnecting(true);
-    const r = await fetchToken({ lang, consent: true, consentVersion: CONSENT_VERSION, visitor: visitorRef.current, prevSessionId: slotRef.current, transcript: turnsRef.current.map((x) => ({ role: x.role, text: x.text })) });
+    const r = await fetchToken({ lang, consent: true, consentVersion: CONSENT_VERSION, visitor: { ...visitorRef.current, hour: new Date().getHours() }, prevSessionId: slotRef.current, transcript: turnsRef.current.map((x) => ({ role: x.role, text: x.text })) });
     if (sid !== sessionRef.current || endingRef.current) return;
     if (r.kind !== 'ok') { await startFallback(t.fallbackNote); return; }
     slotRef.current = r.t.sessionId;
@@ -528,7 +528,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     // token, with the wait queue when all lines are busy (polling every 5 s)
     let ticket: string | undefined;
     for (;;) {
-      const r = await fetchToken({ lang, consent: true, consentVersion: CONSENT_VERSION, visitor: visitorRef.current, ticket });
+      const r = await fetchToken({ lang, consent: true, consentVersion: CONSENT_VERSION, visitor: { ...visitorRef.current, hour: new Date().getHours() }, ticket });
       if (sid !== sessionRef.current) return;
       if (r.kind === 'ok') {
         slotRef.current = r.t.sessionId; goPhase('preparing'); setPrep(65);
@@ -656,15 +656,17 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     if (!card) return;
     const name = [cleanName(card.firstName), cleanName(card.lastName)].filter(Boolean).join(' ');
     const email = card.email.trim(), phone = card.phone.trim();
-    if (!name || (!email && !phone)) { setCardErr(t.cardNeedContact); return; }
-    if (email && !EMAIL_RE.test(email)) { setCardErr(t.dlBadEmail); return; }
+    if (!name) { setCardErr(t.cardNeedContact); return; }
+    const mailOk = EMAIL_RE.test(email) && /@.+\./.test(email), phoneOk = phone.replace(/\D/g, '').length >= 7;
+    if (!mailOk && !phoneOk) { setCardErr(t.cardNeedEither); return; }
+    if (email && !mailOk) { setCardErr(t.dlBadEmail); return; }
     setCardBusy(true); setCardErr('');
     try {
       const v = voiceId.current ?? await saveSession();
       const message = [card.service, card.notes].filter(Boolean).join('\n').slice(0, 1000);
       const r = await fetch('/api/contact', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, message, replyPreference: 'written', via: 'assistant', lang, page: window.location.pathname, ...(v ? { voiceSessionId: v.id, voiceSecret: v.secret } : {}) }),
+        body: JSON.stringify({ name, email, phone, business: card.business.trim(), city: card.city.trim(), message, replyPreference: 'written', via: 'assistant', lang, page: window.location.pathname, ...(v ? { voiceSessionId: v.id, voiceSecret: v.secret } : {}) }),
       });
       if (!r.ok) throw new Error(String(r.status));
       if (v) setStyleRef({ id: v.id, secret: v.secret }); setCardSent(true);
@@ -759,9 +761,9 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
             <form onSubmit={(e) => { e.preventDefault(); void sendCard(); }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <p role="note" style={{ margin: 0, display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: 'var(--lq-white)', border: '1px solid var(--lq-line-strong)', borderRadius: 'var(--lq-radius-card)' }}><span aria-hidden>✎</span><span>{t.cardReview}</span></p>
               <p style={{ margin: 0, color: 'var(--lq-silver)', fontSize: 13.5, textAlign: 'center' }}>{t.cardHint}</p>
-              {([['service', t.cardService, 'text', 120], ['firstName', t.cardFirst, 'text', 40], ['lastName', t.cardLast, 'text', 40], ['phone', t.cardPhone, 'tel', 40], ['email', t.cardEmail, 'email', 254]] as const).map(([k, label, type, max]) => (
+              {([['service', t.cardService, 'text', 120], ['business', t.cardBusiness, 'text', 100], ['city', t.cardCity, 'text', 80], ['firstName', t.cardFirst, 'text', 40], ['lastName', t.cardLast, 'text', 40], ['phone', t.cardPhone, 'tel', 40], ['email', t.cardEmail, 'email', 254]] as const).map(([k, label, type, max]) => (
                 <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: 'var(--lq-silver)' }}>
-                  {label}
+                  {label}{(k === 'phone' || k === 'email') ? ` ${t.cardOneOf}` : ''}
                   <input type={type} value={card[k]} maxLength={max} onChange={(e) => setCard({ ...card, [k]: e.target.value })}
                     style={{ padding: '10px 14px', borderRadius: 'var(--lq-radius-sm)', border: '1px solid var(--lq-line-strong)', background: 'var(--lq-kelp)', color: 'var(--lq-white)', fontFamily: 'inherit', fontSize: 15 }} />
                 </label>
