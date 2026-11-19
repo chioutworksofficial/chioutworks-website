@@ -10,7 +10,7 @@ import rateLimit from 'express-rate-limit';
 import { readIntakes } from './intake.js';
 import { offerPath } from '../src/lib/routes.js';
 import { contractLangFor } from './contract.js';
-import { dueNow, openProject, readOffers, setupTotal, stripeOn, testInvoiceNo, testPayOn, writeOffers, type Offer } from './offers.js';
+import { dueNow, openProject, getOffer, getOfferByToken, listOffers, saveOffer, setupTotal, stripeOn, testInvoiceNo, testPayOn, type Offer } from './offers.js';
 
 const API = 'https://api.stripe.com/v1';
 const FIRST_MONTHLY_AFTER_DAYS = 61;          // "monthly fee starts two months after the setup payment"
@@ -46,7 +46,7 @@ const clientEmail = async (o: Offer) => {
   const e = typeof i?.answers.meta_email === 'string' ? i.answers.meta_email.trim() : '';
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : undefined;
 };
-const live = (all: Offer[], token: string) => all.find((x) => x.token === token && !x.cancelledAt && x.status === 'accepted');
+const live = async (token: string) => { const o = await getOfferByToken(token); return o && !o.cancelledAt && o.status === 'accepted' ? o : undefined; };
 
 /** Verifies the Stripe-Signature header (HMAC-SHA256 over "t.payload", 5-minute tolerance). */
 function verify(raw: Buffer, header: string | undefined, secret: string): boolean {
@@ -59,7 +59,7 @@ function verify(raw: Buffer, header: string | undefined, secret: string): boolea
   return sigs.some((s) => s.length === expected.length && crypto.timingSafeEqual(Buffer.from(s), Buffer.from(expected)));
 }
 
-interface Deps { requireAdmin: (req: Request, res: Response) => boolean; rateSkip?: () => boolean }
+interface Deps { requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>; rateSkip?: () => boolean }
 
 export function registerBilling(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
@@ -67,7 +67,7 @@ export function registerBilling(app: Express, d: Deps) {
   // 1) Client: first payment (setup fee or deposit) + monthly subscription starting two months later
   app.post('/api/offer/:token/checkout', limiter, async (req, res) => {
     if (!stripeOn()) return res.status(503).json({ error: 'not_configured' });
-    const all = readOffers(); const o = live(all, String(req.params.token));
+    const o = await live(String(req.params.token));
     if (!o || !o.contract) return res.status(404).json({ error: 'not_found' });
     if (o.billing?.firstPaidAt || o.paidAt) return res.status(409).json({ error: 'already_paid' });
     const lang = contractLangFor(o.market, o.lang); const cur = o.currency.toLowerCase();
@@ -100,12 +100,12 @@ export function registerBilling(app: Express, d: Deps) {
   //     Lets the owner see the whole flow (pay → live project page). No money moves; the offer is marked as test-paid.
   app.post('/api/offer/:token/test-pay', limiter, async (req, res) => {
     if (!testPayOn()) return res.status(404).json({ error: 'not_available' });
-    const all = readOffers(); const o = live(all, String(req.params.token));
+    const o = await live(String(req.params.token));
     if (!o || !o.contract || !o.billing?.payRequestedAt) return res.status(404).json({ error: 'not_found' });
     const at = new Date().toISOString(); const b = o.billing;
     if (!b.firstPaidAt) { b.firstPaidAt = at; b.firstAmount = dueNow(o); b.test = true; }
     if (setupTotal(o) - dueNow(o) <= 0) o.paidAt = o.paidAt ?? at;
-    await openProject(o); o.unreadOwner += 1; writeOffers(all);
+    await openProject(o); o.unreadOwner += 1; await saveOffer(o);
     console.log('[billing] TEST payment recorded (no money)');
     return res.json({ ok: true, project: o.projectToken });
   });
@@ -117,8 +117,8 @@ export function registerBilling(app: Express, d: Deps) {
     el: { t: 'Δοκιμαστικό τιμολόγιο', warn: 'ΔΟΚΙΜΗ – δεν είναι έγκυρο τιμολόγιο. Τα πραγματικά τιμολόγια εκδίδονται αυτόματα από το Stripe σε κάθε πληρωμή.', no: 'Αριθμός', date: 'Ημερομηνία', to: 'Παραλήπτης', from: 'Πάροχος', item: 'Υπηρεσία', sum: 'Πληρώθηκε (δοκιμή)', vat: 'Σύμφωνα με την §19 UStG δεν χρεώνεται ΦΠΑ.', print: 'Εκτύπωση / αποθήκευση ως PDF' },
     en: { t: 'Test invoice', warn: 'TEST – not a valid invoice. Real invoices are created automatically by Stripe with every payment.', no: 'Number', date: 'Date', to: 'Bill to', from: 'Supplier', item: 'Service', sum: 'Paid (test)', vat: 'No VAT is charged under § 19 UStG (small business).', print: 'Print / save as PDF' },
   };
-  app.get('/api/offer/:token/test-invoice', limiter, (req, res) => {
-    const o = live(readOffers(), String(req.params.token));
+  app.get('/api/offer/:token/test-invoice', limiter, async (req, res) => {
+    const o = await live(String(req.params.token));
     if (!o || !o.billing?.test || !o.billing.firstPaidAt) return res.status(404).send('not found');
     const t = TINV[contractLangFor(o.market, o.lang)] ?? TINV.en;
     const esc = (s: string) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
@@ -137,7 +137,7 @@ export function registerBilling(app: Express, d: Deps) {
   // 2) Client: Stripe customer portal (payment method, invoices). Cancellation rules (6-month minimum) come with the cancellation flow.
   app.post('/api/offer/:token/portal', limiter, async (req, res) => {
     if (!stripeOn()) return res.status(503).json({ error: 'not_configured' });
-    const o = live(readOffers(), String(req.params.token));
+    const o = await live(String(req.params.token));
     if (!o?.billing?.customerId) return res.status(404).json({ error: 'not_found' });
     try {
       const s = await stripe('/billing_portal/sessions', { customer: o.billing.customerId, return_url: offerUrl(o), locale: LOCALE[contractLangFor(o.market, o.lang)] ?? 'auto' });
@@ -147,9 +147,9 @@ export function registerBilling(app: Express, d: Deps) {
 
   // 3) Admin: payment link for the remaining setup balance (after a deposit)
   app.post('/api/admin/offers/:id/rest-link', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     if (!stripeOn()) return res.status(503).json({ error: 'not_configured' });
-    const all = readOffers(); const o = all.find((x) => x.id === req.params.id);
+    const o = await getOffer(String(req.params.id));
     if (!o || !o.billing?.firstPaidAt) return res.status(409).json({ error: 'first_not_paid' });
     const rest = Math.round((setupTotal(o) - dueNow(o)) * 100) / 100;
     if (rest <= 0 || o.billing.restPaidAt) return res.status(409).json({ error: 'nothing_due' });
@@ -160,7 +160,7 @@ export function registerBilling(app: Express, d: Deps) {
         metadata: { offerId: o.id, kind: 'rest' },
         line_items: [{ quantity: 1, price_data: { currency: o.currency.toLowerCase(), unit_amount: cents(rest), product_data: { name: `${o.title || 'Projekt'} · Rest` } } }],
       });
-      o.billing.restUrl = s.url; o.billing.restAmount = rest; writeOffers(all);
+      o.billing.restUrl = s.url; o.billing.restAmount = rest; await saveOffer(o);
       return res.json({ ok: true, url: s.url });
     } catch (e) { console.error('[billing] rest link failed', (e as Error).message); return res.status(502).json({ error: 'stripe_failed' }); }
   });
@@ -173,8 +173,7 @@ export function registerBilling(app: Express, d: Deps) {
     let ev: any; try { ev = JSON.parse(raw.toString('utf8')); } catch { return res.status(400).json({ error: 'bad_json' }); }
     const obj = ev?.data?.object ?? {};
     const offerId: string | undefined = obj.metadata?.offerId ?? obj.subscription_details?.metadata?.offerId ?? obj.parent?.subscription_details?.metadata?.offerId;
-    const all = readOffers();
-    const o = offerId ? all.find((x) => x.id === offerId) : all.find((x) => x.billing?.customerId && x.billing.customerId === obj.customer);
+    const o = offerId ? await getOffer(offerId) : obj.customer ? (await listOffers()).find((x) => x.billing?.customerId === obj.customer) : undefined;
     if (!o) return res.json({ received: true, matched: false });
     const b = (o.billing ??= {});
     if (b.events?.includes(ev.id)) return res.json({ received: true, duplicate: true });
@@ -198,7 +197,7 @@ export function registerBilling(app: Express, d: Deps) {
         b.subscriptionId = obj.id ?? b.subscriptionId; b.subStatus = ev.type.endsWith('deleted') ? 'canceled' : obj.status; break;
       default: break;
     }
-    writeOffers(all);
+    await saveOffer(o);
     console.log(`[billing] ${ev.type}`);
     return res.json({ received: true });
   });

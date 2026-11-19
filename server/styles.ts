@@ -65,7 +65,7 @@ export function styleSummary(s: StyleRec | null): string {
 }
 
 interface Deps {
-  requireAdmin: (req: Request, res: Response) => boolean; rateSkip?: () => boolean;
+  requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>; rateSkip?: () => boolean;
   /** Proves the visitor owns this request: intake token, or voice session id + secret. Returns the reference + language. */
   /** request id behind a reference (intake → its request), so the admin can show the style on the request */
   requestOf?: (ref: string) => string | null | Promise<string | null>;
@@ -99,7 +99,7 @@ export function registerStyles(app: Express, d: Deps) {
     return res.json({ ok: true });
   });
   app.get('/api/admin/styles', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const done = (await all_()).filter((s) => s.doneAt);
     return res.json({ styles: await Promise.all(done.map(async (s) => ({ ref: s.ref, requestId: (await d.requestOf?.(s.ref)) ?? null, summary: styleSummary(s), at: s.doneAt }))) });
   });

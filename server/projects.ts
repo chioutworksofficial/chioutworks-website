@@ -129,7 +129,7 @@ function sniff(b: Buffer): { type: string; ext: string } | null {
 }
 const safeName = (n: string) => clean(n, 120).replace(/[/\\?%*:|"<>]/g, '_') || 'datei';
 
-interface Deps { requireAdmin: (req: Request, res: Response) => boolean; rateSkip?: () => boolean; getGroq?: () => Groq | null }
+interface Deps { requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>; rateSkip?: () => boolean; getGroq?: () => Groq | null }
 
 export function registerProjects(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
@@ -297,9 +297,9 @@ export function registerProjects(app: Express, d: Deps) {
   });
 
   // ── Admin ──
-  app.get('/api/admin/projects', async (req, res) => { if (!d.requireAdmin(req, res)) return; return res.json({ projects: (await listProjects()).map(brief).reverse() }); });
+  app.get('/api/admin/projects', async (req, res) => { if (!(await d.requireAdmin(req, res))) return; return res.json({ projects: (await listProjects()).map(brief).reverse() }); });
   app.get('/api/admin/projects/:id', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
     if (p.unreadOwner) { p.unreadOwner = 0; await saveProject(p); }
     // The owner reads what the client wrote in Turkish as well
@@ -311,7 +311,7 @@ export function registerProjects(app: Express, d: Deps) {
       requests: out.requests.map((r) => ({ ...r, textTr: tr[k++] })) } });
   });
   app.patch('/api/admin/projects/:id', express.json({ limit: '32kb' }), async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
     const b = req.body ?? {}; const now = new Date().toISOString();
     if (typeof b.previewUrl === 'string') { const u = clean(b.previewUrl, 400); p.previewUrl = /^https?:\/\//.test(u) || !u ? u : ''; }
@@ -332,7 +332,7 @@ export function registerProjects(app: Express, d: Deps) {
   });
   // Owner writes in Turkish → the client's language (texts of one step: note + items). Not saved here; the admin saves.
   app.post('/api/admin/projects/:id/translate', express.json({ limit: '32kb' }), async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const groq = d.getGroq?.(); if (!groq) return res.status(503).json({ error: 'ai_unavailable' });
     const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
     const texts: string[] = (Array.isArray(req.body?.texts) ? req.body.texts : []).slice(0, 41).map((t: unknown) => clean(t, 600));
@@ -348,14 +348,14 @@ export function registerProjects(app: Express, d: Deps) {
     } catch (e) { console.error('[projects] translate failed', (e as Error).message); return res.status(502).json({ error: 'ai_failed' }); }
   });
   app.post('/api/admin/projects/:id/messages', express.json({ limit: '16kb' }), async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
     const text = clean(req.body?.text, 4000); if (!text) return res.status(400).json({ error: 'empty' });
     p.messages.push({ id: newId(), from: 'owner', text, at: new Date().toISOString() }); p.unreadClient += 1; await saveProject(p);
     return res.json({ ok: true });
   });
   app.post('/api/admin/projects/:id/files', raw, async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
     const r = await saveFile(p, req.body as Buffer, String(req.query.name ?? ''), 'owner');
     if (typeof r === 'string') return res.status(400).json({ error: r });
@@ -365,7 +365,7 @@ export function registerProjects(app: Express, d: Deps) {
   });
   // Owner only: remove a message, a file (with its chat bubble) or a change request. Files are deleted from disk too.
   app.delete('/api/admin/projects/:id/:kind/:itemId', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
     const id = String(req.params.itemId);
     const dropFile = async (fid: string) => {
@@ -382,7 +382,7 @@ export function registerProjects(app: Express, d: Deps) {
     await saveProject(p); return res.json({ ok: true });
   });
   app.get('/api/admin/projects/:id/files/:fileId', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const p = await getProject(req.params.id); if (!p) return res.status(404).end();
     return sendFile(res, p, String(req.params.fileId));
   });

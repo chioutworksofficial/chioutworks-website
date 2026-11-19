@@ -47,7 +47,7 @@ function readFile(): Click[] {
   return out;
 }
 
-interface Deps { requireAdmin: (req: Request, res: Response) => boolean }
+interface Deps { requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean> }
 
 export function registerAffiliates(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false });
@@ -77,7 +77,7 @@ export function registerAffiliates(app: Express, d: Deps) {
   });
 
   app.get('/api/admin/affiliates', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
     const since = Date.now() - days * 864e5;
     const all = await readAll(since).catch((e) => { console.warn(String(e)); return [] as Click[]; });

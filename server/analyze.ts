@@ -5,7 +5,7 @@ import type Groq from 'groq-sdk';
 import { answersForAi, readIntakes, writeIntakes } from './intake.js';
 
 interface Deps {
-  requireAdmin: (req: Request, res: Response) => boolean;
+  requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>;
   getGroq: () => Groq | null;
   readQuotes: () => Promise<any[]>;
   writeQuotes: (all: any[]) => Promise<void>;
@@ -73,7 +73,7 @@ const turnsText = (turns: any[]) => (turns ?? []).slice(-60).map((t) => `${t.rol
 
 export function registerAnalyze(app: Express, d: Deps) {
   app.post('/api/admin/analyze', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const type = String(req.body?.type ?? ''); const id = String(req.body?.id ?? '');
     if (!['intake', 'request', 'session'].includes(type) || !id) return res.status(400).json({ error: 'bad_request' });
     const groq = d.getGroq();

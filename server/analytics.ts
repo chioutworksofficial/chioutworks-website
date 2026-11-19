@@ -70,7 +70,7 @@ async function readDays(n: number): Promise<Ev[]> {
   return out;
 }
 
-interface Deps { requireAdmin: (req: Request, res: Response) => boolean; rateSkip?: () => boolean }
+interface Deps { requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>; rateSkip?: () => boolean }
 
 export function registerAnalytics(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
@@ -102,7 +102,7 @@ export function registerAnalytics(app: Express, d: Deps) {
   });
 
   app.get('/api/admin/analytics', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
     let evs: Ev[]; try { evs = await readDays(days); } catch { return res.status(502).json({ error: 'db' }); }
     const pvs = evs.filter((e) => e.k === 'pv');

@@ -172,7 +172,7 @@ const MAIL: Record<L, { s: string; b: (name: string, url: string) => string }> =
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 interface Deps {
-  requireAdmin: (req: Request, res: Response) => boolean;
+  requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>;
   rateSkip: () => boolean;
   emailFrom: () => { key: string; from: string } | null;
   getGroq?: () => Groq | null;
@@ -303,7 +303,7 @@ export function registerIntake(app: Express, d: Deps) {
   });
 
   app.post('/api/admin/intakes', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const b = req.body ?? {};
     const lang: L = isL(b.lang) ? b.lang : 'tr';
     const second: L | null = isL(b.secondLang) && b.secondLang !== lang ? b.secondLang : null;
@@ -324,19 +324,19 @@ export function registerIntake(app: Express, d: Deps) {
   });
 
   app.get('/api/admin/intakes', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     return res.json({ intakes: (await listIntakes()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(brief) });
   });
 
   app.get('/api/admin/intakes/:id', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const i = await getIntake(String(req.params.id));
     if (!i) return res.status(404).json({ error: 'not_found' });
     return res.json({ intake: brief(i), formatted: formatAnswers(i, 'tr'), markdown: answersMarkdown(i, 'tr'), analysis: i.analysis ?? null, preview: (i as { preview?: { data: unknown } }).preview?.data ?? null });
   });
 
   app.patch('/api/admin/intakes/:id', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const i = await getIntake(String(req.params.id));
     if (!i) return res.status(404).json({ error: 'not_found' });
     if (req.body?.action === 'cancel') i.cancelledAt = new Date().toISOString();
@@ -347,14 +347,14 @@ export function registerIntake(app: Express, d: Deps) {
   });
 
   app.delete('/api/admin/intakes/:id', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     if (!(await deleteIntake(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
     return res.json({ ok: true });
   });
 
   // Never throws, never 5xx for "no verified domain": the admin UI shows a clear message instead.
   app.post('/api/admin/intakes/:id/email', async (req, res) => {
-    if (!d.requireAdmin(req, res)) return;
+    if (!(await d.requireAdmin(req, res))) return;
     const i = await getIntake(String(req.params.id));
     if (!i) return res.status(404).json({ error: 'not_found' });
     const to = clean(req.body?.to, 120);

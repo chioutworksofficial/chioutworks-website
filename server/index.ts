@@ -2,7 +2,7 @@ import { demoText } from '../src/components/demos/demoText';
 import { T as SITE_T } from '../src/translations';
 import { CATALOG_UI } from '../src/components/demos/i18n/catalog';
 import './env.js';
-import { dbOn, dbInsert, dbUpsert, dbSelect, dbDelete, kvGet, kvSet } from './db.js';
+import { dbOn, dbInsert, dbUpsert, dbSelect, dbDelete, dbUpdate, kvGet, kvSet } from './db.js';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -490,20 +490,31 @@ const tokenOk = (given: string) => {
 };
 const sessionIdOf = (req: express.Request) =>
   /(?:^|;\s*)cw_admin_session=([a-f0-9]{64})/.exec(req.headers.cookie ?? '')?.[1];
-const hasSession = (req: express.Request) => {
+const sha = (v: string) => crypto.createHash('sha256').update(v).digest('hex');
+let lastSessionPrune = 0;
+const hasSession = async (req: express.Request) => {
   const id = sessionIdOf(req);
   if (!id) return false;
-  const exp = adminSessions.get(id);
-  if (!exp || exp < Date.now()) { adminSessions.delete(id); return false; }
-  adminSessions.set(id, Date.now() + (adminSessionTtl.get(id) ?? 12 * 3600e3)); // sliding
+  if (!dbOn()) {
+    const exp = adminSessions.get(id);
+    if (!exp || exp < Date.now()) { adminSessions.delete(id); return false; }
+    adminSessions.set(id, Date.now() + (adminSessionTtl.get(id) ?? 12 * 3600e3)); // sliding
+    return true;
+  }
+  // Supabase: only the hash of the cookie token is stored.
+  const h = sha(id); const now = Date.now();
+  if (now - lastSessionPrune > 3600e3) { lastSessionPrune = now; void dbDelete('admin_sessions', `expires_at=lt.${encodeURIComponent(new Date(now).toISOString())}`).catch(() => {}); }
+  const row = (await dbSelect<{ expires_at: string; ttl_ms: number }>('admin_sessions', `select=expires_at,ttl_ms&token_hash=eq.${h}`))[0];
+  if (!row || Date.parse(row.expires_at) < now) { if (row) await dbDelete('admin_sessions', `token_hash=eq.${h}`); return false; }
+  await dbUpdate('admin_sessions', `token_hash=eq.${h}`, { expires_at: new Date(now + Number(row.ttl_ms)).toISOString() }); // sliding
   return true;
 };
-function requireAdmin(req: express.Request, res: express.Response): boolean {
+async function requireAdmin(req: express.Request, res: express.Response): Promise<boolean> {
   if (!process.env.ADMIN_TOKEN) { res.status(503).json({ error: 'admin_token_not_configured' }); return false; }
   // The x-admin-token header is for local scripts only: in production it would let anyone try passwords without the
   // login rate limit, so there only the session cookie (from the rate-limited login) counts. Security standard §3.
   const h = process.env.NODE_ENV !== 'production' ? req.header('x-admin-token') : undefined;
-  if ((h && tokenOk(h)) || hasSession(req)) return true;
+  if ((h && tokenOk(h)) || (await hasSession(req))) return true;
   res.status(401).json({ error: 'unauthorized' });
   return false;
 }
@@ -513,23 +524,24 @@ const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false,
   message: { error: 'rate_limited', message: 'Çok fazla deneme yapıldı. Lütfen 15 dakika sonra tekrar deneyin.' },
 });
-app.post('/api/admin/login', loginLimiter, (req, res) => {
+app.post('/api/admin/login', loginLimiter, async (req, res) => {
   if (!process.env.ADMIN_TOKEN) return res.status(503).json({ error: 'admin_token_not_configured' });
   if (!tokenOk(String(req.body?.password ?? '').slice(0, 500))) return res.status(401).json({ error: 'wrong_password' });
   const ttl = req.body?.remember === true ? 30 * 24 * 3600e3 : 12 * 3600e3;
   const id = crypto.randomBytes(32).toString('hex');
-  adminSessions.set(id, Date.now() + ttl); adminSessionTtl.set(id, ttl);
+  if (dbOn()) await dbInsert('admin_sessions', { token_hash: sha(id), expires_at: new Date(Date.now() + ttl).toISOString(), ttl_ms: ttl });
+  else { adminSessions.set(id, Date.now() + ttl); adminSessionTtl.set(id, ttl); }
   setAdminCookie(res, id, ttl);
   return res.json({ ok: true });
 });
-app.post('/api/admin/logout', (req, res) => {
+app.post('/api/admin/logout', async (req, res) => {
   const id = sessionIdOf(req);
-  if (id) { adminSessions.delete(id); adminSessionTtl.delete(id); }
+  if (id) { adminSessions.delete(id); adminSessionTtl.delete(id); if (dbOn()) await dbDelete('admin_sessions', `token_hash=eq.${sha(id)}`); }
   setAdminCookie(res, '', 0);
   return res.json({ ok: true });
 });
-app.get('/api/admin/me', (req, res) => {
-  if (!requireAdmin(req, res)) return;
+app.get('/api/admin/me', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
   return res.json({ ok: true });
 });
 
@@ -623,7 +635,7 @@ app.get('/api/availability', async (_req, res) => {
 });
 
 app.put('/api/admin/availability', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const b = req.body?.blocked;
   if (!Array.isArray(b) || b.some((x) => typeof x !== 'string' || !isRealDate(x))) return res.status(400).json({ error: 'invalid' });
   const blocked = [...new Set(b as string[])].sort();
@@ -732,7 +744,7 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
 
 // Owner adds a person by hand (details given by phone, in person, etc.); then creates an intake link from it as usual
 app.post('/api/admin/quote-requests', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const name = str(req.body?.name, 80); const email = str(req.body?.email, 254).toLowerCase(); const phone = str(req.body?.phone, 40);
   if (!name || (!email && !phone)) return res.status(400).json({ error: 'invalid', message: 'Ad ve e-posta ya da telefon gerekli.' });
@@ -752,14 +764,14 @@ app.post('/api/admin/quote-requests', async (req, res) => {
 });
 
 app.get('/api/admin/quote-requests', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const all = await listRequests();
   const sessions = new Map((await listVoice() as VoiceSession[]).map((v) => [v.id, v.kind]));
   const withSource = (all as LegacyReq[]).map((r) => (r.source ? r : { ...r, source: legacySource(r, sessions) }));
   return res.json({ requests: withSource.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
 });
 app.patch('/api/admin/quote-requests/:id', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const r = await getRequest(String(req.params.id));
   if (!r) return res.status(404).json({ error: 'not_found' });
   r.read = req.body?.read === true;
@@ -767,7 +779,7 @@ app.patch('/api/admin/quote-requests/:id', async (req, res) => {
   return res.json({ ok: true });
 });
 app.delete('/api/admin/quote-requests/:id', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   if (!(await getRequest(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
   await deleteRequests([String(req.params.id)]);
   return res.json({ ok: true });
@@ -829,16 +841,16 @@ app.post('/api/assistant/status', async (req, res) => {
   const cs = await chatState(abuseIds(req.ip ?? 'anon', req.body?.bid));
   res.json(cs.blocked ? { blocked: true, permanent: cs.permanent, until: cs.until, message: blockedMsg(lang, cs) } : { blocked: false });
 });
-app.get('/api/admin/abuse', async (req, res) => { if (!requireAdmin(req, res)) return; res.json(await adminList()); });
+app.get('/api/admin/abuse', async (req, res) => { if (!(await requireAdmin(req, res))) return; res.json(await adminList()); });
 app.post('/api/admin/abuse/unlock', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const k = typeof req.body?.k === 'string' && /^[0-9a-f]{24}$/.test(req.body.k) ? req.body.k : '';
   if (!k) return res.status(400).json({ error: 'bad_key' });
   res.json({ ok: await adminUnlock(k) });
 });
 
 app.get('/api/admin/tts-usage', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   return res.json({ ...(await readTtsUsage()), cap: TTS_MONTHLY_CAP });
 });
 
@@ -989,6 +1001,17 @@ async function pruneVoice() {
 void pruneVoice();
 setInterval(() => void pruneVoice(), 24 * 60 * 60 * 1000).unref();
 
+// Daily job for Vercel Cron (the in-process timer above only runs on a long-lived server): keep-alive + cleanups.
+app.get('/api/cron/daily', async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return res.status(503).json({ error: 'cron_not_configured' });
+  const given = crypto.createHash('sha256').update(req.get('authorization') ?? '').digest();
+  if (!crypto.timingSafeEqual(given, crypto.createHash('sha256').update(`Bearer ${secret}`).digest())) return res.status(401).json({ error: 'unauthorized' });
+  if (dbOn()) await kvSet('keepalive', { at: new Date().toISOString() });
+  await pruneVoice();
+  return res.json({ ok: true });
+});
+
 app.post('/api/voice/session/:id/contact', voiceLimiter, async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase();
   if (!EMAIL_RE.test(email) || email.length > 254) return res.status(400).json({ error: 'invalid_email' });
@@ -1054,7 +1077,7 @@ app.post('/api/voice/session/:id/request', voiceLimiter, async (req, res) => {
 });
 
 app.get('/api/admin/voice-sessions', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const sessions = (await listVoice())
     .filter((x) => !x.deleted)
     .map(({ ipHash: _ip, secret: _s, ...rest }) => rest)
@@ -1063,7 +1086,7 @@ app.get('/api/admin/voice-sessions', async (req, res) => {
 });
 
 app.delete('/api/admin/voice-sessions/:id', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   if (!(await getVoice(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
   await deleteVoice([String(req.params.id)]);
   return res.json({ ok: true });
@@ -1081,7 +1104,7 @@ function bulkIds(b: any): string[] | null {
   return [...new Set(ids as string[])];
 }
 app.post('/api/admin/quote-requests/bulk', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const ids = bulkIds(req.body);
   const action = req.body?.action;
   if (!ids || !['read', 'unread', 'delete'].includes(action)) return res.status(400).json({ error: 'invalid' });
@@ -1106,7 +1129,7 @@ app.post('/api/admin/quote-requests/bulk', async (req, res) => {
   }
 });
 app.post('/api/admin/voice-sessions/bulk', async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!(await requireAdmin(req, res))) return;
   const ids = bulkIds(req.body);
   if (!ids || req.body?.action !== 'delete') return res.status(400).json({ error: 'invalid' });
   try {
@@ -1177,7 +1200,7 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
 });
 
 app.get('/api/voice/live-status', liveLimiter, async (_req, res) => res.json(await livePressure()));
-app.post('/api/voice/live-heartbeat', liveLimiter, (req, res) => res.json({ ok: pool.beat(String(req.body?.sessionId ?? '')) }));
+app.post('/api/voice/live-heartbeat', liveLimiter, async (req, res) => res.json({ ok: pool.beat(String(req.body?.sessionId ?? '')) }));
 app.post('/api/voice/live-end', liveLimiter, async (req, res) => {
   pool.release(String(req.body?.sessionId ?? ''));
   if (req.body?.abuse === true) await recordAbuse(abuseIds(req.ip ?? 'anon', req.body?.bid));   // call ended by finish_conversation(reason=abuse)

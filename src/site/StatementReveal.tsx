@@ -80,8 +80,10 @@ export default function StatementReveal({ lang, text, caption, items, body, id =
     return () => ctx.revert();
   }, [lang, ui.text]);
 
+  // After the pin ends the lower half of this full-height section is empty (the ring has faded out), so the next
+  // section is pulled up to close the gap (owner, 2026-11-19).
   return (
-    <section ref={root} id={id} translate="no" className="st-root relative overflow-hidden h-[100svh]" >
+    <section ref={root} id={id} translate="no" className="st-root relative overflow-hidden h-[100svh]" style={{ marginBottom: 'calc(-1 * min(30svh, 300px))' }}>
       <div aria-hidden="true" className="st-marks absolute inset-0 pointer-events-none">
         {MARKS.map((m) => (
           <span
