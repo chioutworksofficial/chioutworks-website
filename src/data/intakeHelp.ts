@@ -71,6 +71,48 @@ export const QUESTION_HELP: Record<string, L4> = {
     'Diese Phasen werden im System zu Spalten. Sie verschieben einen Kunden von Spalte zu Spalte und sehen jederzeit, wo wer steht.',
     'Αυτά τα στάδια γίνονται στήλες στο σύστημα. Μετακινώντας έναν πελάτη από στήλη σε στήλη, βλέπετε πάντα πού βρίσκεται ο καθένας.',
   ]),
+  web_goal: l4([
+    'En önemli amacı seçin; tasarım ve içerik buna göre şekillenir. Emin değilseniz en çok işinize yarayacak olanı seçin.',
+    'Pick the most important aim; design and content follow from it. If unsure, choose what would help your business most.',
+    'Wählen Sie das wichtigste Ziel; Gestaltung und Inhalt richten sich danach. Wenn Sie unsicher sind, nehmen Sie das, was Ihrem Geschäft am meisten nützt.',
+    'Επιλέξτε τον σημαντικότερο στόχο· ο σχεδιασμός και το περιεχόμενο προσαρμόζονται σε αυτόν. Αν δεν είστε σίγουροι, διαλέξτε ό,τι βοηθά περισσότερο την επιχείρησή σας.',
+  ]),
+  web_parts: l4([
+    'Bölümler sitenizin menüsü olur, örneğin Hizmetler, Hakkımda, İletişim. Küçük başlamak ve sonra eklemek mümkündür.',
+    'Parts become the menu of your site, e.g. Services, About, Contact. You can start small and add more later.',
+    'Bereiche werden zum Menü Ihrer Website, z. B. Leistungen, Über mich, Kontakt. Sie können klein anfangen und später erweitern.',
+    'Τα τμήματα γίνονται το μενού του ιστότοπού σας, π.χ. Υπηρεσίες, Σχετικά, Επικοινωνία. Μπορείτε να ξεκινήσετε μικρά και να προσθέσετε αργότερα.',
+  ]),
+  web_features: l4([
+    'Özellikler ziyaretçinin sitede yapabildikleridir, örneğin randevu almak, form göndermek ya da WhatsApp’tan yazmak. Ne kadar çoğu seçilirse o kadar kapsam büyür.',
+    'Features are what visitors can do on the site, e.g. book, send a form or write on WhatsApp. The more you pick, the larger the scope.',
+    'Funktionen sind das, was Besucher auf der Website tun können, z. B. buchen, ein Formular senden oder per WhatsApp schreiben. Je mehr Sie wählen, desto größer der Umfang.',
+    'Οι λειτουργίες είναι όσα μπορεί να κάνει ο επισκέπτης, π.χ. να κλείσει ραντεβού, να στείλει φόρμα ή να γράψει στο WhatsApp. Όσα περισσότερα επιλέξετε, τόσο μεγαλύτερο το εύρος.',
+  ]),
+  web_content: l4([
+    'Metin ve fotoğraflar sitenin en çok zaman alan kısmıdır. Hazır değilse sorun değil; eksik olanı ben tamamlarım.',
+    'Texts and photos are what takes the most time. If they are not ready, no problem; I will complete what is missing.',
+    'Texte und Fotos kosten erfahrungsgemäß am meisten Zeit. Wenn sie nicht fertig sind, ist das kein Problem; ich ergänze, was fehlt.',
+    'Τα κείμενα και οι φωτογραφίες είναι αυτά που παίρνουν τον περισσότερο χρόνο. Αν δεν είναι έτοιμα, κανένα πρόβλημα· θα συμπληρώσω ό,τι λείπει.',
+  ]),
+  web_look: l4([
+    'Burada kesin bir tasarım istenmiyor; yalnızca genel his. Renk ve düzen buna göre seçilir.',
+    'No exact design is asked for here, only the general feeling. Colours and layout are chosen to match.',
+    'Hier wird kein genaues Design verlangt, nur der Gesamteindruck. Farben und Aufbau richten sich danach.',
+    'Δεν ζητείται ακριβές σχέδιο, μόνο η γενική αίσθηση. Τα χρώματα και η διάταξη επιλέγονται ανάλογα.',
+  ]),
+  web_examples: l4([
+    'Beğendiğiniz sitelerin adresini yazın; neyi sevdiğinizi (renk, düzen, sadelik) belirtmeniz yeter. Kopyalamak için değil, zevkinizi anlamak içindir.',
+    'Write the addresses of sites you like and say what you like about them (colour, layout, simplicity). It is not for copying, only to understand your taste.',
+    'Schreiben Sie die Adressen von Seiten, die Ihnen gefallen, und was daran (Farbe, Aufbau, Schlichtheit). Es geht nicht ums Kopieren, sondern darum, Ihren Geschmack zu verstehen.',
+    'Γράψτε τις διευθύνσεις ιστότοπων που σας αρέσουν και τι σας αρέσει (χρώμα, διάταξη, απλότητα). Δεν είναι για αντιγραφή, αλλά για να καταλάβω το γούστο σας.',
+  ]),
+  web_update: l4([
+    'Yazıları, fiyatları ve fotoğrafları değiştirmek isteyip istemediğinizi belirtir. Kendiniz yapacaksanız kolay bir yönetim ekranı kurulur.',
+    'This tells whether you want to change texts, prices and photos yourself. If you do, an easy editing area is set up.',
+    'Das zeigt, ob Sie Texte, Preise und Fotos selbst ändern möchten. Wenn ja, wird ein einfacher Bearbeitungsbereich eingerichtet.',
+    'Δείχνει αν θέλετε να αλλάζετε μόνοι σας κείμενα, τιμές και φωτογραφίες. Αν ναι, στήνεται μια εύκολη περιοχή επεξεργασίας.',
+  ]),
   tech_site: l4([
     'Alan adı (domain), sitenizin internetteki adresidir, örneğin firmaniz.com. Bir kez alınır, her yıl küçük bir ücretle yenilenir. Yoksa sorun değil, birlikte seçebiliriz.',
     'A domain is your website’s address on the internet, e.g. yourcompany.com. You register it once and renew it yearly for a small fee. If you don’t have one, no problem, we can pick one together.',
@@ -168,6 +210,8 @@ export const QUESTION_HELP: Record<string, L4> = {
     'Η μηνιαία χρέωση συνήθως καλύπτει διακομιστή, αντίγραφα ασφαλείας, ενημερώσεις ασφαλείας και μικρές αλλαγές.',
   ]),
 };
+
+QUESTION_HELP.web_existing = QUESTION_HELP.tech_site;
 
 /** Who provides the legal texts (Impressum, privacy policy / KVKK, terms)? Added to the budget page. */
 export const LEGAL_Q: QDef = {

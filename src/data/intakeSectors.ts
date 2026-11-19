@@ -235,6 +235,7 @@ export const WEB_Q: StaticQ[] = [
       o('assistant', ['Yapay zekâ sohbet asistanı', 'AI chat assistant', 'KI-Chat-Assistent', 'Βοηθός συνομιλίας ΤΝ']),
     ] },
   { id: 'web_existing', type: 'yn', detail: true, t: l4(['Şu an bir web siteniz veya alan adınız var mı? Varsa hangisi?', 'Do you already have a website or domain? If so, which?', 'Haben Sie bereits eine Website oder Domain? Wenn ja, welche?', 'Έχετε ήδη ιστοσελίδα ή domain; Αν ναι, ποιο;']) },
+  TECH_Q.find((q) => q.id === 'tech_hosting')!,
   { id: 'web_content', type: 'single', t: l4(['Metinler ve fotoğraflar hazır mı?', 'Are texts and photos ready?', 'Sind Texte und Fotos vorhanden?', 'Είναι έτοιμα τα κείμενα και οι φωτογραφίες;']),
     options: [
       o('ready', ['Hazır', 'Ready', 'Vorhanden', 'Έτοιμα']),
@@ -259,6 +260,9 @@ export const WEB_Q: StaticQ[] = [
       o('ads', ['Reklam', 'Advertising', 'Werbung', 'Διαφήμιση']),
       o('walkin', ['Mağaza / yoldan geçerken', 'Passing by / walk-ins', 'Laufkundschaft', 'Περαστικοί πελάτες']),
     ] },
+  { id: 'business_email', type: 'yn', t: l4(['Kurumsal e-posta adresi ister misiniz (ör. info@firmaniz.com)?', 'Would you like professional e-mail addresses (e.g. info@yourcompany.com)?', 'Wünschen Sie professionelle E-Mail-Adressen (z. B. info@ihrefirma.de)?', 'Θέλετε επαγγελματικά e-mail (π.χ. info@etaireia.gr);']) },
+  // Placeholder: friendly() in server/intake.ts swaps in LEGAL_Q (options, help, costNote, mustRead) from intakeHelp.ts.
+  { id: 'legal_texts', type: 'single', t: l4(['Yasal metinleri kim hazırlasın?', 'Who should prepare the legal texts?', 'Wer soll die Rechtstexte erstellen?', 'Ποιος να ετοιμάσει τα νομικά κείμενα;']), options: [] },
 ];
 
 export const NOTSURE_Q: StaticQ[] = [

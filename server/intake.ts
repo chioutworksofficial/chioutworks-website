@@ -13,7 +13,7 @@ import {
   type L, type L4, type Market, type SectorKey, type StaticQ, type QDef, type SecDef, type Definition,
 } from '../src/data/intakeSectors.js';
 import { INTAKE_SLUG } from '../src/lib/routes.js';
-import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, EXTRA_SYSTEM, MESSENGER_Q, QUESTION_HELP, SECTION_INTRO, SECTION_ORDER } from '../src/data/intakeHelp.js';
+import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, EXTRA_SYSTEM, LEGAL_Q, MESSENGER_Q, QUESTION_HELP, SECTION_INTRO, SECTION_ORDER } from '../src/data/intakeHelp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORE = path.join(__dirname, '../data/intakes.json');
@@ -97,6 +97,7 @@ function friendly(secs: SecDef[]): SecDef[] {
     ...s, ...(SECTION_INTRO[s.id] ? { intro: SECTION_INTRO[s.id] } : {}), ...(s.id === 'automation' ? { flow: AUTOMATION_FLOW } : {}),
     qs: s.qs.map((q) => {
       if (q.id === MESSENGER_Q.id) return MESSENGER_Q;
+      if (q.id === LEGAL_Q.id) return LEGAL_Q;
       const base = QUESTION_HELP[q.id] ?? EXTRA_SYSTEM[q.id];
       if (!base) return q;
       const cost = COST_IDS.has(q.id);
