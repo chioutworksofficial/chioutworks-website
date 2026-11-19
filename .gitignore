@@ -40,9 +40,8 @@ Thumbs.db
 graphify-out/
 public/assets-ai/
 
-# ── Obsidian: per-device window state (notes themselves are tracked) ──
-obsidian/**/.obsidian/workspace*.json
-obsidian/**/.obsidian/cache/
+# ── Obsidian vault: owner's private notes, local only (owner, 2026-11-19) ──
+obsidian/
 
 # ── Promo work: large media outputs stay local ──
 tanitim/videolar/*
