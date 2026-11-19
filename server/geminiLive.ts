@@ -192,16 +192,20 @@ export const liveConfigured = () => Boolean(process.env.GEMINI_API_KEY);
 
 /** Words the speech recognizer should prefer per call language (business types, services, site products). */
 const VOCAB: Record<string, string[]> = {
-  tr: ['kuaför', 'berber', 'güzellik salonu', 'kafe', 'restoran', 'muayenehane', 'diş kliniği', 'emlak', 'temizlik', 'web sitesi', 'internet sitesi', 'randevu', 'online randevu', 'QR menü', 'dijital katalog', 'CRM', 'müşteri takibi', 'teklif', 'fatura', 'otomasyon', 'yapay zekâ asistanı', 'işletme', 'şube'],
-  de: ['Friseur', 'Friseursalon', 'Barbershop', 'Kosmetikstudio', 'Café', 'Restaurant', 'Praxis', 'Zahnarztpraxis', 'Immobilien', 'Reinigung', 'Website', 'Webseite', 'Termin', 'Online-Terminbuchung', 'QR-Speisekarte', 'digitaler Katalog', 'CRM', 'Kundenverwaltung', 'Angebot', 'Rechnung', 'Automatisierung', 'KI-Assistent', 'Betrieb', 'Filiale'],
-  en: ['hairdresser', 'hair salon', 'barber', 'beauty salon', 'café', 'restaurant', 'practice', 'dental clinic', 'real estate', 'cleaning', 'website', 'booking', 'online booking', 'QR menu', 'digital catalogue', 'CRM', 'quote', 'invoice', 'automation', 'AI assistant', 'business', 'branch'],
-  el: ['κομμωτήριο', 'κουρείο', 'ινστιτούτο αισθητικής', 'καφέ', 'εστιατόριο', 'ιατρείο', 'οδοντιατρείο', 'ακίνητα', 'καθαριότητα', 'ιστοσελίδα', 'ραντεβού', 'online ραντεβού', 'μενού QR', 'ψηφιακός κατάλογος', 'CRM', 'προσφορά', 'τιμολόγιο', 'αυτοματοποίηση', 'βοηθός τεχνητής νοημοσύνης', 'επιχείρηση', 'κατάστημα'],
+  tr: ['kuaför', 'berber', 'güzellik salonu', 'tırnak salonu', 'kafe', 'restoran', 'fırın', 'pastane', 'otel', 'pansiyon', 'muayenehane', 'diş kliniği', 'fizyoterapi', 'eczane', 'veteriner', 'avukat', 'hukuk bürosu', 'muhasebe', 'mali müşavir', 'emlak', 'inşaat', 'nakliye', 'temizlik', 'oto servis', 'spor salonu', 'butik', 'düğün salonu', 'sigorta',
+    'web sitesi', 'internet sitesi', 'randevu', 'online randevu', 'rezervasyon', 'QR menü', 'dijital katalog', 'sipariş', 'online ödeme', 'e-ticaret', 'stok', 'CRM', 'müşteri takibi', 'teklif', 'fatura', 'otomasyon', 'yapay zekâ asistanı', 'sosyal medya', 'müşteri yorumları', 'işletme', 'şube'],
+  de: ['Friseur', 'Friseursalon', 'Barbershop', 'Kosmetikstudio', 'Nagelstudio', 'Café', 'Restaurant', 'Bäckerei', 'Konditorei', 'Hotel', 'Pension', 'Praxis', 'Zahnarztpraxis', 'Physiotherapie', 'Apotheke', 'Tierarzt', 'Rechtsanwalt', 'Kanzlei', 'Steuerberater', 'Buchhaltung', 'Immobilien', 'Bauunternehmen', 'Umzugsfirma', 'Reinigung', 'Autowerkstatt', 'Fitnessstudio', 'Boutique', 'Hochzeitssaal', 'Versicherung',
+    'Website', 'Webseite', 'Termin', 'Online-Terminbuchung', 'Reservierung', 'QR-Speisekarte', 'digitaler Katalog', 'Bestellung', 'Online-Zahlung', 'Onlineshop', 'Lager', 'CRM', 'Kundenverwaltung', 'Angebot', 'Rechnung', 'Automatisierung', 'KI-Assistent', 'Social Media', 'Kundenbewertungen', 'Betrieb', 'Filiale'],
+  en: ['hairdresser', 'hair salon', 'barber', 'beauty salon', 'nail salon', 'café', 'restaurant', 'bakery', 'pastry shop', 'hotel', 'guesthouse', 'practice', 'dental clinic', 'physiotherapy', 'pharmacy', 'vet', 'lawyer', 'law firm', 'accountant', 'bookkeeping', 'real estate', 'construction', 'removals', 'cleaning', 'car repair', 'gym', 'boutique', 'wedding venue', 'insurance',
+    'website', 'booking', 'online booking', 'reservation', 'QR menu', 'digital catalogue', 'order', 'online payment', 'online shop', 'stock', 'CRM', 'customer management', 'quote', 'invoice', 'automation', 'AI assistant', 'social media', 'customer reviews', 'business', 'branch'],
+  el: ['κομμωτήριο', 'κουρείο', 'ινστιτούτο αισθητικής', 'νυχάδικο', 'καφέ', 'εστιατόριο', 'φούρνος', 'ζαχαροπλαστείο', 'ξενοδοχείο', 'ενοικιαζόμενα δωμάτια', 'ιατρείο', 'οδοντιατρείο', 'φυσικοθεραπεία', 'φαρμακείο', 'κτηνίατρος', 'δικηγόρος', 'δικηγορικό γραφείο', 'λογιστής', 'λογιστικό γραφείο', 'ακίνητα', 'κατασκευαστική', 'μετακομίσεις', 'καθαριότητα', 'συνεργείο αυτοκινήτων', 'γυμναστήριο', 'μπουτίκ', 'κέντρο δεξιώσεων', 'ασφάλειες',
+    'ιστοσελίδα', 'ραντεβού', 'online ραντεβού', 'κράτηση', 'μενού QR', 'ψηφιακός κατάλογος', 'παραγγελία', 'online πληρωμή', 'ηλεκτρονικό κατάστημα', 'αποθήκη', 'CRM', 'διαχείριση πελατών', 'προσφορά', 'τιμολόγιο', 'αυτοματοποίηση', 'βοηθός τεχνητής νοημοσύνης', 'social media', 'κριτικές πελατών', 'επιχείρηση', 'κατάστημα'],
 };
 
 export async function mintToken(lang: string, instruction: string): Promise<{ token: string; model: string; expiresAt: string }> {
   const model = LIVE_MODEL();
   const start = new Date(Date.now() + 2 * 60_000);      // time allowed to open the socket
-  const expire = new Date(Date.now() + 4 * 60_000);     // hard end of the message window
+  const expire = new Date(Date.now() + 5 * 60_000);     // hard end of the message window
   const t = await ai().authTokens.create({
     config: {
       uses: 1, expireTime: expire.toISOString(), newSessionExpireTime: start.toISOString(),

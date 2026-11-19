@@ -35,7 +35,7 @@ function ackName(lang: Lang, v: Visitor): string {
 interface Turn { role: 'user' | 'assistant'; text: string; at: number }
 type Phase = 'consent' | 'preparing' | 'queue' | 'blocked' | 'live' | 'card' | 'idle' | 'listening' | 'thinking' | 'speaking';
 interface Card { service: string; business: string; city: string; firstName: string; lastName: string; phone: string; email: string; notes: string }
-const LIVE_SECONDS = 120;
+const LIVE_SECONDS = 150;
 const LANG_EN: Record<string, string> = { tr: 'Turkish', de: 'German', el: 'Greek', en: 'English' };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -111,6 +111,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const watchRef = useRef<SilenceWatch | null>(null);
   const silenceEndRef = useRef<() => void>(() => {});
   const draining = useRef(false);
+  const softSent = useRef(false);
   const reconnected = useRef(false);
   const liveRole = useRef<'user' | 'assistant' | null>(null);
   const outBuf = useRef('');
@@ -186,7 +187,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       sessionRef.current++; autoRef.current = true; deniedRef.current = false; inFlight.current = false;
       emptyRuns.current = 0; manualStop.current = false; unavailSaid.current = false;
       visitorRef.current = NO_VISITOR; setVFirst(''); setVLast(''); setVSal('none'); setNameDone(false); voiceId.current = null; deletedRef.current = false;
-      deadlineRef.current = 0; setTimeLeft(LIVE_SECONDS); endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; reconnected.current = false;
+      deadlineRef.current = 0; setTimeLeft(LIVE_SECONDS); endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; softSent.current = false; reconnected.current = false;
       liveRole.current = null; liveCut.current = false; outBuf.current = ''; corrections.current = 0; setReconnecting(false); setCard(null); setCardSent(false); setCardErr(''); setCardBusy(false);
       preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false);
       goPhase('consent'); startedAt.current = Date.now(); setOpen(true);
@@ -410,8 +411,9 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const drain = () => {
     if (draining.current) return;
     draining.current = true;
-    const wait = () => { if (callRef.current?.speaking()) setTimeout(wait, 300); else setTimeout(endCall, 500); };
-    wait();
+    const c = callRef.current;
+    callRef.current?.hold();
+    void (c ? c.whenPlaybackDone(8000) : Promise.resolve()).then(() => setTimeout(endCall, 700));
   };
 
   const startTimerOnce = () => {
@@ -420,11 +422,15 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     timerRef.current = setInterval(() => {
       const left = Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000));
       setTimeLeft(left);
+      if (left <= 25 && !softSent.current && !finishPending.current) {
+        softSent.current = true;
+        callRef.current?.sendText('TIME_UP: the call time is almost over. In at most two short sentences, summarise what was confirmed and then say the closing sentence exactly as instructed, then call finish_conversation with reason done.');
+      }
       if (left > 0 || finishPending.current) return;
       finishPending.current = true;
       setNotice(t.timeUp);
-      callRef.current?.sendText('TIME_UP');
-      setTimeout(endCall, 12000);   // hard stop if the model does not close by itself
+      const c = callRef.current;
+      void (c ? c.whenPlaybackDone(6000) : Promise.resolve()).then(endCall);   // hard end: let audio finish (max 6 s)
     }, 500);
   };
 
@@ -466,7 +472,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       },
       onInterrupted: () => { liveCut.current = turnsRef.current[turnsRef.current.length - 1]?.role === 'assistant'; liveRole.current = null; outBuf.current = ''; },
       onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; if (finishPending.current) drain(); },
-      onFinish: (reason) => { if (reason === 'abuse') abuseRef.current = true; finishPending.current = true; setTimeout(drain, 3000); },
+      onFinish: (reason) => { if (reason === 'abuse') abuseRef.current = true; finishPending.current = true; if (reason === 'abuse') setTimeout(drain, 3000); else drain(); },
       onLevel: (rms) => { const n = performance.now(); if (n - lastLevel.current > 80) { lastLevel.current = n; setLevel(Math.min(1, rms * 8)); } },
       onClosed: () => {
         if (callRef.current !== ref.c || endingRef.current || sid !== sessionRef.current) return;

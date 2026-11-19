@@ -48,6 +48,7 @@ export class LiveCall {
   private ready = false;
   private closing = false;
   private next = 0;
+  private ending = false;
   private passUntil = 0;
   private greeting = true;   // until the first assistant turn is done: mic muted, interruptions ignored
   private gotAudio = false;
@@ -96,7 +97,7 @@ export class LiveCall {
       if (!this.ready || this.ws?.readyState !== WebSocket.OPEN) return;
       let pcm = new Uint8Array(e.data.pcm);
       const now = this.ctx.currentTime;
-      if (this.greeting) pcm = new Uint8Array(pcm.length);
+      if (this.greeting || this.ending) pcm = new Uint8Array(pcm.length);
       else if (this.next + GATE_TAIL > now) {   // assistant audible (or just ended): echo gate
         if (e.data.rms > BARGE_RMS) this.passUntil = now + PASS_HOLD;
         else if (now > this.passUntil) pcm = new Uint8Array(pcm.length);
@@ -113,6 +114,18 @@ export class LiveCall {
 
   /** True while queued model audio is still audible. */
   speaking() { return this.next > this.ctx.currentTime; }
+
+  /** Mutes the mic (silence frames only) while the call is ending. */
+  hold() { this.ending = true; }
+
+  /** Resolves when queued model audio has finished playing (polls every 100 ms, gives up after maxMs). */
+  whenPlaybackDone(maxMs = 8000): Promise<void> {
+    return new Promise((res) => {
+      const t0 = Date.now();
+      const tick = () => { if (!this.speaking() || Date.now() - t0 >= maxMs) res(); else setTimeout(tick, 100); };
+      tick();
+    });
+  }
 
   private play(data: string) {
     const bin = atob(data), n = bin.length >> 1;
