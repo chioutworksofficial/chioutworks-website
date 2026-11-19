@@ -3,7 +3,7 @@
 > **Ana harita.** Her görevden ÖNCE okunur, SONRA güncellenir. Yapılmış bir şey bozulmaz; istenen şey zaten varsa
 > sahibe "yapıldı, şurada" denir; kısmen varsa eksiği söylenir. Oturum sonunda ve sahip sorduğunda bu tablo verilir.
 > Yazım kuralı: kısaltma yok; her satır ya **tamamen bitti** ya **bitti ama yayında kontrol edilecek / küçük eksik** ya da **yapılmadı** grubundadır.
-> Son güncelleme: 2026-11-18
+> Son güncelleme: 2026-11-20
 
 ## A. Tamamen bitti — öyle kalabilir (dokunmaya gerek yok)
 | Parça | Nerede |
@@ -30,6 +30,12 @@
 | Admin'e başka siteden işlem yaptırma koruması (CSRF), hız sınırları | `server/index.ts` |
 | Telefondan yerel siteyi açma (aynı Wi-Fi: `http://<bilgisayar-ip>:3000`, sadece geliştirmede) | `vite.config.ts`, `server/index.ts` |
 | Obsidian otomatik aktarım, tanıtım klasörü, kod haritası | `scripts/obsidian-sync.mjs`, `tanitim/` |
+| Veriler Supabase'te (Frankfurt; tüm tablolarda erişim kuralı açık, dışarıya kapalı; özel dosya kutusu; içe aktarma sayıları tuttu) (2026-11-19) | `server/db.ts`, Supabase projesi |
+| Yayın akışı: bilgisayar → GitHub → Vercel otomatik yayın, fonksiyonlar Frankfurt'ta (fra1), günlük bakım görevi; anahtarlar yalnızca `.env` ve Vercel'de (gizli) (2026-11-19) | `vercel.json`, `api/index.ts` |
+| Sesli asistan kapanışı: veda bitmeden kapanmaz (konuşma turu bitti + ses çalındı + 1,5 sn sessizlik; en az 4 sn bekleme, en çok 15 sn); 3 dakika; duraklamada araya girmez, tur başına tek cevap; 4 dilde özel kelime listesi (2026-11-19) | `src/lib/geminiLive.ts`, `server/geminiLive.ts`, `VoiceIntake.tsx` |
+| Sesli talep kartı: e-posta VE telefon zorunlu (arayüz + sunucu), işletme/şehir alanları, tarz bağlantısı kartın üstünde (2026-11-19) | `VoiceIntake.tsx`, `server/index.ts` |
+| Yazılı sohbet kapanışı: gerçek talep kaydı, "eklemek istediğiniz bir şey var mı?", saate göre veda, düzenlenebilir "Talep bilgileriniz" kartı, web/tasarım ise tarz bağlantısı; sohbet talepleri için de sahip bildirimi (2026-11-19) | `AIAssistant.tsx`, `server/index.ts` |
+| Form ürüne özel sorular: web sitesi 13 (açıklamalı, barındırma, kurumsal e-posta, zorunlu okumalı yasal metinler), otomasyon 9, CRM 10, özel uygulama 10, QR/randevu 5; onay metninde sağlayıcı adı yok (2026-11-19) | `src/data/intakeSectors.ts`, `intakeHelp.ts` |
 
 ## B. Bitti ama bir şey bekliyor (küçük eksik / yayında kontrol)
 | Parça | Ne eksik / ne yapılacak | Kim |
@@ -37,7 +43,6 @@
 | Açık mod (lialive yapısı, kendi lacivert paletimiz; üst çubukta güneş/ay düğmesi; seçim tarayıcıda hatırlanır, koyu varsayılan; özellik kartları koyu kalır; admin, canlı demolar, analiz formu ve teklif sayfaları koyu kalır; gizlilik politikasında belirtildi) | Telefonunda ve bilgisayarında açıp bakman | Sen |
 | Canlı proje sayfası (ilk ödemeden sonra otomatik açılır; 5 adımlı ilerleme, test sitesi linki + ekran görüntüleri, iki yönlü mesaj, görsel/PDF/ZIP yükleme (25 MB, türü içeriğe bakarak kontrol), değişiklik istekleri; admin "Projeler" sekmesi; 4 dil) + teklifte "Ödeme linki gönder" ve Stripe yokken TEST ödemesi (yalnızca geliştirme ortamında) | Supabase'e taşınırken dosyalar Supabase Storage'a (Vercel 4,5 MB sınırı yüzünden doğrudan yükleme); e-posta bildirimleri alan adı doğrulanınca | Ben |
 | Admin renkleri (talep kaynağına göre renk: form, sesli asistan, sohbet, hesaplayıcı…; teklifte ödendi yeşil, sorun kırmızı) + görüşme süresi | Senin bakman | Sen |
-| Sesli asistan | Gerçek mikrofonla 4 dilde test | Sen |
 | Mobil uyum (280 pikselden yatay telefona kadar; yana taşma yok; telefonda kaydırma telefonun kendi akıcı kaydırması (lialive gibi); masaüstündeki kaydırma animasyonları telefonda da açık ama bulanıklıksız; "Chioutworks ile" şeridi telefonda sağdan sola akıyor; çark ve kartlar ekrana göre ölçekli; 44 piksel dokunma alanları; iPhone'da form alanı yakınlaştırması yok; ölçüm aracı `node scripts/mobile-check.mjs`) | Gerçek telefonlarda (iPhone + Android) bakış; takılan yer varsa söylemen | Sen |
 | Stripe ödeme altyapısı (kurulum ücreti/ön ödeme tek sefer + 2 ay sonra otomatik aylık abonelik, kalan tutar linki, müşteri ödeme sayfası, Stripe bildirimleri, admin'de durum; paket yok, doğrudan bağlantı) | Stripe hesabı + test anahtarı (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PUBLIC_URL`); aktif etmeden önce gizlilik politikasına Stripe eklenecek; faturada §19 notu Stripe panelinden | Sen + ben |
 | Form sonrası tıklanabilir demo (cevaplara göre web sitesi, CRM ve/veya otomasyon sekmeleri; çalışan menü, randevu, teklif formu, ödeme, müşteri hesabı, asistan, Telegram/WhatsApp bildirim örneği; CRM'de aşama değiştirme, müşteri ve not ekleme; otomasyonda adım adım deneme; en üstte "bu yalnızca bir demo" uyarısı; admin'de de görünür) | Tarayıcıda deneyip beğenip beğenmediğini söylemen | Sen |
@@ -48,7 +53,6 @@
 | Ortak sayfaları (2026-11-18/19): genel sayfa `/tr/araclar` + her ortak için ayrı sayfa (Hostinger, N26, Wise), 4 dil; marka renkli kapsüller; 3D sahne, eğilen kartlar, kaydırınca beliren bölümler; referans linki tarayıcıya hiç gitmez (`server/affiliates.ts`, `/api/go/<id>`), çerezsiz tıklama sayımı admin "Ziyaret analizi" altında; "Reklam" notu; gizlilik 3a paragrafı; site haritası 105 adres | Metinler taslak: sahip kontrol edecek (Hostinger AB veri merkezi, N26 Spaces ve iş hesabı kimlere, Wise yerel hesap); yayında Hostinger yönlendirmesi kontrol | Sen |
 | Hostinger ve N26 referans linkleri + resmi logolar (tek renk; N26 2026-11-18 eklendi, logo n26.com üst kısmından) | Renkli (mor) logo istenirse kural esnetilmeli | Senin kararın |
 | Yapay zekâ onay ekranı yenilendi (2026-11-19): sağlayıcı adı yok, "kabul ederseniz / etmezseniz", zorunlu/isteğe bağlı rozetli kutucuklar, sesli ve yazılı için ayrı onay, Groq yedeği isteğe bağlı, "Ayrıntılar" linki gizlilikte doğru bölüme kayıyor; gizlilik 8. bölüm 4 dilde güncellendi | Avukat kontrolü; gerçek mikrofonla deneme | Sen |
-| Sesli asistan: tek ses, yavaş konuşma, isim+şehir toplama, kötüye kullanım sınırı (saatte 3, günde 5) | Gerçek mikrofonla test | Sen |
 | Impressum | E-posta adresi girilecek (yayından önce şart) | Sen |
 | Partner/affiliate logo yörüngesi | Linkler ve orijinal logolar | Sen |
 | Güvenlik başlıkları (`vercel.json`) | Yayında test edilecek (securityheaders.com) | Ben, yayında |
@@ -58,11 +62,14 @@
 | Sözleşme + e-imza (teklif kabulünden sonra; dil müşterinin ülkesine göre tek dil; firma, adres, imzalayan, işletme onayı; imzalı metnin kontrol değeri ve kanıt kaydı; müşteri ve admin yazdırıp PDF kaydedebilir; admin'de durum) | Sözleşme metni avukat kontrolünden geçmeli; imzalı sözleşme e-postası (müşteriye + sana) kodda hazır, alan adı Resend'de doğrulanınca çalışır | Avukat / ben |
 | Güvenlik standardı + ilk denetim (2026-11-19): `context/GUVENLIK.md`, CLAUDE.md kuralı (her yeni entegrasyonda otomatik); 5 açık kapatıldı (admin başlık şifresi, trust proxy, özel linklerde no-referrer, sesli kayıt numaralandırma, blog HTML kaçışı); asistan sağlayıcı adını söylemiyor (talimat + filtre) | Açık: link süreleri, admin 2. faktör, Turnstile, bağımsız sızma testi (yayından önce) | Ben + sen |
 | Hız sınırı ve bot koruması | Var; bekleme sırası sertleştirme ve Turnstile bot koruması eklenecek | Ben |
+| Sesli asistan ve yazılı sohbetin yeni kapanış akışları | Telefondan gerçek görüşmeyle deneme | Sen |
+| Sohbetteki talep kartı | Sayfa yenilenince geri gelmiyor (küçük eksik) | Ben |
+| Talep bildirim e-postası (form + ses + sohbet) | Resend hesabının e-posta adresi `.env` + Vercel'e (QUOTE_NOTIFY_EMAIL) | Sen → ben |
+| Form soruları DE/EL | Almanca ve Yunanca metinleri bir kişinin okuması | Sen |
 
 ## C. Yapılmadı
 | Parça | Yayından önce şart mı? | Not |
 |---|---|---|
-| Verileri Supabase'e taşıma (erişim kuralları, yedek) | **Evet, şart** | Taşınmazsa yayında veriler kaybolur |
 | Hız ve erişilebilirlik (büyük paketleri bölme vb.) | Hayır, ama önemli | |
 | Hata izleme, son test listesi | Hayır, ama önemli | Yayına yakın |
 | Kendi sitenin yasal metinlerini eRecht24 ile güncelleme (gizlilik, Impressum, AGB; 4 dil, çeviriler kontrollü) | Hayır, ama önemli | Kendi yazdığımız metinler avukat kontrollü değil; eRecht24 alınınca |
@@ -74,7 +81,7 @@
 | Telegram yönetici botu (admin olayları Telegram'a) | Hayır | Sonra; kişisel veri az, admin linkli |
 | Alan adını Resend'de doğrulama (e-postaların müşterilere gidebilmesi için şart) | **Evet, şart** | Resend anahtarı çalışıyor ama hesapta alan adı yok |
 | **8 fazlı yayına hazırlık planı** (sahibin metni, 2026-11-17 kaydedildi; uygulanmadı). Durum: 26 maddenin 7'si yapıldı, 14'ü kısmen, 5'i yapılmadı | Kısmen evet (Supabase, Resend DNS, güvenlik başlıkları testi şart) | Ayrıntı ve madde madde durum: `context/ozellikler/yayin-8-faz-plani.md` |
-| Yayın (Vercel + Supabase + Resend, alan adı) | — | Senin onayınla, en sonda |
+| Alan adı + Vercel Pro (ticari kullanım) + GitHub deposunu gizli yapma | Evet (alan adı) | Senin kararın |
 
 ## Senden beklenenler
 1. Impressum e-postası → `bash scripts/set-key.sh IMPRESSUM_EMAIL`
@@ -94,3 +101,5 @@
 
 - 2026-11-19 · Blog okuma kalemi (BlogArticle.tsx) · Randevu sahnesi (BookingScene.tsx + i18n/bookingScene.ts) · Chat kilidi 15 dk/tarayıcı, yalnızca hakaret (server/abuse.ts) · Tekrar önleyici + doğal fiyat cevabı (server/index.ts) · Mobil mikrofon izin sırası (VoiceIntake.tsx). Yapılacak: diğer 5 paket sahnesi.
 - 2026-11-19 (devam) · Kademeli sohbet koruması + yönetim kilit açma + gizlilik 8a · Hız sınırı ve günlük bütçe sigortası · Sesli asistan: gizlilik kuralı, 3 adımlı uyarı, dikkatli dinleme, yankı süzme, https test (dev:https, :3443) · Tarz sayfası: gerçekçi önizleme, 12 palet + 5 renkli kendi paleti, 11 yazı tipi çifti (kendi sunucumuzda), çıkış uyarısı · 6 paket sahnesi + kaydırma ipucu · Form: ürüne göre kısa akış (12–19 soru), uzun soru bankası kaldırıldı, form sonu önizleme kaldırıldı · Asistanlar ürüne göre soru sorar · Blog: araç adları temizlendi. Yapılacak: sohbet dil pürüzleri, mobil menü arka planı (isteğe bağlı).
+
+- 2026-11-20 · Sesli kapanış (veda), 3 dk, e-posta+telefon zorunlu · Sohbet gerçek talep + kapanış sorusu + düzenlenebilir kart · Tarz bağlantısı talepten önce · Form ürüne özel sorular, web 13 · Supabase + Vercel fra1 yayında
