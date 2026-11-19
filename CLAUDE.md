@@ -57,10 +57,11 @@ Lacivert tema (`[data-site-theme='liquid']` içinde, `src/styles/theme.css`). Y�
 - Değişiklikten sonra iki `tsc` komutunu çalıştır, ardından `graphify update .`.
 - Çelişkili veya eski bilgi görürsen sessizce seçme, sahibe bildir.
 - Kalıcı karar çıkarsa `context/kararlar.md` dosyasına ekle ("hafızayı güncelle" için `proje-hafizasi` becerisi).
+- **Her iş sonunda kayıt zinciri (sahip, 2026-11-19):** `context/SON-DURUM.md` + `HARITA.md` güncelle → `npm run obsidian` (Obsidian kasası) → commit + `git push` (GitHub `chioutworksofficial/chioutworks-website`; pre-commit anahtar kontrolü çalışır) → Vercel GitHub'dan otomatik yayınlar. Vercel'e doğrudan yayın yapılmaz.
 
 ## Yapma
 - Eski bileşenleri (`CinematicGate`, `VillaTour`, `ClubXInvestors` vb.) silme.
-- `node_modules`, `public/kapigiris/` içine dokunma. `obsidian/` yalnızca sahibin isteğiyle güncellenir.
+- `node_modules`, `public/kapigiris/` içine dokunma.
 - Sahibin açık isteği olmadan yayımlama, kalıcı silme, harici mesaj, ücretli servis açma.
 - Tarayıcıda canlı testi sahibin yerine yapma; sahip kendi bakar.
 - Sır, anahtar, parola yazma.

@@ -82,6 +82,7 @@ tags: ["karar", "indeks"]
 ## 2026-11-19: Paket süreleri
 - "Teslim" yerine "Tipik süre"; gerçekçi aralıklar (tek kişilik işletme, iş yoğunluğu payı): CRM 6–12, kurumsal site 3–6, online randevu 4–8, yapay zekâ asistanı 4–8, teklif/fatura otomasyonu 3–6, QR menü 1–3 hafta. Kartların altında not: kesin takvim ücretsiz değerlendirmede, kapsam ve iş yoğunluğuna göre.
 - 2026-11-19 · Veri deposu Supabase (proje Chioutworks, Frankfurt, ayrı "Chiout Works" hesabı). Yalnızca sunucu gizli anahtarla erişir; tarayıcıdan doğrudan erişim yok, Supabase Auth yok. Kayıtlar JSON olarak saklanır (davranış JSON dosyalarıyla birebir aynı), geçiş adım adım ve JSON yedeğiyle.
+- 2026-11-19 · Yayın akışı: değişiklik → GitHub (`chioutworksofficial/chioutworks-website`) → Vercel otomatik çeker (Chioutworks'ün ayrı Vercel hesabı, ekip `chioutworks`). Vercel'e doğrudan yayın yok; Vercel API anahtarı tutulmaz. Her iş sonunda Obsidian'a kayıt (`npm run obsidian`).
 
 Son otomatik güncelleme: 2026-11-19 (scripts/obsidian-sync.mjs)
 <!-- otomatik:bitir -->
