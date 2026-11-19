@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
+import { dbOn, kvGet, kvSet } from './db.js';
 
 export const LIVE_MODEL = () => process.env.GEMINI_LIVE_MODEL || 'models/gemini-3.8-live';
 export const LIVE_VOICE = () => process.env.GEMINI_LIVE_VOICE || 'Sulafat';
@@ -54,20 +55,22 @@ export const pool = new SlotPool(() => envInt('GEMINI_LIVE_MAX_CONCURRENT', 3));
 const USAGE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../data/gemini-live-usage.json');
 interface Usage { day: string; dayCount: number; month: string; monthCount: number }
 const dayKey = (d = new Date()) => d.toISOString().slice(0, 10);
-function readUsage(d = new Date()): Usage {
+async function readUsage(d = new Date()): Promise<Usage> {
   let u: Usage = { day: dayKey(d), dayCount: 0, month: dayKey(d).slice(0, 7), monthCount: 0 };
-  try { const j = JSON.parse(fs.readFileSync(USAGE, 'utf8')) as Usage; if (j && typeof j.dayCount === 'number') u = { ...u, ...j }; } catch { /* none yet */ }
+  try { const j = (dbOn() ? await kvGet<Usage>('live_usage') : JSON.parse(fs.readFileSync(USAGE, 'utf8'))) as Usage | null; if (j && typeof j.dayCount === 'number') u = { ...u, ...j }; } catch { /* none yet */ }
   if (u.day !== dayKey(d)) { u.day = dayKey(d); u.dayCount = 0; }
   if (u.month !== dayKey(d).slice(0, 7)) { u.month = dayKey(d).slice(0, 7); u.monthCount = 0; }
   return u;
 }
-export function capReached(d = new Date(), u = readUsage(d)): 'daily' | 'monthly' | null {
+export async function capReached(d = new Date(), u?: Usage): Promise<'daily' | 'monthly' | null> {
+  u ??= await readUsage(d);
   if (u.dayCount >= envInt('GEMINI_LIVE_DAILY_CAP', 60)) return 'daily';
   if (u.monthCount >= envInt('GEMINI_LIVE_MONTHLY_CAP', 500)) return 'monthly';
   return null;
 }
-export function countSession() {
-  const u = readUsage(); u.dayCount++; u.monthCount++;
+export async function countSession() {
+  const u = await readUsage(); u.dayCount++; u.monthCount++;
+  if (dbOn()) { await kvSet('live_usage', u); return; }
   fs.mkdirSync(path.dirname(USAGE), { recursive: true });
   fs.writeFileSync(USAGE, JSON.stringify(u));
 }
@@ -76,12 +79,12 @@ export const markQuota = () => { lastQuotaHit = Date.now(); };
 export const quotaRecently = (ms: number) => Date.now() - lastQuotaHit < ms;
 export const isQuotaError = (e: unknown) => /429|RESOURCE_EXHAUSTED|quota/i.test(String((e as Error)?.message ?? e));
 /** 'high' = today's server count is at/above GEMINI_LIVE_PRESSURE_PCT of the daily cap, or Gemini reported quota within the last hour. */
-export function livePressure(): { pressure: 'low' | 'high'; browserMax: number } {
-  const u = readUsage();
+export async function livePressure(): Promise<{ pressure: 'low' | 'high'; browserMax: number }> {
+  const u = await readUsage();
   const high = quotaRecently(3600_000) || u.dayCount >= envInt('GEMINI_LIVE_DAILY_CAP', 60) * envInt('GEMINI_LIVE_PRESSURE_PCT', 70) / 100;
   return { pressure: high ? 'high' : 'low', browserMax: high ? 2 : envInt('GEMINI_LIVE_BROWSER_MAX_LOW', 6) };
 }
-export const usageSnapshot = () => { const u = readUsage(); return { ...u, dayCap: envInt('GEMINI_LIVE_DAILY_CAP', 60), monthCap: envInt('GEMINI_LIVE_MONTHLY_CAP', 500), max: envInt('GEMINI_LIVE_MAX_CONCURRENT', 3), active: pool.active }; };
+export const usageSnapshot = async () => { const u = await readUsage(); return { ...u, dayCap: envInt('GEMINI_LIVE_DAILY_CAP', 60), monthCap: envInt('GEMINI_LIVE_MONTHLY_CAP', 500), max: envInt('GEMINI_LIVE_MAX_CONCURRENT', 3), active: pool.active }; };
 
 // ── System instruction ────────────────────────────────────────────────────────────────────────
 export interface LiveVisitor { firstName: string; salutation: 'm' | 'f' | 'none'; hasLastName: boolean }

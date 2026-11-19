@@ -2,7 +2,7 @@ import { demoText } from '../src/components/demos/demoText';
 import { T as SITE_T } from '../src/translations';
 import { CATALOG_UI } from '../src/components/demos/i18n/catalog';
 import './env.js';
-import { dbOn, dbInsert } from './db.js';
+import { dbOn, dbInsert, dbUpsert, dbSelect, dbDelete, kvGet, kvSet } from './db.js';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -228,6 +228,16 @@ function loadDemoLeads(): DemoLead[] {
   }
 }
 
+// Supabase rows: columns code/email/expires_at + full lead in data. Expired rows (>30 days) are purged at most once a day.
+type DemoRow = { code: string; data: DemoLead };
+const demoRow = (l: DemoLead) => ({ code: l.code, email: l.email, expires_at: new Date(l.expiresAt).toISOString(), data: l });
+let demoPurgedAt = 0;
+async function purgeDemoRows() {
+  if (Date.now() - demoPurgedAt < 24 * 60 * 60 * 1000) return;
+  demoPurgedAt = Date.now();
+  try { await dbDelete('demo_access', `expires_at=lt.${encodeURIComponent(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())}`); } catch { /* retry tomorrow */ }
+}
+
 function saveDemoLeads(leads: DemoLead[]) {
   fs.mkdirSync(path.dirname(DEMO_STORE), { recursive: true });
   fs.writeFileSync(DEMO_STORE, JSON.stringify(leads, null, 2));
@@ -307,28 +317,32 @@ app.post('/api/demo/request-code', demoRequestLimiter, async (req, res) => {
 
   try {
     const now = Date.now();
-    const leads = loadDemoLeads();
-    const active = leads.filter((l) => l.expiresAt > now);
+    const db = dbOn();
+    const leads = db ? [] : loadDemoLeads();
+    const nowIso = encodeURIComponent(new Date(now).toISOString());
+    const active = db
+      ? (await dbSelect<DemoRow>('demo_access', `select=code,data&email=eq.${encodeURIComponent(email)}&expires_at=gt.${nowIso}`)).map((r) => r.data)
+      : leads.filter((l) => l.expiresAt > now);
 
     // Same email within 24h → reuse the active code instead of minting new ones
     let lead = active.find((l) => l.email === email);
     if (!lead) {
       lead = {
-        code: generateDemoCode(new Set(active.map((l) => l.code))),
+        code: generateDemoCode(new Set(db ? (await dbSelect<{ code: string }>('demo_access', `select=code&expires_at=gt.${nowIso}`)).map((r) => r.code) : active.map((l) => l.code))),
         email, name, phone, demo, lang,
         createdAt: now,
         expiresAt: now + DEMO_TTL_MS,
         emailSent: false,
       };
-      leads.push(lead);
+      if (!db) leads.push(lead);
     }
 
     const live = emailConfigured();
     if (live) lead.emailSent = (await sendDemoEmail(email, lead.code, lang)) || lead.emailSent;
-    saveDemoLeads(leads);
+    if (db) { await dbUpsert('demo_access', demoRow(lead), 'code'); void purgeDemoRows(); } else saveDemoLeads(leads);
 
     if (live && !lead.emailSent) return res.status(502).json({ ok: false, error: 'server' });
-    if (!live) console.log(`[demo] (simulated email) code ${lead.code} → ${email}`);
+    if (!live && process.env.NODE_ENV !== 'production') console.log(`[demo] (simulated email, local only) code ${lead.code}`);   // no e-mail address in logs
 
     return res.json({
       ok: true,
@@ -343,20 +357,21 @@ app.post('/api/demo/request-code', demoRequestLimiter, async (req, res) => {
 });
 
 // ── POST /api/demo/verify ──────────────────────────────────────────────────
-app.post('/api/demo/verify', demoVerifyLimiter, (req, res) => {
+app.post('/api/demo/verify', demoVerifyLimiter, async (req, res) => {
   const code = String(req.body?.code ?? '').replace(/\D/g, '');
   if (code.length !== 6) return res.status(400).json({ ok: false, error: 'invalid_code' });
 
   try {
     const now = Date.now();
-    const leads = loadDemoLeads();
-    const matches = leads.filter((l) => l.code === code).sort((a, b) => b.createdAt - a.createdAt);
+    const db = dbOn();
+    const leads = db ? [] : loadDemoLeads();
+    const matches = (db ? (await dbSelect<DemoRow>('demo_access', `select=code,data&code=eq.${code}`)).map((r) => r.data) : leads.filter((l) => l.code === code)).sort((a, b) => b.createdAt - a.createdAt);
     const lead = matches.find((l) => l.expiresAt > now);
     if (!lead) {
       return res.status(matches.length ? 410 : 404).json({ ok: false, error: matches.length ? 'expired' : 'invalid_code' });
     }
     lead.verifiedAt ??= now;
-    saveDemoLeads(leads);
+    if (db) await dbUpsert('demo_access', demoRow(lead), 'code'); else saveDemoLeads(leads);
     return res.json({ ok: true, expiresAt: lead.expiresAt, email: lead.email });
   } catch (err) {
     console.error('[demo] verify failed', err);
@@ -424,7 +439,7 @@ app.post('/api/demo/quote', quoteLimiter, async (req, res) => {
         body: JSON.stringify({ from: process.env.DEMO_EMAIL_FROM, to: [notify], reply_to: quote.email, subject: `${quote.kind === 'demo-request' ? 'Demo request' : 'Quote request'}: ${quote.business || quote.email} (${quote.demo})`, text: body }),
       }).catch((e) => console.error('[quote] notify failed', e));
     } else {
-      console.log(`[quote] new request from ${quote.email} (${quote.demo}): ${quote.modules.join(', ')}`);
+      console.log(`[quote] new request (${quote.demo}): ${quote.modules.join(', ')}`);   // no personal data in logs
     }
     return res.json({ ok: true });
   } catch (err) {
@@ -491,8 +506,8 @@ app.get('/api/admin/me', (req, res) => {
 
 // ── Availability (owner-managed busy days) ─────────────────────────────────
 const AVAIL_STORE = path.join(path.dirname(QUOTE_STORE), 'availability.json');
-const readBlocked = (): string[] => {
-  try { const b = JSON.parse(fs.readFileSync(AVAIL_STORE, 'utf8'))?.blocked; return Array.isArray(b) ? b.filter((x) => typeof x === 'string') : []; } catch { return []; }
+const readBlocked = async (): Promise<string[]> => {
+  try { const b = (dbOn() ? await kvGet<{ blocked?: unknown }>('availability') : JSON.parse(fs.readFileSync(AVAIL_STORE, 'utf8')))?.blocked; return Array.isArray(b) ? b.filter((x) => typeof x === 'string') : []; } catch { return []; }
 };
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const isRealDate = (s: string) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false; const d = new Date(`${s}T00:00:00Z`); return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s; };
@@ -503,6 +518,7 @@ const RATES_TTL = 12 * 60 * 60 * 1000;
 let ratesCache: { fetchedAt: number; rates: Record<string, number> } | null = null;
 try { ratesCache = JSON.parse(fs.readFileSync(RATES_FILE, 'utf8')); } catch { /* none yet */ }
 app.get('/api/rates', async (_req, res) => {
+  if (!ratesCache && dbOn()) { try { ratesCache = await kvGet('fx_rates'); } catch { /* none yet */ } }
   if (!ratesCache || Date.now() - ratesCache.fetchedAt > RATES_TTL) {
     try {
       const r = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,TRY', { signal: AbortSignal.timeout(8000) });
@@ -510,7 +526,7 @@ app.get('/api/rates', async (_req, res) => {
       const rates = { USD: d.rates?.USD, GBP: d.rates?.GBP, TRY: d.rates?.TRY } as Record<string, number>;
       if (Object.values(rates).every((n) => typeof n === 'number' && n > 0)) {
         ratesCache = { fetchedAt: Date.now(), rates };
-        try { fs.writeFileSync(RATES_FILE, JSON.stringify(ratesCache)); } catch { /* ignore */ }
+        try { if (dbOn()) await kvSet('fx_rates', ratesCache); else fs.writeFileSync(RATES_FILE, JSON.stringify(ratesCache)); } catch { /* ignore */ }
       }
     } catch { /* keep stale cache if any */ }
   }
@@ -574,19 +590,19 @@ app.get('/api/imprint-contact', (_req, res) => {
   return res.json({ email: EMAIL_RE.test(email) ? email : null });
 });
 
-app.get('/api/availability', (_req, res) => {
+app.get('/api/availability', async (_req, res) => {
   const today = localToday();
-  return res.json({ blocked: readBlocked().filter((d) => d >= today) });
+  return res.json({ blocked: (await readBlocked()).filter((d) => d >= today) });
 });
 
-app.put('/api/admin/availability', (req, res) => {
+app.put('/api/admin/availability', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const b = req.body?.blocked;
   if (!Array.isArray(b) || b.some((x) => typeof x !== 'string' || !isRealDate(x))) return res.status(400).json({ error: 'invalid' });
   const blocked = [...new Set(b as string[])].sort();
   if (blocked.length > 400) return res.status(400).json({ error: 'too_many' });
-  fs.mkdirSync(path.dirname(AVAIL_STORE), { recursive: true });
-  fs.writeFileSync(AVAIL_STORE, JSON.stringify({ blocked }, null, 2));
+  if (dbOn()) await kvSet('availability', { blocked });
+  else { fs.mkdirSync(path.dirname(AVAIL_STORE), { recursive: true }); fs.writeFileSync(AVAIL_STORE, JSON.stringify({ blocked }, null, 2)); }
   return res.json({ ok: true, blocked });
 });
 
@@ -632,7 +648,7 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
   const message = str(req.body?.message, 1000);
   if (!name || (!email && !phone)) return res.status(400).json({ ok: false, error: 'invalid' });
   if (email && !EMAIL_RE.test(email)) return res.status(400).json({ ok: false, error: 'invalid_email' });
-  if (readBlocked().includes(str(req.body?.preferredStart, 10))) return res.status(400).json({ ok: false, error: 'date_blocked' });
+  if ((await readBlocked()).includes(str(req.body?.preferredStart, 10))) return res.status(400).json({ ok: false, error: 'date_blocked' });
   let voiceLink: VoiceSession | null = null;
   const vid = str(req.body?.voiceSessionId, 64);
   if (vid) {
@@ -683,7 +699,7 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
         body: JSON.stringify({ from: process.env.DEMO_EMAIL_FROM, to: [notify], ...(rec.email ? { reply_to: rec.email } : {}), subject: `Contact: ${rec.name}`, text: body }),
       }).catch((e) => console.error('[contact] notify failed', e));
     } else {
-      console.log(`[contact] new message from ${rec.name} (${rec.email || rec.phone})`);
+      console.log('[contact] new message received');   // no personal data in logs
     }
     return res.json({ ok: true });
   } catch (err) {
@@ -772,25 +788,25 @@ const TTS_MONTHLY_CAP = Number(process.env.TTS_MONTHLY_CAP) || 450000;
 const TTS_SESSION_CAP = Number(process.env.TTS_SESSION_CAP) || 6000;
 const ttsSessions = new Map<string, { chars: number; at: number }>();
 const monthKey = () => new Date().toISOString().slice(0, 7);
-function readTtsUsage(): { month: string; chars: number } {
+async function readTtsUsage(): Promise<{ month: string; chars: number }> {
   try {
-    const j = JSON.parse(fs.readFileSync(TTS_USAGE_STORE, 'utf8'));
+    const j = dbOn() ? await kvGet<{ month?: string; chars?: number }>('tts_usage') : JSON.parse(fs.readFileSync(TTS_USAGE_STORE, 'utf8'));
     if (j?.month === monthKey() && Number.isFinite(j.chars)) return { month: j.month, chars: Number(j.chars) };
   } catch { /* none yet */ }
   return { month: monthKey(), chars: 0 };
 }
 /** Returns false (and counts nothing) if the text would exceed the monthly or session cap. */
-function reserveTts(len: number, sessionId: string): boolean {
+async function reserveTts(len: number, sessionId: string): Promise<boolean> {
   const now = Date.now();
   for (const [k, v] of ttsSessions) if (now - v.at > 2 * 60 * 60 * 1000) ttsSessions.delete(k);
   const sess = ttsSessions.get(sessionId) ?? { chars: 0, at: now };
-  const usage = readTtsUsage();
+  const usage = await readTtsUsage();
   if (usage.chars + len > TTS_MONTHLY_CAP || sess.chars + len > TTS_SESSION_CAP) return false;
   usage.chars += len;
   sess.chars += len; sess.at = now;
   ttsSessions.set(sessionId, sess);
-  fs.mkdirSync(path.dirname(TTS_USAGE_STORE), { recursive: true });
-  fs.writeFileSync(TTS_USAGE_STORE, JSON.stringify(usage));
+  if (dbOn()) await kvSet('tts_usage', usage);
+  else { fs.mkdirSync(path.dirname(TTS_USAGE_STORE), { recursive: true }); fs.writeFileSync(TTS_USAGE_STORE, JSON.stringify(usage)); }
   return true;
 }
 // Chat abuse: visitor status (client checks before a new chat, no model call) and admin unlock (owner 2026-11-19)
@@ -808,9 +824,9 @@ app.post('/api/admin/abuse/unlock', async (req, res) => {
   res.json({ ok: await adminUnlock(k) });
 });
 
-app.get('/api/admin/tts-usage', (req, res) => {
+app.get('/api/admin/tts-usage', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  return res.json({ ...readTtsUsage(), cap: TTS_MONTHLY_CAP });
+  return res.json({ ...(await readTtsUsage()), cap: TTS_MONTHLY_CAP });
 });
 
 app.post('/api/assistant/tts', ttsLimiter, async (req, res) => {
@@ -821,7 +837,7 @@ app.post('/api/assistant/tts', ttsLimiter, async (req, res) => {
   if (!text) return res.status(400).json({ error: 'invalid_text' });
   const sessionId = String(req.body?.sessionId ?? '').slice(0, 64) || (req.ip ?? 'anon');
   try {
-    if (!reserveTts(text.length, sessionId)) return res.status(429).json({ fallback: true });
+    if (!(await reserveTts(text.length, sessionId))) return res.status(429).json({ fallback: true });
   } catch (err) { console.error('[tts] usage store failed', err); return res.status(429).json({ fallback: true }); }
   const v = AZURE_VOICES[req.body?.lang] ?? AZURE_VOICES.en;
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${v.locale}"><voice name="${v.voice}">${xmlEscape(text)}</voice></speak>`;
@@ -1144,7 +1160,7 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
   const prev = typeof b.prevSessionId === 'string' ? b.prevSessionId : '';
   const resumed = Boolean(prev) && pool.has(prev);
   if (resumed) pool.release(prev);
-  const cap = resumed ? null : capReached() ?? (quotaRecently(10 * 60_000) ? 'daily' : null);
+  const cap = resumed ? null : (await capReached()) ?? (quotaRecently(10 * 60_000) ? 'daily' : null);
   if (cap) return res.status(503).json({ error: 'cap', scope: cap });
   const slot = pool.acquire(typeof b.ticket === 'string' ? b.ticket.slice(0, 64) : undefined);
   if (slot.ok === false) return res.status(503).json({ error: 'full', ticket: slot.ticket, position: slot.position, retryAfter: 5 });
@@ -1154,7 +1170,7 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
   try {
     const instruction = buildLiveInstruction(lang, loadKnowledge(), loadPersona(), visitor, resumed ? cleanTurns(b.transcript) : []);
     const t = await mintToken(lang, instruction);
-    if (!resumed) countSession();
+    if (!resumed) await countSession();
     return res.json({ ...t, sessionId: slot.id });
   } catch (err) {
     pool.release(slot.id);
@@ -1164,7 +1180,7 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
   }
 });
 
-app.get('/api/voice/live-status', liveLimiter, (_req, res) => res.json(livePressure()));
+app.get('/api/voice/live-status', liveLimiter, async (_req, res) => res.json(await livePressure()));
 app.post('/api/voice/live-heartbeat', liveLimiter, (req, res) => res.json({ ok: pool.beat(String(req.body?.sessionId ?? '')) }));
 app.post('/api/voice/live-end', liveLimiter, async (req, res) => {
   pool.release(String(req.body?.sessionId ?? ''));
@@ -1490,6 +1506,14 @@ registerAnalytics(app, { requireAdmin, rateSkip: demoLimitSkip });
 registerAffiliates(app, { requireAdmin });
 // AI website preview after the intake is submitted (content only, rendered by our template)
 registerPreview(app, { getGroq, rateSkip: demoLimitSkip });
+
+// Last-resort error handler (owner, 2026-11-19): async route errors (e.g. database briefly unavailable) answer with a
+// short JSON error; no stack traces or internals to the visitor, and only a short note in the server log.
+app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error(`[error] ${req.method} ${req.path}: ${String((err as Error)?.message ?? err).slice(0, 200)}`);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'server_error' });
+});
 
 app.listen(PORT, () => {
   console.log(`\x1b[32m✓\x1b[0m Chioutworks AI server running on http://localhost:${PORT}`);

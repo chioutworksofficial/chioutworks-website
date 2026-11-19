@@ -200,6 +200,8 @@ Boş (sahip girecek): `IMPRESSUM_EMAIL` (Impressum'da zorunlu e-posta; `bash scr
 - **Vercel**: eklenti hâlâ Workruno hesabında (team "Chousein's projects", workruno-app); sahip Chioutworks için ayrı Vercel hesabı istiyor → eklentiyi o hesaba yeniden bağlayacak. API anahtarı gerekmez.
 - **Vercel**: eklenti artık Chioutworks hesabında (ekip `chioutworks`, team_s1ZGvkwcs8i36qVzgVI0sCDy), erişim onaylandı, henüz proje yok. Sahibin oluşturduğu Vercel hesap anahtarı silindi (kullanılmıyor). Proje, API Vercel'e uyarlanıp Supabase geçişi bitince GitHub deposuna bağlanacak (önce önizleme testi). Obsidian kaydı artık her iş sonunda (CLAUDE.md kuralı güncellendi).
 - Supabase geçişi 4/15: + ziyaret istatistikleri (`analytics_events`, `daily_salts`; günlük tuz, eski tuzlar ve 400 günden eski olaylar silinir) + sohbet kilitleri (`abuse_*`; ABUSE_SALT .env'den; veritabanı hatasında kilit siteyi durdurmaz, açık kalır). İkisi de canlı veritabanında test edildi, test satırları silindi.
+- Supabase geçişi 8/15: + bülten (`newsletter_subscribers`), demo erişimi (`demo_access`, 30 gün sonra silinir), kapalı günler / döviz kuru / TTS ve canlı ses kullanım sayaçları (`kv`: availability, fx_rates, tts_usage, live_usage). Hepsi canlı test edildi, test verisi silindi.
+- Güvenlik: sunucu kayıtlarından kişisel veri kaldırıldı (demo isteği, teklif, iletişim satırları; demo kodu yalnızca yerelde ve e-posta servisi yokken yazılır). Son çare hata yakalayıcı: async hatalarda kısa JSON `server_error`, ziyaretçiye ayrıntı yok (Express 5 async hataları zaten yakalıyor, çökme yok).
 
 Son otomatik güncelleme: 2026-11-19 (scripts/obsidian-sync.mjs)
 <!-- otomatik:bitir -->

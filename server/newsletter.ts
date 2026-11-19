@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { dbOn, dbSelect, dbUpsert } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORE = path.join(__dirname, '../data/newsletter.json');
@@ -32,9 +33,19 @@ const write = (all: Subscriber[]) => {
   fs.renameSync(tmp, STORE);
 };
 
+const TABLE = 'newsletter_subscribers';
+const find = async (col: 'email' | 'token', val: string): Promise<Subscriber | undefined> => {
+  if (!dbOn()) return read().find((x) => x[col] === val);
+  return (await dbSelect<{ data: Subscriber }>(TABLE, `select=data&${col}=eq.${encodeURIComponent(val)}&limit=1`))[0]?.data;
+};
+const save = async (s: Subscriber) => {
+  if (!dbOn()) { const all = read(); const i = all.findIndex((x) => x.id === s.id); if (i < 0) all.push(s); else all[i] = s; return write(all); }
+  await dbUpsert(TABLE, { id: s.id, email: s.email, token: s.token, status: s.status, data: s }, 'id');
+};
+
 /** Only confirmed, not unsubscribed addresses may receive campaign mail. */
-export function canSend(email: string): boolean {
-  const s = read().find((x) => x.email === email.trim().toLowerCase());
+export async function canSend(email: string): Promise<boolean> {
+  const s = await find('email', email.trim().toLowerCase());
   return !!s && s.status === 'active';
 }
 export const unsubscribeUrl = (origin: string, token: string) => `${origin}/api/newsletter/unsubscribe?token=${encodeURIComponent(token)}`;
@@ -63,30 +74,30 @@ export function registerNewsletter(app: Express, d: Deps) {
   app.post('/api/newsletter/subscribe', limiter, async (req: Request, res: Response) => {
     const email = String(req.body?.email ?? '').trim().toLowerCase().slice(0, 254);
     if (!EMAIL_RE.test(email) || req.body?.consent !== true) return res.status(400).json({ error: 'bad_request' });
-    const all = read(); let s = all.find((x) => x.email === email);
+    let s = await find('email', email);
     if (s?.status === 'active') return res.json({ ok: true });
-    if (!s) { s = { id: crypto.randomUUID(), email, lang: langOf(req.body?.lang), source: String(req.body?.source ?? 'site').slice(0, 40), status: 'pending', token: crypto.randomBytes(24).toString('base64url'), consentVersion: CONSENT_TEXT_VERSION, createdAt: new Date().toISOString(), confirmedAt: null, unsubscribedAt: null }; all.push(s); }
+    if (!s) { s = { id: crypto.randomUUID(), email, lang: langOf(req.body?.lang), source: String(req.body?.source ?? 'site').slice(0, 40), status: 'pending', token: crypto.randomBytes(24).toString('base64url'), consentVersion: CONSENT_TEXT_VERSION, createdAt: new Date().toISOString(), confirmedAt: null, unsubscribedAt: null }; }
     else { s.status = 'pending'; s.unsubscribedAt = null; s.consentVersion = CONSENT_TEXT_VERSION; }
-    write(all);
+    await save(s);
     const origin = `${req.protocol}://${req.get('host')}`;
     // Without a verified sending domain nothing is mailed; the address simply stays "pending" (never mailed).
     await d.sendConfirm?.(email, s.lang, `${origin}/api/newsletter/confirm?token=${encodeURIComponent(s.token)}`, unsubscribeUrl(origin, s.token)).catch(() => false);
     return res.json({ ok: true });
   });
 
-  app.get('/api/newsletter/confirm', (req, res) => {
-    const all = read(); const s = all.find((x) => x.token === String(req.query.token ?? ''));
+  app.get('/api/newsletter/confirm', async (req, res) => {
+    const s = await find('token', String(req.query.token ?? ''));
     if (!s || s.status === 'unsubscribed') return res.status(404).type('html').send(html(s?.lang ?? 'en', PAGE[s?.lang ?? 'en'].bad, ''));
-    if (s.status === 'pending') { s.status = 'active'; s.confirmedAt = new Date().toISOString(); write(all); }
+    if (s.status === 'pending') { s.status = 'active'; s.confirmedAt = new Date().toISOString(); await save(s); }
     return res.type('html').send(html(s.lang, PAGE[s.lang].ok, PAGE[s.lang].okBody));
   });
 
   // One click from the mail (GET) and RFC 8058 one-click from mail apps (POST)
-  const unsubscribe = (req: Request, res: Response) => {
+  const unsubscribe = async (req: Request, res: Response) => {
     const token = String(req.query.token ?? req.body?.token ?? '');
-    const all = read(); const s = all.find((x) => x.token === token);
+    const s = await find('token', token);
     if (!s) return res.status(404).type('html').send(html('en', PAGE.en.bad, ''));
-    if (s.status !== 'unsubscribed') { s.status = 'unsubscribed'; s.unsubscribedAt = new Date().toISOString(); write(all); }
+    if (s.status !== 'unsubscribed') { s.status = 'unsubscribed'; s.unsubscribedAt = new Date().toISOString(); await save(s); }
     return res.type('html').send(html(s.lang, PAGE[s.lang].out, PAGE[s.lang].outBody));
   };
   app.get('/api/newsletter/unsubscribe', unsubscribe);
