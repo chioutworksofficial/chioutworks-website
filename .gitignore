@@ -1,0 +1,54 @@
+# ── Secrets: never commit (keys live in .env / Vercel env vars) ──
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.crt
+.vercel/
+.claude/settings.local.json
+
+# ── Dependencies / build output ──
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# ── Local runtime data (personal data: requests, intakes, offers, consents, uploads) ──
+data/
+!data/.gitkeep
+
+# ── Logs and temporary files ──
+*.log
+npm-debug.log*
+logs/
+*.tmp
+*.swp
+.cache/
+
+# ── OS / editor ──
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ── Tooling output ──
+graphify-out/
+public/assets-ai/
+
+# ── Obsidian: per-device window state (notes themselves are tracked) ──
+obsidian/**/.obsidian/workspace*.json
+obsidian/**/.obsidian/cache/
+
+# ── Promo work: large media outputs stay local ──
+tanitim/videolar/*
+tanitim/ses/*
+tanitim/kaynak-dosyalar/*
+!tanitim/**/.gitkeep
+
+# _yedek/ (archive) is intentionally tracked; uncomment the next line to ignore it
+# _yedek/

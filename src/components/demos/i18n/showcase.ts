@@ -1,0 +1,48 @@
+import type { Lang } from '../../../translations';
+
+export const SHOWCASE_UI = {
+  en: {
+    quote: 'Build package',
+    open: 'Open demo',
+    requestDemo: 'Request a demo',
+    requestTitle: 'Request a personal demo',
+    requestSub: 'This app is not open to the public. Tell us a little about your business and we will set up a personal demo for you, usually within one working day.',
+    requestMessage: 'I would like to see the demo of: {name}',
+    send: 'Send request',
+    sending: 'Sending…',
+    sent: 'Thank you! Your request has been received. We will get back to you shortly with access to the demo.',
+  },
+  de: {
+    quote: 'Paket zusammenstellen',
+    open: 'Demo öffnen',
+    requestDemo: 'Demo anfragen',
+    requestTitle: 'Persönliche Demo anfragen',
+    requestSub: 'Diese Anwendung ist nicht öffentlich zugänglich. Erzählen Sie uns kurz von Ihrem Unternehmen – wir richten Ihnen eine persönliche Demo ein, meist innerhalb eines Werktags.',
+    requestMessage: 'Ich möchte die Demo ansehen: {name}',
+    send: 'Anfrage senden',
+    sending: 'Wird gesendet…',
+    sent: 'Vielen Dank! Ihre Anfrage ist eingegangen. Wir melden uns in Kürze mit dem Zugang zur Demo.',
+  },
+  tr: {
+    quote: 'Paket oluştur',
+    open: 'Demoyu aç',
+    requestDemo: 'Demo talep et',
+    requestTitle: 'Size özel demo talep edin',
+    requestSub: 'Bu uygulama herkese açık değildir. İşletmenizden kısaca bahsedin; size özel bir demo hazırlayalım, genellikle bir iş günü içinde.',
+    requestMessage: 'Şu uygulamanın demosunu görmek istiyorum: {name}',
+    send: 'Talebi gönder',
+    sending: 'Gönderiliyor…',
+    sent: 'Teşekkürler! Talebiniz alındı. Kısa süre içinde demo erişimiyle size dönüş yapacağız.',
+  },
+  el: {
+    quote: 'Δημιουργία πακέτου',
+    open: 'Άνοιγμα επίδειξης',
+    requestDemo: 'Αίτημα επίδειξης',
+    requestTitle: 'Ζητήστε προσωπική επίδειξη',
+    requestSub: 'Αυτή η εφαρμογή δεν είναι δημόσια. Πείτε μας λίγα λόγια για την επιχείρησή σας και θα ετοιμάσουμε μια προσωπική επίδειξη, συνήθως μέσα σε μία εργάσιμη ημέρα.',
+    requestMessage: 'Θα ήθελα να δω την επίδειξη: {name}',
+    send: 'Αποστολή αιτήματος',
+    sending: 'Αποστολή…',
+    sent: 'Ευχαριστούμε! Το αίτημά σας ελήφθη. Θα επικοινωνήσουμε σύντομα μαζί σας με πρόσβαση στην επίδειξη.',
+  },
+} satisfies Record<Lang, Record<string, string>>;

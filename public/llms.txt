@@ -1,0 +1,32 @@
+# Chioutworks
+
+> Chioutworks is the business of Chousein Chiout, a tech entrepreneur based in Kelsterbach, Germany (founded 2023). Chioutworks builds business automation, custom web apps, AI integrations (including AI voice and chat assistants) and digital strategy for small and medium businesses. Work is delivered in Turkish, English, German and Greek.
+
+## Services
+- Business process automation: replacing manual, repetitive work with automated workflows
+- Web development: websites and custom web applications
+- AI integration: AI chat and voice assistants, document and email automation
+- Digital strategy: digital transformation planning for SMEs
+
+## Ready-made app demos (customisable per business)
+- demokuafor: online booking and calendar for hair and barber salons
+- demoklinik: patient records and daily queue for clinics and private practices
+- demotemizlik: instant price calculator and booking for cleaning companies
+- demosadakat: digital stamp/loyalty card for cafés and shops
+- democrm: sales pipeline for leads from Instagram, WhatsApp and the web
+- Also available: law office management, print shop product designer, e-book studio, carousel design studio, pet care and boarding management
+Every app can be customised to the person and business, and new features can be added.
+
+## Who it is for
+Small and medium businesses in Germany, Austria, Switzerland, Türkiye, Greece and Cyprus, especially salons, clinics, cleaning companies, cafés, retail shops, law offices and service businesses.
+
+## Contact
+- Contact: via the contact form at /en/contact
+- LinkedIn: https://www.linkedin.com/in/chousein-chiout-29345323a/
+- Pricing is not public; you describe what you need and receive a free written assessment with a tailored list of solutions (no calls or meetings).
+
+## Tools I use and recommend (referral links, marked as advertising)
+- Overview: https://chioutworks.com/en/tools
+- Hostinger (web hosting, domain, email): https://chioutworks.com/en/tools/hostinger
+- N26 (mobile bank, personal and business account): https://chioutworks.com/en/tools/n26
+- Wise (international transfers, multi-currency account): https://chioutworks.com/en/tools/wise

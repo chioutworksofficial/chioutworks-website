@@ -1,0 +1,2048 @@
+{
+ "form": "chioutworks-intake",
+ "version": "2026-09",
+ "field_naming": {
+  "text": "<question_id>",
+  "multi": "<question_id>__<option_id>  (checkbox, checked value '/Yes')",
+  "single / yn": "<question_id>  (radio group; value = option_id, yn -> yes|no|unsure)",
+  "other": "<question_id>__other (free text)",
+  "detail": "<question_id>__detail (free text)",
+  "consent": "consent (checkbox)",
+  "meta": [
+   "meta_company",
+   "meta_contact",
+   "meta_email",
+   "meta_phone",
+   "meta_date",
+   "meta_website"
+  ]
+ },
+ "markets": {
+  "DE": "Deutschland",
+  "TR": "Türkiye",
+  "GR": "Ελλάδα"
+ },
+ "variants": [
+  {
+   "file": "Chioutworks_Bedarfsanalyse_DE.pdf",
+   "langs": [
+    "de"
+   ],
+   "market": "DE"
+  },
+  {
+   "file": "Chioutworks_Ihtiyac_Analizi_TR_Almanya.pdf",
+   "langs": [
+    "tr"
+   ],
+   "market": "DE"
+  },
+  {
+   "file": "Chioutworks_Analysi_Anagkon_EL_Germania.pdf",
+   "langs": [
+    "el"
+   ],
+   "market": "DE"
+  },
+  {
+   "file": "Chioutworks_Ihtiyac_Analizi_TR_Turkiye.pdf",
+   "langs": [
+    "tr"
+   ],
+   "market": "TR"
+  },
+  {
+   "file": "Chioutworks_Analysi_Anagkon_EL_Ellada.pdf",
+   "langs": [
+    "el"
+   ],
+   "market": "GR"
+  },
+  {
+   "file": "Chioutworks_Bedarfsanalyse_DE-TR.pdf",
+   "langs": [
+    "de",
+    "tr"
+   ],
+   "market": "DE"
+  },
+  {
+   "file": "Chioutworks_Ihtiyac_Analizi_TR-DE.pdf",
+   "langs": [
+    "tr",
+    "de"
+   ],
+   "market": "DE"
+  },
+  {
+   "file": "Chioutworks_Bedarfsanalyse_DE-EL.pdf",
+   "langs": [
+    "de",
+    "el"
+   ],
+   "market": "DE"
+  },
+  {
+   "file": "Chioutworks_Analysi_Anagkon_EL-DE.pdf",
+   "langs": [
+    "el",
+    "de"
+   ],
+   "market": "DE"
+  },
+  {
+   "file": "Chioutworks_Bedarfsanalyse_DE-TR-EL.pdf",
+   "langs": [
+    "de",
+    "tr",
+    "el"
+   ],
+   "market": "DE"
+  }
+ ],
+ "sections": [
+  {
+   "id": "company",
+   "title": {
+    "de": "Angaben zum Unternehmen",
+    "tr": "Şirket Bilgileri",
+    "el": "Στοιχεία επιχείρησης"
+   },
+   "questions": [
+    {
+     "no": 1,
+     "id": "company_name",
+     "type": "text",
+     "text": {
+      "de": "Wie heißt Ihr Unternehmen?",
+      "tr": "Şirketinizin adı nedir?",
+      "el": "Ποια είναι η επωνυμία της επιχείρησής σας;"
+     }
+    },
+    {
+     "no": 2,
+     "id": "service_area",
+     "type": "text",
+     "text": {
+      "de": "In welcher Stadt / Region sind Sie tätig?",
+      "tr": "Hangi şehir/bölgede hizmet veriyorsunuz?",
+      "el": "Σε ποια πόλη / περιοχή δραστηριοποιείστε;"
+     }
+    },
+    {
+     "no": 3,
+     "id": "services",
+     "type": "text",
+     "text": {
+      "de": "Welche Leistungen bieten Sie an?",
+      "tr": "Hangi hizmetleri sunuyorsunuz?",
+      "el": "Ποιες υπηρεσίες προσφέρετε;"
+     }
+    },
+    {
+     "no": 4,
+     "id": "founded",
+     "type": "text",
+     "text": {
+      "de": "Seit wann gibt es Ihr Unternehmen?",
+      "tr": "Şirketiniz ne zamandır faaliyet gösteriyor?",
+      "el": "Από πότε λειτουργεί η επιχείρησή σας;"
+     }
+    },
+    {
+     "no": 5,
+     "id": "employees",
+     "type": "text",
+     "text": {
+      "de": "Wie viele Mitarbeitende haben Sie derzeit ungefähr?",
+      "tr": "Şu anda yaklaşık kaç çalışanınız var?",
+      "el": "Πόσους εργαζόμενους έχετε περίπου σήμερα;"
+     }
+    },
+    {
+     "no": 6,
+     "id": "customer_groups",
+     "type": "multi",
+     "text": {
+      "de": "Wer ist Ihre wichtigste Kundengruppe?",
+      "tr": "Hizmet verdiğiniz ana müşteri grubu kim?",
+      "el": "Ποια είναι η κύρια ομάδα πελατών σας;"
+     },
+     "options": [
+      {
+       "id": "private",
+       "text": {
+        "de": "Privatkunden",
+        "tr": "Bireysel müşteriler",
+        "el": "Ιδιώτες"
+       }
+      },
+      {
+       "id": "companies",
+       "text": {
+        "de": "Unternehmen",
+        "tr": "Firmalar",
+        "el": "Εταιρείες"
+       }
+      },
+      {
+       "id": "property_mgmt",
+       "text": {
+        "de": "Wohnanlagen / Hausverwaltungen",
+        "tr": "Apartman / Hausverwaltung",
+        "el": "Πολυκατοικίες / Hausverwaltung",
+        "tr_TR": "Apartman / site yönetimleri",
+        "el_GR": "Πολυκατοικίες / διαχειρίσεις"
+       }
+      },
+      {
+       "id": "commercial",
+       "text": {
+        "de": "Gewerbe",
+        "tr": "Gewerbe (ticari işletmeler)",
+        "el": "Επαγγελματικοί χώροι (Gewerbe)",
+        "tr_TR": "Ticari işletmeler",
+        "el_GR": "Επαγγελματικοί χώροι"
+       }
+      },
+      {
+       "id": "hospitality",
+       "text": {
+        "de": "Hotel / Gastronomie",
+        "tr": "Otel / Gastronomi",
+        "el": "Ξενοδοχεία / Εστίαση"
+       }
+      },
+      {
+       "id": "public",
+       "text": {
+        "de": "Öffentliche Einrichtungen",
+        "tr": "Kamu kurumları",
+        "el": "Δημόσιοι φορείς"
+       }
+      }
+     ],
+     "other": true
+    }
+   ]
+  },
+  {
+   "id": "current",
+   "title": {
+    "de": "Aktuelle Situation",
+    "tr": "Mevcut Durum",
+    "el": "Τρέχουσα κατάσταση"
+   },
+   "questions": [
+    {
+     "no": 7,
+     "id": "website_current",
+     "type": "text",
+     "text": {
+      "de": "Haben Sie derzeit eine Website? Wenn ja, wie lautet die Adresse?",
+      "tr": "Şu anda bir web siteniz var mı? Varsa adresini paylaşın.",
+      "el": "Έχετε σήμερα ιστοσελίδα; Αν ναι, ποια είναι η διεύθυνσή της;"
+     }
+    },
+    {
+     "no": 8,
+     "id": "website_satisfaction",
+     "type": "text",
+     "text": {
+      "de": "Sind Sie mit Ihrer aktuellen Website zufrieden? Was gefällt Ihnen nicht?",
+      "tr": "Web sitenizden memnun musunuz? Neyi beğenmiyorsunuz?",
+      "el": "Είστε ικανοποιημένος/η από την ιστοσελίδα σας; Τι δεν σας αρέσει;"
+     }
+    },
+    {
+     "no": 9,
+     "id": "contact_channels",
+     "type": "multi",
+     "text": {
+      "de": "Wie kommen Kunden heute zu Ihnen?",
+      "tr": "Şu anda müşteriler size nasıl ulaşıyor?",
+      "el": "Πώς έρχονται σήμερα οι πελάτες σε επαφή μαζί σας;"
+     },
+     "options": [
+      {
+       "id": "phone",
+       "text": {
+        "de": "Telefon",
+        "tr": "Telefon",
+        "el": "Τηλέφωνο"
+       }
+      },
+      {
+       "id": "whatsapp",
+       "text": {
+        "de": "WhatsApp",
+        "tr": "WhatsApp",
+        "el": "WhatsApp"
+       }
+      },
+      {
+       "id": "viber",
+       "text": {
+        "de": "Viber",
+        "tr": "Viber",
+        "el": "Viber"
+       },
+       "markets": [
+        "GR"
+       ]
+      },
+      {
+       "id": "email",
+       "text": {
+        "de": "E-Mail",
+        "tr": "E-posta",
+        "el": "E-mail"
+       }
+      },
+      {
+       "id": "instagram",
+       "text": {
+        "de": "Instagram",
+        "tr": "Instagram",
+        "el": "Instagram"
+       }
+      },
+      {
+       "id": "facebook",
+       "text": {
+        "de": "Facebook",
+        "tr": "Facebook",
+        "el": "Facebook"
+       }
+      },
+      {
+       "id": "google",
+       "text": {
+        "de": "Google",
+        "tr": "Google",
+        "el": "Google"
+       }
+      },
+      {
+       "id": "website",
+       "text": {
+        "de": "Website",
+        "tr": "Web sitesi",
+        "el": "Ιστοσελίδα"
+       }
+      },
+      {
+       "id": "referral",
+       "text": {
+        "de": "Empfehlung",
+        "tr": "Tavsiye",
+        "el": "Σύσταση"
+       }
+      },
+      {
+       "id": "portals",
+       "text": {
+        "de": "Online-Portale (z. B. MyHammer, Check24)",
+        "tr": "Online platformlar (ör. MyHammer, Check24)",
+        "el": "Online πλατφόρμες (π.χ. MyHammer, Check24)",
+        "tr_TR": "Online platformlar (ör. Armut)",
+        "el_GR": "Online πλατφόρμες / αγγελίες"
+       }
+      }
+     ],
+     "other": true
+    },
+    {
+     "no": 10,
+     "id": "main_channel",
+     "type": "text",
+     "text": {
+      "de": "Über welchen Kanal kommen die meisten Aufträge?",
+      "tr": "Siparişlerin/işlerin çoğu hangi kanaldan geliyor?",
+      "el": "Από ποιο κανάλι έρχονται οι περισσότερες δουλειές;"
+     }
+    },
+    {
+     "no": 11,
+     "id": "google_business",
+     "type": "yn",
+     "text": {
+      "de": "Haben Sie ein Google-Unternehmensprofil (Google Maps)?",
+      "tr": "Google Business / Google Haritalar profiliniz var mı?",
+      "el": "Έχετε προφίλ στο Google Business / Google Maps;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 12,
+     "id": "social_media",
+     "type": "text",
+     "text": {
+      "de": "Welche Social-Media-Kanäle nutzen Sie?",
+      "tr": "Sosyal medya hesaplarınız hangileri?",
+      "el": "Ποιους λογαριασμούς κοινωνικών δικτύων έχετε;"
+     }
+    },
+    {
+     "no": 13,
+     "id": "crm_current",
+     "type": "text",
+     "text": {
+      "de": "Nutzen Sie derzeit ein CRM oder ein anderes System zur Kundenverwaltung?",
+      "tr": "Herhangi bir CRM veya müşteri takip sistemi kullanıyor musunuz?",
+      "el": "Χρησιμοποιείτε κάποιο CRM ή σύστημα παρακολούθησης πελατών;"
+     }
+    },
+    {
+     "no": 14,
+     "id": "customer_data_storage",
+     "type": "multi",
+     "text": {
+      "de": "Wo speichern Sie Ihre Kundendaten aktuell?",
+      "tr": "Müşteri bilgilerini şu anda nerede tutuyorsunuz?",
+      "el": "Πού κρατάτε σήμερα τα στοιχεία των πελατών σας;"
+     },
+     "options": [
+      {
+       "id": "excel",
+       "text": {
+        "de": "Excel",
+        "tr": "Excel",
+        "el": "Excel"
+       }
+      },
+      {
+       "id": "gsheets",
+       "text": {
+        "de": "Google Sheets",
+        "tr": "Google Sheets",
+        "el": "Google Sheets"
+       }
+      },
+      {
+       "id": "crm",
+       "text": {
+        "de": "CRM",
+        "tr": "CRM",
+        "el": "CRM"
+       }
+      },
+      {
+       "id": "email",
+       "text": {
+        "de": "E-Mail",
+        "tr": "E-posta",
+        "el": "E-mail"
+       }
+      },
+      {
+       "id": "whatsapp",
+       "text": {
+        "de": "WhatsApp",
+        "tr": "WhatsApp",
+        "el": "WhatsApp"
+       }
+      },
+      {
+       "id": "paper",
+       "text": {
+        "de": "Papier",
+        "tr": "Kağıt",
+        "el": "Χαρτί"
+       }
+      }
+     ],
+     "other": true
+    }
+   ]
+  },
+  {
+   "id": "website",
+   "title": {
+    "de": "Erwartungen an die neue Website",
+    "tr": "Yeni Web Sitesinden Beklentiler",
+    "el": "Προσδοκίες από τη νέα ιστοσελίδα"
+   },
+   "questions": [
+    {
+     "no": 15,
+     "id": "website_goals",
+     "type": "multi",
+     "text": {
+      "de": "Was ist das Hauptziel der neuen Website?",
+      "tr": "Yeni web sitesinin temel amacı nedir?",
+      "el": "Ποιος είναι ο βασικός στόχος της νέας ιστοσελίδας;"
+     },
+     "options": [
+      {
+       "id": "professional",
+       "text": {
+        "de": "Professioneller auftreten",
+        "tr": "Daha profesyonel görünmek",
+        "el": "Πιο επαγγελματική εικόνα"
+       }
+      },
+      {
+       "id": "google_leads",
+       "text": {
+        "de": "Neue Kunden über Google",
+        "tr": "Google’dan yeni müşteri almak",
+        "el": "Νέοι πελάτες από το Google"
+       }
+      },
+      {
+       "id": "quote_requests",
+       "text": {
+        "de": "Angebotsanfragen sammeln",
+        "tr": "Teklif talepleri toplamak",
+        "el": "Συλλογή αιτημάτων προσφοράς"
+       }
+      },
+      {
+       "id": "phone_whatsapp",
+       "text": {
+        "de": "Kunden über Telefon / WhatsApp",
+        "tr": "Telefon/WhatsApp ile müşteri almak",
+        "el": "Πελάτες μέσω τηλεφώνου / WhatsApp"
+       }
+      },
+      {
+       "id": "b2b",
+       "text": {
+        "de": "Geschäftskunden erreichen",
+        "tr": "Kurumsal müşterilere ulaşmak",
+        "el": "Προσέγγιση εταιρικών πελατών"
+       }
+      },
+      {
+       "id": "present_services",
+       "text": {
+        "de": "Leistungen vorstellen",
+        "tr": "Hizmetleri tanıtmak",
+        "el": "Παρουσίαση υπηρεσιών"
+       }
+      },
+      {
+       "id": "recruiting",
+       "text": {
+        "de": "Mitarbeitende finden",
+        "tr": "Çalışan bulmak",
+        "el": "Εύρεση προσωπικού"
+       }
+      },
+      {
+       "id": "brand",
+       "text": {
+        "de": "Marke aufbauen",
+        "tr": "Marka oluşturmak",
+        "el": "Δημιουργία brand"
+       }
+      }
+     ],
+     "other": true
+    },
+    {
+     "no": 16,
+     "id": "pages",
+     "type": "multi",
+     "text": {
+      "de": "Welche Seiten soll die Website enthalten?",
+      "tr": "Web sitesinde hangi sayfaların olmasını istiyorsunuz?",
+      "el": "Ποιες σελίδες θέλετε να έχει η ιστοσελίδα;"
+     },
+     "options": [
+      {
+       "id": "home",
+       "text": {
+        "de": "Startseite",
+        "tr": "Startseite (Ana sayfa)",
+        "el": "Startseite (Αρχική)",
+        "tr_TR": "Ana sayfa",
+        "el_GR": "Αρχική"
+       }
+      },
+      {
+       "id": "about",
+       "text": {
+        "de": "Über uns",
+        "tr": "Über uns (Hakkımızda)",
+        "el": "Über uns (Σχετικά με εμάς)",
+        "tr_TR": "Hakkımızda",
+        "el_GR": "Σχετικά με εμάς"
+       }
+      },
+      {
+       "id": "services",
+       "text": {
+        "de": "Leistungen",
+        "tr": "Leistungen (Hizmetler)",
+        "el": "Leistungen (Υπηρεσίες)",
+        "tr_TR": "Hizmetler",
+        "el_GR": "Υπηρεσίες"
+       }
+      },
+      {
+       "id": "references",
+       "text": {
+        "de": "Referenzen",
+        "tr": "Referenzen (Referanslar)",
+        "el": "Referenzen (Αναφορές / έργα)",
+        "tr_TR": "Referanslar",
+        "el_GR": "Αναφορές / έργα"
+       }
+      },
+      {
+       "id": "prices",
+       "text": {
+        "de": "Preise",
+        "tr": "Preise (Fiyatlar)",
+        "el": "Preise (Τιμές)",
+        "tr_TR": "Fiyatlar",
+        "el_GR": "Τιμές"
+       }
+      },
+      {
+       "id": "contact",
+       "text": {
+        "de": "Kontakt",
+        "tr": "Kontakt (İletişim)",
+        "el": "Kontakt (Επικοινωνία)",
+        "tr_TR": "İletişim",
+        "el_GR": "Επικοινωνία"
+       }
+      },
+      {
+       "id": "faq",
+       "text": {
+        "de": "FAQ",
+        "tr": "FAQ (SSS)",
+        "el": "FAQ (Συχνές ερωτήσεις)",
+        "tr_TR": "SSS (Sık sorulan sorular)",
+        "el_GR": "Συχνές ερωτήσεις"
+       }
+      },
+      {
+       "id": "career",
+       "text": {
+        "de": "Karriere",
+        "tr": "Karriere (Kariyer)",
+        "el": "Karriere (Καριέρα)",
+        "tr_TR": "Kariyer",
+        "el_GR": "Καριέρα"
+       }
+      },
+      {
+       "id": "blog",
+       "text": {
+        "de": "Blog",
+        "tr": "Blog",
+        "el": "Blog"
+       }
+      },
+      {
+       "id": "gallery",
+       "text": {
+        "de": "Galerie / Vorher-Nachher",
+        "tr": "Galerie (Öncesi-Sonrası)",
+        "el": "Galerie (Πριν-Μετά)",
+        "tr_TR": "Galeri / Öncesi-Sonrası",
+        "el_GR": "Γκαλερί / Πριν-Μετά"
+       }
+      },
+      {
+       "id": "privacy",
+       "text": {
+        "de": "Datenschutz",
+        "tr": "Datenschutz (Gizlilik)",
+        "el": "Datenschutz (Προστασία δεδομένων)",
+        "tr_TR": "KVKK Aydınlatma Metni / Gizlilik",
+        "el_GR": "Πολιτική απορρήτου (GDPR)"
+       }
+      },
+      {
+       "id": "legal",
+       "text": {
+        "de": "Impressum",
+        "tr": "Impressum (Yasal künye)",
+        "el": "Impressum (Νομικά στοιχεία)",
+        "tr_TR": "Çerez politikası",
+        "el_GR": "Όροι χρήσης / Cookies"
+       }
+      }
+     ],
+     "other": true
+    },
+    {
+     "no": 17,
+     "id": "quote_form",
+     "type": "yn",
+     "text": {
+      "de": "Sollen Kunden über die Website ein Angebot anfragen können?",
+      "tr": "Müşterilerin web sitesinden teklif talep etmesini ister misiniz?",
+      "el": "Θέλετε οι πελάτες να μπορούν να ζητούν προσφορά μέσω της ιστοσελίδας;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 18,
+     "id": "quote_fields",
+     "type": "multi",
+     "text": {
+      "de": "Welche Angaben möchten Sie bei einer Angebotsanfrage abfragen?",
+      "tr": "Teklif talep eden müşteriden hangi bilgileri almak istersiniz?",
+      "el": "Ποια στοιχεία θέλετε να δίνει ο πελάτης όταν ζητά προσφορά;"
+     },
+     "options": [
+      {
+       "id": "name",
+       "text": {
+        "de": "Name",
+        "tr": "İsim",
+        "el": "Όνομα"
+       }
+      },
+      {
+       "id": "phone",
+       "text": {
+        "de": "Telefon",
+        "tr": "Telefon",
+        "el": "Τηλέφωνο"
+       }
+      },
+      {
+       "id": "email",
+       "text": {
+        "de": "E-Mail",
+        "tr": "E-posta",
+        "el": "E-mail"
+       }
+      },
+      {
+       "id": "address",
+       "text": {
+        "de": "Adresse",
+        "tr": "Adres",
+        "el": "Διεύθυνση"
+       }
+      },
+      {
+       "id": "size",
+       "text": {
+        "de": "Größe der Fläche (m²)",
+        "tr": "Alanın büyüklüğü (m²)",
+        "el": "Εμβαδόν χώρου (m²)"
+       }
+      },
+      {
+       "id": "service_type",
+       "text": {
+        "de": "Art der Leistung",
+        "tr": "Hizmet türü",
+        "el": "Είδος υπηρεσίας"
+       }
+      },
+      {
+       "id": "frequency",
+       "text": {
+        "de": "Häufigkeit (einmalig / regelmäßig)",
+        "tr": "Sıklık (tek sefer / düzenli)",
+        "el": "Συχνότητα (εφάπαξ / τακτικά)"
+       }
+      },
+      {
+       "id": "date",
+       "text": {
+        "de": "Wunschtermin",
+        "tr": "İstenen tarih",
+        "el": "Επιθυμητή ημερομηνία"
+       }
+      },
+      {
+       "id": "photos",
+       "text": {
+        "de": "Fotos",
+        "tr": "Fotoğraf",
+        "el": "Φωτογραφίες"
+       }
+      },
+      {
+       "id": "notes",
+       "text": {
+        "de": "Zusätzliche Hinweise",
+        "tr": "Ek açıklama",
+        "el": "Επιπλέον σχόλια"
+       }
+      }
+     ],
+     "other": true
+    },
+    {
+     "no": 19,
+     "id": "online_booking",
+     "type": "yn",
+     "text": {
+      "de": "Sollen Kunden direkt über die Website einen Termin buchen können?",
+      "tr": "Müşterilerin web sitesinden doğrudan randevu almasını ister misiniz?",
+      "el": "Θέλετε οι πελάτες να κλείνουν ραντεβού απευθείας από την ιστοσελίδα;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 20,
+     "id": "online_payment",
+     "type": "yn",
+     "text": {
+      "de": "Wird Online-Zahlung auf der Website benötigt?",
+      "tr": "Web sitesinde online ödeme gerekli mi?",
+      "el": "Χρειάζεται ηλεκτρονική πληρωμή στην ιστοσελίδα;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 21,
+     "id": "customer_accounts",
+     "type": "yn",
+     "text": {
+      "de": "Sollen Kunden auf der Website ein eigenes Konto anlegen können?",
+      "tr": "Müşterilerin web sitesinde hesap oluşturması gerekiyor mu?",
+      "el": "Χρειάζεται οι πελάτες να δημιουργούν λογαριασμό στην ιστοσελίδα;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 22,
+     "id": "website_languages",
+     "type": "multi",
+     "text": {
+      "de": "In welchen Sprachen soll die Website erscheinen?",
+      "tr": "Web sitesi hangi dillerde olmalı?",
+      "el": "Σε ποιες γλώσσες πρέπει να είναι η ιστοσελίδα;"
+     },
+     "options": [
+      {
+       "id": "de",
+       "text": {
+        "de": "Deutsch",
+        "tr": "Almanca",
+        "el": "Γερμανικά"
+       }
+      },
+      {
+       "id": "tr",
+       "text": {
+        "de": "Türkisch",
+        "tr": "Türkçe",
+        "el": "Τουρκικά"
+       }
+      },
+      {
+       "id": "el",
+       "text": {
+        "de": "Griechisch",
+        "tr": "Yunanca",
+        "el": "Ελληνικά"
+       }
+      },
+      {
+       "id": "en",
+       "text": {
+        "de": "Englisch",
+        "tr": "İngilizce",
+        "el": "Αγγλικά"
+       }
+      }
+     ],
+     "other": true
+    }
+   ]
+  },
+  {
+   "id": "process",
+   "title": {
+    "de": "Leistungen & Angebotsprozess",
+    "tr": "Hizmetler & Teklif Süreci",
+    "el": "Υπηρεσίες & διαδικασία προσφοράς"
+   },
+   "questions": [
+    {
+     "no": 23,
+     "id": "service_list",
+     "type": "multi",
+     "text": {
+      "de": "Welche Leistungen bieten Sie konkret an?",
+      "tr": "Hangi hizmetleri veriyorsunuz?",
+      "el": "Ποιες υπηρεσίες προσφέρετε συγκεκριμένα;"
+     },
+     "options": [
+      {
+       "id": "office",
+       "text": {
+        "de": "Büroreinigung",
+        "tr": "Büroreinigung (ofis)",
+        "el": "Büroreinigung (γραφεία)",
+        "tr_TR": "Ofis temizliği",
+        "el_GR": "Καθαρισμός γραφείων"
+       }
+      },
+      {
+       "id": "building",
+       "text": {
+        "de": "Gebäudereinigung",
+        "tr": "Gebäudereinigung (bina)",
+        "el": "Gebäudereinigung (κτίρια)",
+        "tr_TR": "Bina temizliği",
+        "el_GR": "Καθαρισμός κτιρίων"
+       }
+      },
+      {
+       "id": "maintenance",
+       "text": {
+        "de": "Unterhaltsreinigung",
+        "tr": "Unterhaltsreinigung (periyodik)",
+        "el": "Unterhaltsreinigung (τακτικός)",
+        "tr_TR": "Periyodik temizlik",
+        "el_GR": "Τακτικός καθαρισμός"
+       }
+      },
+      {
+       "id": "windows",
+       "text": {
+        "de": "Fenster- / Glasreinigung",
+        "tr": "Fenster-/Glasreinigung (cam)",
+        "el": "Fenster-/Glasreinigung (τζάμια)",
+        "tr_TR": "Cam temizliği",
+        "el_GR": "Καθαρισμός τζαμιών"
+       }
+      },
+      {
+       "id": "stairwell",
+       "text": {
+        "de": "Treppenhausreinigung",
+        "tr": "Treppenhausreinigung (merdiven)",
+        "el": "Treppenhausreinigung (κλιμακοστάσια)",
+        "tr_TR": "Apartman / merdiven temizliği",
+        "el_GR": "Καθαρισμός κλιμακοστασίων"
+       }
+      },
+      {
+       "id": "deep",
+       "text": {
+        "de": "Grundreinigung",
+        "tr": "Grundreinigung (detaylı)",
+        "el": "Grundreinigung (γενικός)",
+        "tr_TR": "Detaylı temizlik",
+        "el_GR": "Γενικός καθαρισμός"
+       }
+      },
+      {
+       "id": "construction",
+       "text": {
+        "de": "Bauendreinigung",
+        "tr": "Bauendreinigung (inşaat sonrası)",
+        "el": "Bauendreinigung (μετά από εργασίες)",
+        "tr_TR": "İnşaat sonrası temizlik",
+        "el_GR": "Καθαρισμός μετά από οικοδομικές εργασίες"
+       }
+      },
+      {
+       "id": "medical",
+       "text": {
+        "de": "Praxisreinigung",
+        "tr": "Praxisreinigung (muayenehane)",
+        "el": "Praxisreinigung (ιατρεία)",
+        "tr_TR": "Klinik / muayenehane temizliği",
+        "el_GR": "Καθαρισμός ιατρείων"
+       }
+      },
+      {
+       "id": "hotel",
+       "text": {
+        "de": "Hotelreinigung",
+        "tr": "Hotelreinigung (otel)",
+        "el": "Hotelreinigung (ξενοδοχεία)",
+        "tr_TR": "Otel temizliği",
+        "el_GR": "Καθαρισμός ξενοδοχείων"
+       }
+      },
+      {
+       "id": "holiday",
+       "text": {
+        "de": "Ferienwohnungen",
+        "tr": "Ferienwohnung (tatil evi)",
+        "el": "Ferienwohnung (ενοικ. καταλύματα)",
+        "tr_TR": "Günlük kiralık / Airbnb daire",
+        "el_GR": "Airbnb / ενοικιαζόμενα καταλύματα"
+       }
+      },
+      {
+       "id": "industrial",
+       "text": {
+        "de": "Industriereinigung",
+        "tr": "Industriereinigung (endüstriyel)",
+        "el": "Industriereinigung (βιομηχανικός)",
+        "tr_TR": "Endüstriyel temizlik",
+        "el_GR": "Βιομηχανικός καθαρισμός"
+       }
+      },
+      {
+       "id": "home",
+       "text": {
+        "de": "Privathaushalte",
+        "tr": "Ev temizliği",
+        "el": "Καθαρισμός οικιών"
+       }
+      }
+     ],
+     "other": true
+    },
+    {
+     "no": 24,
+     "id": "per_service_questions",
+     "type": "text",
+     "text": {
+      "de": "Müssen je nach Leistung unterschiedliche Fragen an den Kunden gestellt werden?",
+      "tr": "Her hizmet için müşteriye farklı sorular sorulması gerekiyor mu?",
+      "el": "Χρειάζονται διαφορετικές ερωτήσεις στον πελάτη ανάλογα με την υπηρεσία;"
+     }
+    },
+    {
+     "no": 25,
+     "id": "pricing_inputs",
+     "type": "text",
+     "text": {
+      "de": "Welche Informationen benötigen Sie, um einen Preis festzulegen?",
+      "tr": "Fiyatı belirlemek için hangi bilgilere ihtiyacınız oluyor?",
+      "el": "Ποιες πληροφορίες χρειάζεστε για να καθορίσετε την τιμή;"
+     }
+    },
+    {
+     "no": 26,
+     "id": "current_quote_process",
+     "type": "text",
+     "text": {
+      "de": "Was passiert heute, wenn eine Anfrage bei Ihnen eingeht?",
+      "tr": "Bir müşteriden talep geldiğinde şu anda ne yapıyorsunuz?",
+      "el": "Τι κάνετε σήμερα όταν λαμβάνετε ένα αίτημα;"
+     }
+    },
+    {
+     "no": 27,
+     "id": "quote_time",
+     "type": "text",
+     "text": {
+      "de": "Wie viel Zeit benötigen Sie für ein Angebot?",
+      "tr": "Bir teklif hazırlamak ne kadar zamanınızı alıyor?",
+      "el": "Πόσο χρόνο σας παίρνει η προετοιμασία μιας προσφοράς;"
+     }
+    },
+    {
+     "no": 28,
+     "id": "quotes_per_month",
+     "type": "text",
+     "text": {
+      "de": "Wie viele Anfragen / Angebote haben Sie ungefähr pro Monat?",
+      "tr": "Ayda yaklaşık kaç talep alıyor / kaç teklif hazırlıyorsunuz?",
+      "el": "Περίπου πόσα αιτήματα / προσφορές έχετε τον μήνα;"
+     }
+    },
+    {
+     "no": 29,
+     "id": "quotes_manual",
+     "type": "yn",
+     "text": {
+      "de": "Erstellen Sie Angebote manuell?",
+      "tr": "Teklifleri manuel olarak mı hazırlıyorsunuz?",
+      "el": "Ετοιμάζετε τις προσφορές χειροκίνητα;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 30,
+     "id": "quote_send_channel",
+     "type": "multi",
+     "text": {
+      "de": "Wie versenden Sie Angebote?",
+      "tr": "Teklifleri müşterilere nasıl gönderiyorsunuz?",
+      "el": "Πώς στέλνετε τις προσφορές;"
+     },
+     "options": [
+      {
+       "id": "email",
+       "text": {
+        "de": "E-Mail",
+        "tr": "E-posta",
+        "el": "E-mail"
+       }
+      },
+      {
+       "id": "whatsapp",
+       "text": {
+        "de": "WhatsApp",
+        "tr": "WhatsApp",
+        "el": "WhatsApp"
+       }
+      },
+      {
+       "id": "viber",
+       "text": {
+        "de": "Viber",
+        "tr": "Viber",
+        "el": "Viber"
+       },
+       "markets": [
+        "GR"
+       ]
+      },
+      {
+       "id": "paper",
+       "text": {
+        "de": "Post / Papier",
+        "tr": "Kağıt / elden",
+        "el": "Σε χαρτί"
+       }
+      },
+      {
+       "id": "phone",
+       "text": {
+        "de": "Mündlich / Telefon",
+        "tr": "Sözlü / telefonla",
+        "el": "Προφορικά / τηλεφωνικά"
+       }
+      }
+     ],
+     "other": true
+    },
+    {
+     "no": 31,
+     "id": "follow_up_current",
+     "type": "text",
+     "text": {
+      "de": "Fassen Sie nach dem Versand eines Angebots beim Kunden nach?",
+      "tr": "Teklif gönderildikten sonra müşteriyi takip ediyor musunuz?",
+      "el": "Επικοινωνείτε ξανά με τον πελάτη μετά την προσφορά;"
+     }
+    },
+    {
+     "no": 32,
+     "id": "auto_follow_up",
+     "type": "yn",
+     "text": {
+      "de": "Wünschen Sie z. B. nach 3 Tagen eine automatische Nachricht wie „Haben Sie noch Fragen zu unserem Angebot?“",
+      "tr": "Örneğin 3 gün sonra müşteriye otomatik olarak “Teklifimiz hakkında sorunuz var mı?” mesajı gönderilmesini ister misiniz?",
+      "el": "Θα θέλατε π.χ. μετά από 3 ημέρες να στέλνεται αυτόματα ένα μήνυμα όπως «Έχετε ερωτήσεις για την προσφορά μας;»"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "automation",
+   "title": {
+    "de": "Automatisierung",
+    "tr": "Otomasyon İhtiyaçları",
+    "el": "Ανάγκες αυτοματισμού"
+   },
+   "questions": [
+    {
+     "no": 33,
+     "id": "repetitive_tasks",
+     "type": "text",
+     "text": {
+      "de": "Welche Aufgaben kosten aktuell am meisten Zeit oder wiederholen sich ständig?",
+      "tr": "İşletmenizde en çok zaman alan veya sürekli tekrar ettiğiniz işler nelerdir?",
+      "el": "Ποιες εργασίες σας παίρνουν τον περισσότερο χρόνο ή επαναλαμβάνονται συνεχώς;"
+     }
+    },
+    {
+     "no": 34,
+     "id": "form_flow",
+     "type": "text",
+     "text": {
+      "de": "Was soll passieren, wenn ein Kunde über die Website ein Formular absendet?",
+      "tr": "Müşteri web sitesinden form gönderdiğinde ne olmasını istersiniz?",
+      "el": "Τι θα θέλατε να συμβαίνει όταν ένας πελάτης στέλνει φόρμα από την ιστοσελίδα;"
+     }
+    },
+    {
+     "no": 35,
+     "id": "auto_crm",
+     "type": "yn",
+     "text": {
+      "de": "Soll bei einer neuen Anfrage automatisch ein Kundeneintrag (CRM) angelegt werden?",
+      "tr": "Yeni müşteri geldiğinde otomatik olarak CRM kaydı oluşturulsun mu?",
+      "el": "Να δημιουργείται αυτόματα εγγραφή πελάτη (CRM) σε κάθε νέο αίτημα;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 36,
+     "id": "auto_email",
+     "type": "yn",
+     "text": {
+      "de": "Möchten Sie automatische E-Mails an Kunden versenden?",
+      "tr": "Müşterilere otomatik e-posta göndermek ister misiniz?",
+      "el": "Θέλετε να στέλνονται αυτόματα e-mail στους πελάτες;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 37,
+     "id": "messenger_notify",
+     "type": "yn",
+     "text": {
+      "de": "Werden automatische Benachrichtigungen per WhatsApp benötigt?",
+      "tr": "WhatsApp üzerinden otomatik bilgilendirme veya bildirim gerekli mi?",
+      "el": "Χρειάζεστε αυτόματες ειδοποιήσεις μέσω WhatsApp;",
+      "el_GR": "Χρειάζεστε αυτόματες ειδοποιήσεις μέσω Viber ή WhatsApp;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 38,
+     "id": "booking_system",
+     "type": "yn",
+     "text": {
+      "de": "Wird ein Terminbuchungssystem benötigt?",
+      "tr": "Randevu sistemi gerekli mi?",
+      "el": "Χρειάζεστε σύστημα κρατήσεων / ραντεβού;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 39,
+     "id": "auto_quotes",
+     "type": "yn",
+     "text": {
+      "de": "Sollen Angebote automatisch erstellt werden?",
+      "tr": "Tekliflerin otomatik oluşturulmasını ister misiniz?",
+      "el": "Θέλετε οι προσφορές να δημιουργούνται αυτόματα;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 40,
+     "id": "invoicing",
+     "type": "yn",
+     "text": {
+      "de": "Wird eine Anbindung an Ihr Rechnungsprogramm benötigt? Welches nutzen Sie (z. B. lexoffice, sevDesk)?",
+      "tr": "Fatura programınızla bağlantı gerekiyor mu? Hangi programı kullanıyorsunuz?",
+      "el": "Χρειάζεται σύνδεση με το πρόγραμμα τιμολόγησης; Ποιο χρησιμοποιείτε;",
+      "tr_TR": "Fatura / e-Fatura programınızla bağlantı gerekiyor mu? Hangisini kullanıyorsunuz (ör. Paraşüt, Logo)?",
+      "el_GR": "Χρειάζεται σύνδεση με το πρόγραμμα τιμολόγησης / myDATA; Ποιο χρησιμοποιείτε (π.χ. Elorus, Epsilon);"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ],
+     "detail": true
+    },
+    {
+     "no": 41,
+     "id": "calendar",
+     "type": "yn",
+     "text": {
+      "de": "Nutzen Sie Google Kalender oder ein anderes Kalendersystem?",
+      "tr": "Google Takvim veya başka bir takvim sistemi kullanıyor musunuz?",
+      "el": "Χρησιμοποιείτε Google Calendar ή άλλο ημερολόγιο;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ],
+     "detail": true
+    },
+    {
+     "no": 42,
+     "id": "staff_scheduling",
+     "type": "yn",
+     "text": {
+      "de": "Möchten Sie Aufgaben Ihrer Mitarbeitenden oder Einsatztermine digital verwalten?",
+      "tr": "Çalışanlarınızın görevlerini veya iş randevularını dijital olarak takip etmek ister misiniz?",
+      "el": "Θέλετε να διαχειρίζεστε ψηφιακά τις εργασίες του προσωπικού ή τα ραντεβού;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 43,
+     "id": "customer_history",
+     "type": "multi",
+     "text": {
+      "de": "Welche Kundenhistorie möchten Sie einsehen können?",
+      "tr": "Müşteri geçmişinde neleri görmek istersiniz?",
+      "el": "Τι θέλετε να βλέπετε στο ιστορικό κάθε πελάτη;"
+     },
+     "options": [
+      {
+       "id": "last_job",
+       "text": {
+        "de": "Letzter Einsatz",
+        "tr": "Son hizmet tarihi",
+        "el": "Τελευταία εργασία"
+       }
+      },
+      {
+       "id": "quote",
+       "text": {
+        "de": "Versendetes Angebot",
+        "tr": "Verilen teklif",
+        "el": "Προσφορά που δόθηκε"
+       }
+      },
+      {
+       "id": "price",
+       "text": {
+        "de": "Preis",
+        "tr": "Fiyat",
+        "el": "Τιμή"
+       }
+      },
+      {
+       "id": "conversations",
+       "text": {
+        "de": "Gespräche",
+        "tr": "Görüşmeler",
+        "el": "Συνομιλίες"
+       }
+      },
+      {
+       "id": "notes",
+       "text": {
+        "de": "Notizen",
+        "tr": "Notlar",
+        "el": "Σημειώσεις"
+       }
+      },
+      {
+       "id": "next_appt",
+       "text": {
+        "de": "Nächster Termin",
+        "tr": "Sonraki randevu",
+        "el": "Επόμενο ραντεβού"
+       }
+      }
+     ],
+     "other": true
+    }
+   ]
+  },
+  {
+   "id": "marketing",
+   "title": {
+    "de": "Google & Werbung",
+    "tr": "Google ve Reklam",
+    "el": "Google & Διαφήμιση"
+   },
+   "questions": [
+    {
+     "no": 44,
+     "id": "target_regions",
+     "type": "text",
+     "text": {
+      "de": "In welchen Städten / Regionen möchten Sie bei Google gefunden werden?",
+      "tr": "Google’da hangi şehirlerde/bölgelerde bulunmak istiyorsunuz?",
+      "el": "Σε ποιες πόλεις / περιοχές θέλετε να εμφανίζεστε στο Google;"
+     }
+    },
+    {
+     "no": 45,
+     "id": "local_search",
+     "type": "yn",
+     "text": {
+      "de": "Ist es wichtig, über Suchen wie „Reinigungsfirma Frankfurt“ Kunden zu gewinnen?",
+      "tr": "“Reinigungsfirma Frankfurt” gibi aramalardan müşteri almak sizin için önemli mi?",
+      "el": "Είναι σημαντικό να βρίσκετε πελάτες από αναζητήσεις όπως «Reinigungsfirma Frankfurt»;",
+      "tr_TR": "“Temizlik şirketi İstanbul” gibi aramalardan müşteri almak sizin için önemli mi?",
+      "el_GR": "Είναι σημαντικό να βρίσκετε πελάτες από αναζητήσεις όπως «εταιρεία καθαρισμού Αθήνα»;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 46,
+     "id": "google_ads",
+     "type": "yn",
+     "text": {
+      "de": "Planen Sie Google-Werbung (Google Ads)?",
+      "tr": "Google reklamı vermeyi düşünüyor musunuz?",
+      "el": "Σκέφτεστε διαφήμιση στο Google;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 47,
+     "id": "meta_ads",
+     "type": "yn",
+     "text": {
+      "de": "Planen Sie Werbung auf Instagram / Facebook?",
+      "tr": "Instagram / Facebook reklamı vermeyi düşünüyor musunuz?",
+      "el": "Σκέφτεστε διαφήμιση στο Instagram / Facebook;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 48,
+     "id": "tiktok",
+     "type": "yn",
+     "text": {
+      "de": "Ist TikTok für Sie ein sinnvoller Kanal?",
+      "tr": "TikTok sizin için anlamlı bir kanal mı?",
+      "el": "Είναι το TikTok κανάλι που έχει νόημα για εσάς;"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 49,
+     "id": "ad_budget",
+     "type": "text",
+     "text": {
+      "de": "Wie hoch ist ungefähr Ihr monatliches Werbebudget?",
+      "tr": "Aylık reklam bütçeniz yaklaşık ne kadar?",
+      "el": "Περίπου πόσος είναι ο μηνιαίος προϋπολογισμός διαφήμισης;"
+     }
+    }
+   ]
+  },
+  {
+   "id": "goals",
+   "title": {
+    "de": "Ziele für die Zukunft",
+    "tr": "Gelecek Hedefleri",
+    "el": "Μελλοντικοί στόχοι"
+   },
+   "questions": [
+    {
+     "no": 50,
+     "id": "growth_12m",
+     "type": "text",
+     "text": {
+      "de": "Wie möchten Sie Ihr Unternehmen in den nächsten 12 Monaten weiterentwickeln?",
+      "tr": "Önümüzdeki 12 ayda şirketinizi nasıl büyütmek istiyorsunuz?",
+      "el": "Πώς θέλετε να αναπτύξετε την επιχείρησή σας τους επόμενους 12 μήνες;"
+     }
+    },
+    {
+     "no": 51,
+     "id": "target_customer_type",
+     "type": "single",
+     "text": {
+      "de": "Möchten Sie eher mehr Privat- oder mehr Geschäftskunden gewinnen?",
+      "tr": "Daha fazla bireysel müşteri mi, yoksa kurumsal müşteri mi istiyorsunuz?",
+      "el": "Θέλετε περισσότερους ιδιώτες ή περισσότερους εταιρικούς πελάτες;"
+     },
+     "options": [
+      {
+       "id": "b2c",
+       "text": {
+        "de": "Mehr Privatkunden",
+        "tr": "Daha çok bireysel",
+        "el": "Περισσότερους ιδιώτες"
+       }
+      },
+      {
+       "id": "b2b",
+       "text": {
+        "de": "Mehr Geschäftskunden",
+        "tr": "Daha çok kurumsal",
+        "el": "Περισσότερους εταιρικούς"
+       }
+      },
+      {
+       "id": "both",
+       "text": {
+        "de": "Beides",
+        "tr": "İkisi de",
+        "el": "Και τα δύο"
+       }
+      }
+     ]
+    },
+    {
+     "no": 52,
+     "id": "new_customers_month",
+     "type": "text",
+     "text": {
+      "de": "Wie viele Neukunden möchten Sie ungefähr pro Monat gewinnen?",
+      "tr": "Aylık yaklaşık kaç yeni müşteri kazanmak istiyorsunuz?",
+      "el": "Πόσους νέους πελάτες θέλετε περίπου τον μήνα;"
+     }
+    },
+    {
+     "no": 53,
+     "id": "success_definition",
+     "type": "text",
+     "text": {
+      "de": "Woran würden Sie erkennen, dass Website und digitales System ein Erfolg sind?",
+      "tr": "Web sitesi ve dijital sistem başarılı olduğunda ne değişmiş olmalı?",
+      "el": "Όταν η ιστοσελίδα και το ψηφιακό σύστημα πετύχουν, τι θα έχει αλλάξει;"
+     }
+    }
+   ]
+  },
+  {
+   "id": "design",
+   "title": {
+    "de": "Design & Inhalte",
+    "tr": "Tasarım & İçerik",
+    "el": "Σχεδιασμός & περιεχόμενο"
+   },
+   "questions": [
+    {
+     "no": 54,
+     "id": "logo",
+     "type": "yn",
+     "text": {
+      "de": "Haben Sie bereits ein Logo? (Falls ja, bitte als Datei mitsenden.)",
+      "tr": "Logonuz var mı? (Varsa lütfen dosya olarak gönderin.)",
+      "el": "Έχετε ήδη λογότυπο; (Αν ναι, στείλτε το ως αρχείο.)"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ],
+     "detail": true
+    },
+    {
+     "no": 55,
+     "id": "brand_colors",
+     "type": "text",
+     "text": {
+      "de": "Gibt es Firmenfarben oder einen gewünschten Stil (z. B. modern, seriös, freundlich)?",
+      "tr": "Firma renkleriniz veya istediğiniz bir tarz var mı (ör. modern, ciddi, samimi)?",
+      "el": "Υπάρχουν εταιρικά χρώματα ή επιθυμητό ύφος (π.χ. μοντέρνο, σοβαρό, φιλικό);"
+     }
+    },
+    {
+     "no": 56,
+     "id": "photos",
+     "type": "multi",
+     "text": {
+      "de": "Welche Fotos stehen zur Verfügung?",
+      "tr": "Hangi fotoğraflar mevcut?",
+      "el": "Ποιες φωτογραφίες υπάρχουν διαθέσιμες;"
+     },
+     "options": [
+      {
+       "id": "own_work",
+       "text": {
+        "de": "Eigene Arbeitsfotos (Vorher/Nachher)",
+        "tr": "Kendi iş fotoğraflarımız (öncesi/sonrası)",
+        "el": "Δικές μας φωτογραφίες εργασιών (πριν/μετά)"
+       }
+      },
+      {
+       "id": "team",
+       "text": {
+        "de": "Team- / Firmenfotos",
+        "tr": "Ekip / firma fotoğrafları",
+        "el": "Φωτογραφίες ομάδας / εταιρείας"
+       }
+      },
+      {
+       "id": "stock_ok",
+       "text": {
+        "de": "Stockfotos sind in Ordnung",
+        "tr": "Hazır (stok) fotoğraflar olur",
+        "el": "Φωτογραφίες stock είναι εντάξει"
+       }
+      },
+      {
+       "id": "shooting",
+       "text": {
+        "de": "Fotoshooting gewünscht",
+        "tr": "Fotoğraf çekimi istiyoruz",
+        "el": "Θέλουμε φωτογράφιση"
+       }
+      }
+     ],
+     "other": true
+    },
+    {
+     "no": 57,
+     "id": "texts_by",
+     "type": "single",
+     "text": {
+      "de": "Wer erstellt die Texte für die Website?",
+      "tr": "Web sitesi metinlerini kim hazırlayacak?",
+      "el": "Ποιος θα γράψει τα κείμενα της ιστοσελίδας;"
+     },
+     "options": [
+      {
+       "id": "client",
+       "text": {
+        "de": "Wir selbst",
+        "tr": "Biz hazırlarız",
+        "el": "Εμείς"
+       }
+      },
+      {
+       "id": "agency",
+       "text": {
+        "de": "Chioutworks",
+        "tr": "Chioutworks",
+        "el": "Chioutworks"
+       }
+      },
+      {
+       "id": "together",
+       "text": {
+        "de": "Gemeinsam",
+        "tr": "Birlikte",
+        "el": "Μαζί"
+       }
+      }
+     ]
+    },
+    {
+     "no": 58,
+     "id": "liked_websites",
+     "type": "text",
+     "text": {
+      "de": "Welche Websites gefallen Ihnen (auch aus anderen Branchen)? Was gefällt Ihnen daran?",
+      "tr": "Beğendiğiniz web siteleri var mı (başka sektörlerden de olabilir)? Neyini beğeniyorsunuz?",
+      "el": "Ποιες ιστοσελίδες σας αρέσουν (και από άλλους κλάδους); Τι σας αρέσει σε αυτές;"
+     }
+    },
+    {
+     "no": 59,
+     "id": "competitors",
+     "type": "text",
+     "text": {
+      "de": "Wer sind Ihre wichtigsten Wettbewerber? Was machen Sie besser als diese?",
+      "tr": "En önemli rakipleriniz kimler? Onlardan neyi daha iyi yapıyorsunuz?",
+      "el": "Ποιοι είναι οι βασικοί σας ανταγωνιστές; Τι κάνετε καλύτερα από αυτούς;"
+     }
+    },
+    {
+     "no": 60,
+     "id": "usp",
+     "type": "text",
+     "text": {
+      "de": "Warum sollten Kunden Sie wählen? (z. B. Zuverlässigkeit, Preis, Schnelligkeit, Erfahrung)",
+      "tr": "Müşteriler neden sizi seçmeli? (ör. güvenilirlik, fiyat, hız, tecrübe)",
+      "el": "Γιατί να σας επιλέξουν οι πελάτες; (π.χ. αξιοπιστία, τιμή, ταχύτητα, εμπειρία)"
+     }
+    }
+   ]
+  },
+  {
+   "id": "project",
+   "title": {
+    "de": "Budget, Zeitplan & Technik",
+    "tr": "Bütçe, Zaman & Teknik",
+    "el": "Προϋπολογισμός, χρονοδιάγραμμα & τεχνικά"
+   },
+   "questions": [
+    {
+     "no": 61,
+     "id": "domain",
+     "type": "yn",
+     "text": {
+      "de": "Haben Sie bereits eine Domain (z. B. ihrefirma.de)? Wenn ja, welche?",
+      "tr": "Alan adınız (domain) var mı (ör. firmaniz.com)? Varsa hangisi?",
+      "el": "Έχετε ήδη domain (π.χ. etaireia.gr); Αν ναι, ποιο;",
+      "tr_TR": "Alan adınız (domain) var mı (ör. firmaniz.com.tr)? Varsa hangisi?"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ],
+     "detail": true
+    },
+    {
+     "no": 62,
+     "id": "business_email",
+     "type": "yn",
+     "text": {
+      "de": "Wünschen Sie professionelle E-Mail-Adressen (z. B. info@ihrefirma.de)?",
+      "tr": "Kurumsal e-posta adresi ister misiniz (ör. info@firmaniz.com)?",
+      "el": "Θέλετε επαγγελματικά e-mail (π.χ. info@etaireia.gr);",
+      "tr_TR": "Kurumsal e-posta adresi ister misiniz (ör. info@firmaniz.com.tr)?"
+     },
+     "options": [
+      {
+       "id": "yes"
+      },
+      {
+       "id": "no"
+      },
+      {
+       "id": "unsure"
+      }
+     ]
+    },
+    {
+     "no": 63,
+     "id": "tech_access",
+     "type": "text",
+     "text": {
+      "de": "Wer verwaltet aktuell Website, Domain und Hosting? Haben Sie die Zugangsdaten?",
+      "tr": "Mevcut site, domain ve hosting’i kim yönetiyor? Giriş bilgileriniz var mı?",
+      "el": "Ποιος διαχειρίζεται σήμερα ιστοσελίδα, domain και hosting; Έχετε τους κωδικούς;"
+     }
+    },
+    {
+     "no": 64,
+     "id": "budget_onetime",
+     "type": "text",
+     "text": {
+      "de": "Welches Budget haben Sie ungefähr für die einmalige Erstellung eingeplant?",
+      "tr": "Tek seferlik kurulum için yaklaşık ne kadar bütçe ayırdınız?",
+      "el": "Περίπου τι προϋπολογισμό έχετε για την εφάπαξ δημιουργία;"
+     }
+    },
+    {
+     "no": 65,
+     "id": "budget_monthly",
+     "type": "text",
+     "text": {
+      "de": "Welcher monatliche Betrag für Betreuung / Support wäre für Sie in Ordnung?",
+      "tr": "Bakım / destek için aylık ne kadar ödemek sizin için uygun olur?",
+      "el": "Ποιο μηνιαίο ποσό για υποστήριξη / συντήρηση θα ήταν εντάξει για εσάς;"
+     }
+    },
+    {
+     "no": 66,
+     "id": "go_live",
+     "type": "text",
+     "text": {
+      "de": "Bis wann soll die Website online sein? Gibt es einen festen Termin?",
+      "tr": "Web sitesi ne zamana kadar yayında olmalı? Kesin bir tarih var mı?",
+      "el": "Μέχρι πότε πρέπει να είναι online η ιστοσελίδα; Υπάρχει συγκεκριμένη ημερομηνία;"
+     }
+    },
+    {
+     "no": 67,
+     "id": "decision_maker",
+     "type": "text",
+     "text": {
+      "de": "Wer entscheidet über das Projekt?",
+      "tr": "Proje hakkında kim karar veriyor?",
+      "el": "Ποιος αποφασίζει για το έργο;"
+     }
+    },
+    {
+     "no": 68,
+     "id": "preferred_contact",
+     "type": "multi",
+     "text": {
+      "de": "Wie möchten Sie am liebsten kontaktiert werden?",
+      "tr": "Size en çok hangi yolla ulaşmamı istersiniz?",
+      "el": "Πώς προτιμάτε να επικοινωνούμε;"
+     },
+     "options": [
+      {
+       "id": "phone",
+       "text": {
+        "de": "Telefon",
+        "tr": "Telefon",
+        "el": "Τηλέφωνο"
+       }
+      },
+      {
+       "id": "whatsapp",
+       "text": {
+        "de": "WhatsApp",
+        "tr": "WhatsApp",
+        "el": "WhatsApp"
+       }
+      },
+      {
+       "id": "viber",
+       "text": {
+        "de": "Viber",
+        "tr": "Viber",
+        "el": "Viber"
+       },
+       "markets": [
+        "GR"
+       ]
+      },
+      {
+       "id": "email",
+       "text": {
+        "de": "E-Mail",
+        "tr": "E-posta",
+        "el": "E-mail"
+       }
+      },
+      {
+       "id": "video",
+       "text": {
+        "de": "Videocall",
+        "tr": "Görüntülü görüşme",
+        "el": "Βιντεοκλήση"
+       }
+      },
+      {
+       "id": "in_person",
+       "text": {
+        "de": "Persönliches Treffen",
+        "tr": "Yüz yüze görüşme",
+        "el": "Συνάντηση από κοντά"
+       }
+      }
+     ],
+     "other": true
+    },
+    {
+     "no": 69,
+     "id": "best_time",
+     "type": "text",
+     "text": {
+      "de": "Wann sind Sie am besten erreichbar?",
+      "tr": "Size en iyi hangi saatlerde ulaşılabilir?",
+      "el": "Πότε είστε πιο εύκολα διαθέσιμος/η;"
+     }
+    }
+   ]
+  },
+  {
+   "id": "additional",
+   "title": {
+    "de": "Ergänzungen",
+    "tr": "Eklemek İstedikleriniz",
+    "el": "Επιπλέον σχόλια"
+   },
+   "questions": [
+    {
+     "no": 70,
+     "id": "additional_notes",
+     "type": "text",
+     "text": {
+      "de": "Gibt es noch etwas, das Sie ergänzen möchten? Wünsche, Ideen, Bedenken oder Fragen – alles ist willkommen.",
+      "tr": "Eklemek istediğiniz başka bir şey var mı? İstekler, fikirler, endişeler veya sorular – hepsini yazabilirsiniz.",
+      "el": "Υπάρχει κάτι άλλο που θέλετε να προσθέσετε; Επιθυμίες, ιδέες, ανησυχίες ή ερωτήσεις – όλα είναι ευπρόσδεκτα."
+     }
+    },
+    {
+     "no": 71,
+     "id": "attachments",
+     "type": "text",
+     "text": {
+      "de": "Welche Unterlagen senden Sie zusätzlich mit?",
+      "tr": "Ek olarak hangi dosyaları gönderiyorsunuz?",
+      "el": "Ποια έγγραφα στέλνετε επιπλέον;"
+     }
+    },
+    {
+     "no": 72,
+     "id": "heard_about",
+     "type": "text",
+     "text": {
+      "de": "Wie sind Sie auf mich aufmerksam geworden?",
+      "tr": "Beni nereden duydunuz?",
+      "el": "Πώς μάθατε για μένα;"
+     }
+    },
+    {
+     "no": 73,
+     "id": "consent",
+     "type": "consent",
+     "text": {
+      "de": "Ich bin einverstanden, dass meine Angaben ausschließlich zur Erstellung eines Angebots verarbeitet werden (DSGVO). Die Daten werden nicht an Dritte weitergegeben.",
+      "tr": "Bilgilerimin yalnızca teklif hazırlanması amacıyla işlenmesini kabul ediyorum (DSGVO / GDPR). Bilgiler üçüncü kişilerle paylaşılmaz.",
+      "el": "Συμφωνώ να γίνει επεξεργασία των στοιχείων μου αποκλειστικά για τη σύνταξη προσφοράς (ΓΚΠΔ / GDPR). Τα στοιχεία δεν κοινοποιούνται σε τρίτους.",
+      "tr_TR": "Bilgilerimin yalnızca teklif hazırlanması amacıyla işlenmesini 6698 sayılı KVKK kapsamında kabul ediyorum. Bilgiler üçüncü kişilerle paylaşılmaz."
+     }
+    }
+   ]
+  }
+ ]
+}

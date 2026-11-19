@@ -1,0 +1,19 @@
+@import "./styles/fonts.css";
+@import "./styles/theme.css";
+
+/* Savings calculator — printable A4 report (hidden on screen) */
+.roi-print-root { display: none; }
+@media print {
+  @page { size: A4; margin: 16mm; }
+  body.roi-printing > *:not(.roi-print-root) { display: none !important; }
+  body.roi-printing { background: white !important; }
+  body.roi-printing .roi-print-root { display: block; color: black; background: white; font: 12pt/1.45 system-ui, sans-serif; }
+  .roi-print-root h1 { font-size: 22pt; margin: 0 0 4pt; }
+  .roi-print-root h2 { font-size: 13pt; margin: 16pt 0 6pt; }
+  .roi-print-root table { width: 100%; border-collapse: collapse; }
+  .roi-print-root th, .roi-print-root td { text-align: left; padding: 4pt 6pt; border-bottom: 1px solid color-mix(in srgb, black 20%, white); }
+  .roi-print-root td:not(:first-child), .roi-print-root th:not(:first-child) { text-align: right; white-space: nowrap; }
+  .roi-print-root ul { margin: 0; padding-left: 16pt; }
+  .roi-print-root .roi-muted { color: dimgray; margin: 0; }
+  .roi-print-root .roi-cta { margin-top: 18pt; font-weight: 600; }
+}

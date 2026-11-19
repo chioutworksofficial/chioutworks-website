@@ -1,0 +1,63 @@
+import type { Lang } from '../../translations';
+
+// Strings for the per-item solution deck pages (/:lang/<solutions>/:slug) and the menu groups.
+type Sectors = Record<string, string>;
+
+export const SOLUTION_UI = {
+  en: {
+    heroHead: '{name}: what it changes in your work, step by step', heroP2: 'See how {name} works in your business in this deck.', pdfLabel: 'Download deck as PDF',
+    appsGroup: 'App showcase', solutionOf: 'Chioutworks · {sector} solution', pages: '{n} pages', slide: 'Slide',
+    viewStack: 'Single view', viewGrid: 'Grid view', pdf: 'PDF', thumbs: 'Slide thumbnails', back: 'All demos',
+    challengeT: 'The challenge', challengeLead: 'Everyday work in this field eats time that should go to customers.',
+    challenge: ['Requests arrive by phone, message and email, and get lost between them.', 'Routine questions and bookings are answered by hand, again and again.', 'Customer data is scattered across notebooks, chats and spreadsheets.'],
+    solutionT: 'The solution', solutionLead: 'One app, built around how this business actually works.',
+    featuresT: 'What it does', moreT: 'Included in every app',
+    more: ['Adapted to your brand, services and prices', 'Available in Turkish, English, German and Greek', 'Choose only the modules you need with the package builder'],
+    shotsT: 'In use', shotsT2: 'On every screen',
+    gainsT: 'What you gain', gains: ['Less time on routine requests', 'One clear place for every enquiry and booking', 'A professional first impression for customers'],
+    ctaT: 'Ready to see it in your business?', ctaLive: 'Open the live demo', ctaPackage: 'Build a package', ctaRequest: 'Request a demo', ctaContact: 'Get in touch', ctaSub: 'No obligation. I adapt the app to your business.',
+    sectors: { demokuafor: 'Hair & beauty', demoklinik: 'Clinic & practice', demotemizlik: 'Cleaning', democrm: 'Sales', demoemlak: 'Real estate', demokafe: 'Café & bakery', demosadakat: 'Loyalty', demokariyer: 'Careers', demolojistik: 'Logistics', demoburo: 'Office', demobaski: 'Printing', demoekitap: 'E-book', demokarusel: 'Carousel', demopatika: 'Pet care' } as Sectors,
+  },
+  de: {
+    heroHead: '{name}: was sich in Ihrem Alltag ändert, Schritt für Schritt', heroP2: 'Sehen Sie in dieser Präsentation, wie {name} in Ihrem Betrieb funktioniert.', pdfLabel: 'Präsentation als PDF herunterladen',
+    appsGroup: 'Anwendungsbeispiele', solutionOf: 'Chioutworks · {sector}-Lösung', pages: '{n} Seiten', slide: 'Folie',
+    viewStack: 'Einzelansicht', viewGrid: 'Rasteransicht', pdf: 'PDF', thumbs: 'Folienvorschau', back: 'Alle Demos',
+    challengeT: 'Die Herausforderung', challengeLead: 'Der Alltag in dieser Branche kostet Zeit, die den Kunden fehlt.',
+    challenge: ['Anfragen kommen per Telefon, Nachricht und E-Mail und gehen dazwischen verloren.', 'Routinefragen und Buchungen werden immer wieder von Hand beantwortet.', 'Kundendaten liegen verstreut in Notizbüchern, Chats und Tabellen.'],
+    solutionT: 'Die Lösung', solutionLead: 'Eine Anwendung, gebaut nach dem echten Ablauf Ihres Betriebs.',
+    featuresT: 'Das leistet sie', moreT: 'In jeder Anwendung enthalten',
+    more: ['Angepasst an Marke, Leistungen und Preise', 'Auf Deutsch, Englisch, Türkisch und Griechisch verfügbar', 'Mit dem Paketkonfigurator nur die Module wählen, die Sie brauchen'],
+    shotsT: 'Im Einsatz', shotsT2: 'Auf jedem Bildschirm',
+    gainsT: 'Was Sie gewinnen', gains: ['Weniger Zeit für Routineanfragen', 'Ein klarer Ort für jede Anfrage und Buchung', 'Ein professioneller erster Eindruck bei Kunden'],
+    ctaT: 'Bereit, es in Ihrem Betrieb zu sehen?', ctaLive: 'Live-Demo öffnen', ctaPackage: 'Paket zusammenstellen', ctaRequest: 'Demo anfragen', ctaContact: 'Kontakt aufnehmen', ctaSub: 'Unverbindlich. Ich passe die Anwendung an Ihren Betrieb an.',
+    sectors: { demokuafor: 'Friseur', demoklinik: 'Praxis', demotemizlik: 'Reinigung', democrm: 'Vertrieb', demoemlak: 'Immobilien', demokafe: 'Café & Konditorei', demosadakat: 'Kundenbindung', demokariyer: 'Karriere', demolojistik: 'Logistik', demoburo: 'Büro', demobaski: 'Druck', demoekitap: 'E-Book', demokarusel: 'Karussell', demopatika: 'Tierpflege' } as Sectors,
+  },
+  tr: {
+    heroHead: '{name}: işinizde neyi değiştirir, adım adım', heroP2: 'Bu sunumda {name} çözümünün işinizde nasıl çalıştığını görün.', pdfLabel: 'Sunumu PDF olarak indir',
+    appsGroup: 'Uygulama örnekleri', solutionOf: 'Chioutworks · {sector} çözümü', pages: '{n} sayfa', slide: 'Slayt',
+    viewStack: 'Tekli görünüm', viewGrid: 'Izgara görünümü', pdf: 'PDF', thumbs: 'Slayt küçük resimleri', back: 'Tüm demolar',
+    challengeT: 'Sektörün zorluğu', challengeLead: 'Bu alandaki günlük iş, müşterilere ayrılması gereken zamanı yiyor.',
+    challenge: ['Talepler telefon, mesaj ve e-postayla geliyor, arada kayboluyor.', 'Rutin sorular ve randevular tekrar tekrar elle yanıtlanıyor.', 'Müşteri verileri defterlerde, sohbetlerde ve tablolarda dağınık duruyor.'],
+    solutionT: 'Çözüm', solutionLead: 'İşletmenizin gerçek işleyişine göre kurulmuş tek bir uygulama.',
+    featuresT: 'Neler yapar', moreT: 'Her uygulamada var',
+    more: ['Markanıza, hizmetlerinize ve fiyatlarınıza uyarlanır', 'Türkçe, İngilizce, Almanca ve Yunanca kullanılabilir', 'Paket oluşturucuyla yalnızca ihtiyacınız olan modülleri seçersiniz'],
+    shotsT: 'Kullanımda', shotsT2: 'Her ekranda',
+    gainsT: 'Size neler kazandırır', gains: ['Rutin taleplere daha az zaman', 'Her talep ve randevu için tek bir net yer', 'Müşterilerde profesyonel bir ilk izlenim'],
+    ctaT: 'İşletmenizde görmeye hazır mısınız?', ctaLive: 'Canlı demoyu aç', ctaPackage: 'Paket oluştur', ctaRequest: 'Demo talep edin', ctaContact: 'İletişime geçin', ctaSub: 'Taahhüt yok. Uygulamayı işletmenize göre uyarlıyorum.',
+    sectors: { demokuafor: 'Kuaför', demoklinik: 'Klinik', demotemizlik: 'Temizlik', democrm: 'Satış', demoemlak: 'Emlak', demokafe: 'Kafe ve pastane', demosadakat: 'Sadakat', demokariyer: 'Kariyer', demolojistik: 'Lojistik', demoburo: 'Ofis', demobaski: 'Baskı', demoekitap: 'E-kitap', demokarusel: 'Karusel', demopatika: 'Evcil hayvan bakımı' } as Sectors,
+  },
+  el: {
+    heroHead: '{name}: τι αλλάζει στη δουλειά σας, βήμα βήμα', heroP2: 'Δείτε σε αυτή την παρουσίαση πώς λειτουργεί το {name} στην επιχείρησή σας.', pdfLabel: 'Λήψη παρουσίασης σε PDF',
+    appsGroup: 'Παραδείγματα εφαρμογών', solutionOf: 'Chioutworks · λύση {sector}', pages: '{n} σελίδες', slide: 'Διαφάνεια',
+    viewStack: 'Μονή προβολή', viewGrid: 'Προβολή πλέγματος', pdf: 'PDF', thumbs: 'Μικρογραφίες διαφανειών', back: 'Όλες οι επιδείξεις',
+    challengeT: 'Η πρόκληση', challengeLead: 'Η καθημερινή δουλειά στον κλάδο αυτό τρώει χρόνο που ανήκει στους πελάτες.',
+    challenge: ['Τα αιτήματα έρχονται με τηλέφωνο, μήνυμα και email και χάνονται ανάμεσά τους.', 'Οι συνηθισμένες ερωτήσεις και κρατήσεις απαντιούνται με το χέρι, ξανά και ξανά.', 'Τα στοιχεία πελατών είναι σκόρπια σε τετράδια, συνομιλίες και λογιστικά φύλλα.'],
+    solutionT: 'Η λύση', solutionLead: 'Μία εφαρμογή, φτιαγμένη γύρω από το πώς δουλεύει πραγματικά η επιχείρησή σας.',
+    featuresT: 'Τι κάνει', moreT: 'Περιλαμβάνεται σε κάθε εφαρμογή',
+    more: ['Προσαρμόζεται στη μάρκα, τις υπηρεσίες και τις τιμές σας', 'Διαθέσιμη σε ελληνικά, αγγλικά, γερμανικά και τουρκικά', 'Επιλέγετε μόνο τις λειτουργίες που χρειάζεστε με τον δημιουργό πακέτου'],
+    shotsT: 'Σε χρήση', shotsT2: 'Σε κάθε οθόνη',
+    gainsT: 'Τι κερδίζετε', gains: ['Λιγότερος χρόνος σε συνηθισμένα αιτήματα', 'Ένα σαφές σημείο για κάθε αίτημα και κράτηση', 'Επαγγελματική πρώτη εντύπωση στους πελάτες'],
+    ctaT: 'Έτοιμοι να το δείτε στην επιχείρησή σας;', ctaLive: 'Άνοιγμα ζωντανής επίδειξης', ctaPackage: 'Δημιουργία πακέτου', ctaRequest: 'Ζητήστε επίδειξη', ctaContact: 'Επικοινωνήστε μαζί μου', ctaSub: 'Χωρίς δέσμευση. Προσαρμόζω την εφαρμογή στην επιχείρησή σας.',
+    sectors: { demokuafor: 'Κομμωτήριο', demoklinik: 'Ιατρείο', demotemizlik: 'Καθαρισμός', democrm: 'Πωλήσεις', demoemlak: 'Ακίνητα', demokafe: 'Καφέ & ζαχαροπλαστείο', demosadakat: 'Πιστότητα', demokariyer: 'Καριέρα', demolojistik: 'Logistics', demoburo: 'Γραφείο', demobaski: 'Εκτυπώσεις', demoekitap: 'E-book', demokarusel: 'Καρουζέλ', demopatika: 'Φροντίδα κατοικιδίων' } as Sectors,
+  },
+} satisfies Record<Lang, unknown>;

@@ -1,0 +1,30 @@
+/* Keeps the demo apps in their own light industry theme inside the Liquid page chrome.
+   The Liquid root remaps the legacy tokens to dark values; here the light values from
+   :root (theme.css) are restored for everything inside [data-demo-theme]. */
+[data-site-theme='liquid'] [data-demo-theme] {
+  --background: #f5f5f2;
+  --color-surface-raised: #fbfbf8;
+  --color-border-card: #dee2de;
+  --color-ink-strongest: #1a1818f0;
+  --color-ink-muted: #262323a0;
+  --color-lime-300: #bbf451;
+  --color-lime-soft: #bbf45133;
+  --color-on-accent: initial;
+  --color-overlay: #262323a6;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: #262323cc;
+  background: var(--background);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+/* Per-industry accents (copied from theme.css) at higher specificity so they still win */
+[data-site-theme='liquid'] [data-demo-theme='kuafor'] { --color-lime-300: #f5c2cf; --color-lime-soft: #fbe4ea; --color-ink-strongest: #2d1f24; }
+[data-site-theme='liquid'] [data-demo-theme='klinik'] { --color-lime-300: #9fd0f2; --color-lime-soft: #e4f2fc; --color-ink-strongest: #14304a; }
+[data-site-theme='liquid'] [data-demo-theme='temizlik'] { --color-lime-300: #86e0cf; --color-lime-soft: #dff7f2; --color-ink-strongest: #123c3a; }
+[data-site-theme='liquid'] [data-demo-theme='crm'] { --color-lime-300: #a9b8ff; --color-lime-soft: #e9edff; --color-ink-strongest: #1e2150; }
+[data-site-theme='liquid'] [data-demo-theme='emlak'] { --color-lime-300: #e6c88a; --color-lime-soft: #f7eedb; --color-ink-strongest: #1d2a3a; }
+[data-site-theme='liquid'] [data-demo-theme='kafe'] { --color-lime-300: #e9bf94; --color-lime-soft: #f8ecdf; --color-ink-strongest: #3a2418; }
+[data-site-theme='liquid'] [data-demo-theme='sadakat'] { --color-lime-300: #ffb3a0; --color-lime-soft: #ffe8e2; --color-ink-strongest: #3a1f1a; }
+[data-site-theme='liquid'] [data-demo-theme='kariyer'] { --color-lime-300: #f4d27a; --color-lime-soft: #fbf2d6; --color-ink-strongest: #3a2a12; }
+[data-site-theme='liquid'] [data-demo-theme='lojistik'] { --color-lime-300: #ffb259; --color-lime-soft: #ffedd8; --color-ink-strongest: #1b2433; }

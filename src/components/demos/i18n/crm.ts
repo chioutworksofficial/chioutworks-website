@@ -1,0 +1,73 @@
+import type { Lang } from '../../../translations';
+
+// {name} = customer first name, {shop} = business name, {n} = number
+export const CRM_UI = {
+  en: {
+    tabs: { pipeline: 'Pipeline', inbox: 'Inbox', contacts: 'Contacts', tasks: 'Tasks', reports: 'Reports' },
+    searchPlaceholder: 'Search contacts, deals…', notificationsTitle: 'Notifications',
+    tags: ['New', 'Regular', 'Big order', 'Awaiting reply'],
+    openDeals: '{n} open', dealsCount: '{n} deals',
+    inbox: { title: 'Conversations', back: 'Back', placeholder: 'Write a reply…', send: 'Send', ai: 'AI suggestion', createLead: 'Create lead', leadCreated: 'Added to the pipeline', leadExists: 'Already in the pipeline', sent: 'Message sent', you: 'You', unread: 'Unread', empty: 'Select a conversation', hint: 'Click “AI suggestion” to draft a reply' },
+    contacts: { search: 'Search name or company…', allTags: 'All tags', add: 'Add contact', name: 'Name', company: 'Company (optional)', phone: 'Phone', channel: 'Channel', tags: 'Tags', value: 'Deal value', stage: 'Stage', last: 'Last contact', noDeal: 'No deal', empty: 'No contacts match your search', added: 'Contact added', today: 'Today' },
+    tasks: { newTask: 'New follow-up', text: 'What needs doing?', contact: 'Contact', due: 'Due', dueOpts: ['Today', 'Tomorrow', 'In 3 days'], overdue: 'Overdue', today: 'Today', tomorrow: 'Tomorrow', open: 'Open tasks', done: 'Completed', doneToast: 'Task completed', added: 'Task added', noOpen: 'All caught up!' },
+    reports: { byStage: 'Pipeline value by stage', bySource: 'Leads by source', wonMonth: 'Won this month', avgDeal: 'Average deal value', avgResponse: 'Average response time', minutes: '{n} min', deals: 'Deals' },
+    ai: {
+      price: 'Hi {name}, thanks for asking! Prices start from the amount shown on the post, and delivery within Bristol is free. Shall I send you a personalised quote today? – {shop}',
+      avail: 'Hi {name}, good news, we can do that. Shall I reserve a time or piece for you? Just let me know what suits you best. – {shop}',
+      complaint: 'Hi {name}, I’m really sorry about this and I want to put it right. Could you send a photo? We will arrange a free replacement straight away. – {shop}',
+      generic: 'Hi {name}, thank you for your message! I’ll be happy to prepare an offer for you. When would a short call suit you this week? – {shop}',
+      price_kw: ['how much', 'price', 'cost', 'prices'], avail_kw: ['stock', 'available', 'when', 'open'], complaint_kw: ['broken', 'disappoint', 'problem', 'damaged'],
+    },
+  },
+  de: {
+    tabs: { pipeline: 'Vertrieb', inbox: 'Posteingang', contacts: 'Kontakte', tasks: 'Aufgaben', reports: 'Auswertung' },
+    searchPlaceholder: 'Kontakte, Aufträge suchen…', notificationsTitle: 'Benachrichtigungen',
+    tags: ['Neu', 'Stammkunde', 'Großauftrag', 'Wartet auf Antwort'],
+    openDeals: '{n} offen', dealsCount: '{n} Aufträge',
+    inbox: { title: 'Unterhaltungen', back: 'Zurück', placeholder: 'Antwort schreiben…', send: 'Senden', ai: 'KI-Vorschlag', createLead: 'Interessent anlegen', leadCreated: 'Zur Übersicht hinzugefügt', leadExists: 'Bereits in der Übersicht', sent: 'Nachricht gesendet', you: 'Sie', unread: 'Ungelesen', empty: 'Unterhaltung auswählen', hint: 'Mit „KI-Vorschlag“ einen Antwortentwurf erstellen' },
+    contacts: { search: 'Name oder Firma suchen…', allTags: 'Alle Markierungen', add: 'Kontakt hinzufügen', name: 'Name', company: 'Firma (optional)', phone: 'Telefon', channel: 'Kanal', tags: 'Markierungen', value: 'Auftragswert', stage: 'Phase', last: 'Letzter Kontakt', noDeal: 'Kein Auftrag', empty: 'Keine Kontakte gefunden', added: 'Kontakt hinzugefügt', today: 'Heute' },
+    tasks: { newTask: 'Neue Wiedervorlage', text: 'Was ist zu tun?', contact: 'Kontakt', due: 'Fällig', dueOpts: ['Heute', 'Morgen', 'In 3 Tagen'], overdue: 'Überfällig', today: 'Heute', tomorrow: 'Morgen', open: 'Offene Aufgaben', done: 'Erledigt', doneToast: 'Aufgabe erledigt', added: 'Aufgabe hinzugefügt', noOpen: 'Alles erledigt!' },
+    reports: { byStage: 'Auftragswert nach Phase', bySource: 'Interessenten nach Quelle', wonMonth: 'Gewonnen diesen Monat', avgDeal: 'Ø Auftragswert', avgResponse: 'Ø Antwortzeit', minutes: '{n} Min.', deals: 'Aufträge' },
+    ai: {
+      price: 'Guten Tag {name}, vielen Dank für Ihre Anfrage! Der Preis hängt vom Umfang ab, ich erstelle Ihnen gern ein unverbindliches Angebot inkl. MwSt. Darf ich morgen vorbeikommen? – {shop}',
+      avail: 'Guten Tag {name}, das lässt sich einrichten. Ich habe diese Woche noch Termine frei. Welcher Tag passt Ihnen am besten? – {shop}',
+      complaint: 'Guten Tag {name}, das tut mir sehr leid, das bringen wir in Ordnung. Unser Monteur kommt kostenlos vorbei, wann passt es Ihnen? – {shop}',
+      generic: 'Guten Tag {name}, vielen Dank für Ihre Nachricht! Gerne erstelle ich Ihnen ein Angebot. Wann passt Ihnen diese Woche ein kurzes Gespräch? – {shop}',
+      price_kw: ['kosten', 'kostet', 'preis'], avail_kw: ['termin', 'verfügbar', 'frei', 'wann'], complaint_kw: ['tropft', 'ärger', 'defekt', 'kaputt', 'beschwer'],
+    },
+  },
+  tr: {
+    tabs: { pipeline: 'Satış hattı', inbox: 'Gelen kutusu', contacts: 'Kişiler', tasks: 'Görevler', reports: 'Raporlar' },
+    searchPlaceholder: 'Kişi, fırsat ara…', notificationsTitle: 'Bildirimler',
+    tags: ['Yeni', 'Sadık müşteri', 'Toptan', 'Teklif bekliyor'],
+    openDeals: '{n} açık', dealsCount: '{n} fırsat',
+    inbox: { title: 'Görüşmeler', back: 'Geri', placeholder: 'Yanıt yazın…', send: 'Gönder', ai: 'YZ önerisi', createLead: 'Aday oluştur', leadCreated: 'Satış hattına eklendi', leadExists: 'Zaten satış hattında', sent: 'Mesaj gönderildi', you: 'Siz', unread: 'Okunmadı', empty: 'Bir görüşme seçin', hint: 'Yanıt taslağı için “YZ önerisi”ne tıklayın' },
+    contacts: { search: 'Ad veya firma ara…', allTags: 'Tüm etiketler', add: 'Kişi ekle', name: 'Ad soyad', company: 'Firma (isteğe bağlı)', phone: 'Telefon', channel: 'Kanal', tags: 'Etiketler', value: 'Fırsat tutarı', stage: 'Aşama', last: 'Son görüşme', noDeal: 'Fırsat yok', empty: 'Aramaya uyan kişi yok', added: 'Kişi eklendi', today: 'Bugün' },
+    tasks: { newTask: 'Yeni takip görevi', text: 'Ne yapılacak?', contact: 'Kişi', due: 'Vade', dueOpts: ['Bugün', 'Yarın', '3 gün sonra'], overdue: 'Gecikmiş', today: 'Bugün', tomorrow: 'Yarın', open: 'Açık görevler', done: 'Tamamlananlar', doneToast: 'Görev tamamlandı', added: 'Görev eklendi', noOpen: 'Tüm görevler tamam!' },
+    reports: { byStage: 'Aşamaya göre satış hattı tutarı', bySource: 'Kaynağa göre adaylar', wonMonth: 'Bu ay kazanılan', avgDeal: 'Ortalama fırsat tutarı', avgResponse: 'Ortalama yanıt süresi', minutes: '{n} dk', deals: 'Fırsatlar' },
+    ai: {
+      price: 'Merhaba {name}, ilginiz için teşekkürler! Fiyatlarımız modele göre değişiyor, size özel bir teklif hazırlayıp bugün iletebilirim. Bursa içi teslimat ücretsiz. – {shop}',
+      avail: 'Merhaba {name}, evet, ürünümüz mevcut. İsterseniz sizin için ayıralım, hangi gün uygun olur? – {shop}',
+      complaint: 'Merhaba {name}, yaşadığınız sorun için çok üzgünüz, hemen çözelim. Bir fotoğraf iletirseniz ücretsiz değişim ayarlayalım. – {shop}',
+      generic: 'Merhaba {name}, mesajınız için teşekkürler! Size özel bir teklif hazırlamaktan memnuniyet duyarım. Bu hafta kısa bir görüşme için hangi gün uygun olur? – {shop}',
+      price_kw: ['fiyat', 'ne kadar', 'ücret', 'kaça'], avail_kw: ['stok', 'var mı', 'teslimat', 'ne zaman', 'açık mı'], complaint_kw: ['kırık', 'sorun', 'şikayet', 'üzgün', 'iade'],
+    },
+  },
+  el: {
+    tabs: { pipeline: 'Πωλήσεις', inbox: 'Εισερχόμενα', contacts: 'Επαφές', tasks: 'Εργασίες', reports: 'Αναφορές' },
+    searchPlaceholder: 'Αναζήτηση επαφών, ευκαιριών…', notificationsTitle: 'Ειδοποιήσεις',
+    tags: ['Νέος', 'Τακτικός', 'Μεγάλη παραγγελία', 'Αναμονή απάντησης'],
+    openDeals: '{n} ανοιχτές', dealsCount: '{n} ευκαιρίες',
+    inbox: { title: 'Συνομιλίες', back: 'Πίσω', placeholder: 'Γράψτε απάντηση…', send: 'Αποστολή', ai: 'Πρόταση ΤΝ', createLead: 'Δημιουργία υποψήφιου', leadCreated: 'Προστέθηκε στις πωλήσεις', leadExists: 'Υπάρχει ήδη στις πωλήσεις', sent: 'Το μήνυμα στάλθηκε', you: 'Εσείς', unread: 'Μη αναγνωσμένο', empty: 'Επιλέξτε συνομιλία', hint: 'Πατήστε «Πρόταση ΤΝ» για προσχέδιο απάντησης' },
+    contacts: { search: 'Αναζήτηση ονόματος ή εταιρείας…', allTags: 'Όλες οι ετικέτες', add: 'Προσθήκη επαφής', name: 'Ονοματεπώνυμο', company: 'Εταιρεία (προαιρετικά)', phone: 'Τηλέφωνο', channel: 'Κανάλι', tags: 'Ετικέτες', value: 'Αξία ευκαιρίας', stage: 'Στάδιο', last: 'Τελευταία επαφή', noDeal: 'Χωρίς ευκαιρία', empty: 'Δεν βρέθηκαν επαφές', added: 'Η επαφή προστέθηκε', today: 'Σήμερα' },
+    tasks: { newTask: 'Νέα εργασία παρακολούθησης', text: 'Τι πρέπει να γίνει;', contact: 'Επαφή', due: 'Προθεσμία', dueOpts: ['Σήμερα', 'Αύριο', 'Σε 3 ημέρες'], overdue: 'Εκπρόθεσμη', today: 'Σήμερα', tomorrow: 'Αύριο', open: 'Ανοιχτές εργασίες', done: 'Ολοκληρωμένες', doneToast: 'Η εργασία ολοκληρώθηκε', added: 'Η εργασία προστέθηκε', noOpen: 'Όλα ολοκληρώθηκαν!' },
+    reports: { byStage: 'Αξία πωλήσεων ανά στάδιο', bySource: 'Υποψήφιοι πελάτες ανά πηγή', wonMonth: 'Κερδισμένα αυτόν τον μήνα', avgDeal: 'Μέση αξία ευκαιρίας', avgResponse: 'Μέσος χρόνος απάντησης', minutes: '{n} λεπτά', deals: 'Ευκαιρίες' },
+    ai: {
+      price: 'Γεια σας {name}, ευχαριστούμε για το ενδιαφέρον! Η τιμή εξαρτάται από το μοντέλο, μπορώ να σας στείλω σήμερα εξατομικευμένη προσφορά. Η μεταφορά εντός Λάρισας είναι δωρεάν. – {shop}',
+      avail: 'Γεια σας {name}, ναι, το έχουμε διαθέσιμο. Αν θέλετε, σας το κρατάμε. Ποια ημέρα σας βολεύει; – {shop}',
+      complaint: 'Γεια σας {name}, λυπούμαστε πολύ για το πρόβλημα και θα το λύσουμε άμεσα. Στείλτε μας μια φωτογραφία και κανονίζουμε δωρεάν αντικατάσταση. – {shop}',
+      generic: 'Γεια σας {name}, ευχαριστώ για το μήνυμά σας! Θα χαρώ να σας ετοιμάσω μια προσφορά. Πότε σας βολεύει μια σύντομη κλήση αυτή την εβδομάδα; – {shop}',
+      price_kw: ['πόσο', 'τιμή', 'κοστίζ', 'κόστος'], avail_kw: ['διαθέσιμ', 'πότε', 'ανοιχτό', 'στοκ'], complaint_kw: ['σπασμέν', 'πρόβλημα', 'παράπονο', 'απογοητ'],
+    },
+  },
+} satisfies Record<Lang, unknown>;

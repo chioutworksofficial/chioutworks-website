@@ -1,0 +1,47 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /demo/
+Disallow: /en/demos/
+Disallow: /de/demos/
+Disallow: /tr/demolar/
+Disallow: /el/epideixeis/
+Disallow: /api/
+Disallow: /tr/analiz/
+Disallow: /en/brief/
+Disallow: /de/analyse/
+Disallow: /el/analysi/
+
+# AI answer engines (GEO) are welcome to read the public site
+User-agent: GPTBot
+Allow: /
+Disallow: /admin
+Disallow: /demo/
+Disallow: /en/demos/
+Disallow: /de/demos/
+Disallow: /tr/demolar/
+Disallow: /el/epideixeis/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin
+Disallow: /demo/
+Disallow: /en/demos/
+Disallow: /de/demos/
+Disallow: /tr/demolar/
+Disallow: /el/epideixeis/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin
+Disallow: /demo/
+Disallow: /en/demos/
+Disallow: /de/demos/
+Disallow: /tr/demolar/
+Disallow: /el/epideixeis/
+
+User-agent: Google-Extended
+Allow: /
+
+# TODO(domain): update when the final domain is live
+Sitemap: https://chioutworks.com/sitemap.xml
