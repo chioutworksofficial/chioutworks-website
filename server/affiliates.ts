@@ -3,6 +3,7 @@
 // Counting is cookieless: no IP, no visitor id, nothing stored on the device. Stored per click: time, tool, page
 // language, button position, country (from the hosting header, live only), device type and a bot flag.
 // Storage: data/affiliate-clicks.jsonl (git-ignored). Admin: GET /api/admin/affiliates.
+import { dbOn, dbInsert, dbSelect } from './db.js';
 import type { Express, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
@@ -32,7 +33,14 @@ const day = (t: number) => new Date(t).toISOString().slice(0, 10);
 
 interface Click { t: number; id: string; lang: Lang; src: string; cc: string; dev: string; bot: boolean }
 
-function readAll(): Click[] {
+async function readAll(since: number): Promise<Click[]> {
+  if (dbOn()) {
+    const rows = await dbSelect<{ data: Click }>('affiliate_clicks', `select=data&t=gte.${new Date(since).toISOString()}&order=t.asc`);
+    return rows.map((r) => r.data);
+  }
+  return readFile().filter((c) => c.t >= since);
+}
+function readFile(): Click[] {
   let txt = ''; try { txt = fs.readFileSync(FILE, 'utf8'); } catch { return []; }
   const out: Click[] = [];
   for (const line of txt.split('\n')) { if (!line) continue; try { out.push(JSON.parse(line)); } catch { /* skip */ } }
@@ -59,8 +67,8 @@ export function registerAffiliates(app: Express, d: Deps) {
         dev: device(ua),
         bot: BOT_UA.test(ua) || !req.get('accept-language'),
       };
-      fs.mkdirSync(path.dirname(FILE), { recursive: true });
-      fs.appendFileSync(FILE, JSON.stringify(click) + '\n');
+      if (dbOn()) void dbInsert('affiliate_clicks', { t: new Date(click.t).toISOString(), data: click }).catch((e) => console.warn(String(e)));
+      else { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs.appendFileSync(FILE, JSON.stringify(click) + '\n'); }
     } catch { /* never block the visitor */ }
     res.set('Cache-Control', 'no-store');
     res.set('X-Robots-Tag', 'noindex, nofollow');
@@ -68,11 +76,11 @@ export function registerAffiliates(app: Express, d: Deps) {
     return res.redirect(302, link(lang));
   });
 
-  app.get('/api/admin/affiliates', (req, res) => {
+  app.get('/api/admin/affiliates', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
     const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
     const since = Date.now() - days * 864e5;
-    const all = readAll().filter((c) => c.t >= since);
+    const all = await readAll(since).catch((e) => { console.warn(String(e)); return [] as Click[]; });
     const human = all.filter((c) => !c.bot);
     const tally = (xs: string[]) => { const m = new Map<string, number>(); xs.forEach((x) => m.set(x || '—', (m.get(x || '—') ?? 0) + 1)); return [...m].sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value })); };
     const daily: { day: string; value: number }[] = [];

@@ -2,6 +2,7 @@ import { demoText } from '../src/components/demos/demoText';
 import { T as SITE_T } from '../src/translations';
 import { CATALOG_UI } from '../src/components/demos/i18n/catalog';
 import './env.js';
+import { dbOn, dbInsert } from './db.js';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -545,12 +546,16 @@ app.post('/api/roi-report', quoteLimiter, (req, res) => {
 // Proof of cookie consent (GDPR Art. 7(1)): random id, version, choices, time. No IP, no user agent.
 const CONSENT_STORE = path.join(__dirname, '../data/consents.json');
 const consentLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, skip: demoLimitSkip });
-app.post('/api/consent', consentLimiter, (req, res) => {
+app.post('/api/consent', consentLimiter, async (req, res) => {
   const b = req.body ?? {};
   const id = String(b.id ?? '');
   if (!/^[0-9a-f-]{36}$/i.test(id) || !Number.isInteger(b.v)) return res.status(400).json({ error: 'bad_request' });
   const rec = { id, v: b.v, functional: b.functional === true, statistics: b.statistics === true, at: new Date().toISOString() };
   try {
+    if (dbOn()) {
+      await dbInsert('consents', { consent_id: id, at: rec.at, data: rec });
+      return res.json({ ok: true });
+    }
     let all: unknown[] = [];
     try { all = JSON.parse(fs.readFileSync(CONSENT_STORE, 'utf8')); } catch { all = []; }
     all.push(rec);
