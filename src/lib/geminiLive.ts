@@ -49,6 +49,8 @@ export class LiveCall {
   private closing = false;
   private next = 0;
   private passUntil = 0;
+  private greeting = true;   // until the first assistant turn is done: mic muted, interruptions ignored
+  private gotAudio = false;
   private sources = new Set<AudioBufferSourceNode>();
   constructor(private ctx: AudioContext, private stream: MediaStream, private h: LiveHandlers) {}
 
@@ -68,14 +70,14 @@ export class LiveCall {
       ws.onmessage = async (ev) => {
         let m: LiveServerMessage;
         try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : await (ev.data as Blob).text()); } catch { return; }
-        if (m.setupComplete && !this.ready) { this.ready = true; clearTimeout(timer); this.startMic(); resolve(); return; }
+        if (m.setupComplete && !this.ready) { this.ready = true; clearTimeout(timer); setTimeout(() => { this.greeting = false; }, 12000); this.startMic(); resolve(); return; }
         const sc = m.serverContent;
         if (sc) {
-          if (sc.interrupted) { this.stopPlayback(); this.h.onInterrupted(); }
-          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) this.play(p.inlineData.data);
+          if (sc.interrupted && !this.greeting) { this.stopPlayback(); this.h.onInterrupted(); }
+          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) { this.gotAudio = true; this.play(p.inlineData.data); }
           if (sc.inputTranscription?.text) this.h.onInput(sc.inputTranscription.text);
           if (sc.outputTranscription?.text) this.h.onOutput(sc.outputTranscription.text);
-          if (sc.turnComplete) this.h.onTurnComplete();
+          if (sc.turnComplete) { if (this.gotAudio) this.greeting = false; this.h.onTurnComplete(); }
         }
         if (m.toolCall?.functionCalls) {
           const calls = m.toolCall.functionCalls as { id: string; name: string; args?: { reason?: unknown } }[];
@@ -94,7 +96,8 @@ export class LiveCall {
       if (!this.ready || this.ws?.readyState !== WebSocket.OPEN) return;
       let pcm = new Uint8Array(e.data.pcm);
       const now = this.ctx.currentTime;
-      if (this.next + GATE_TAIL > now) {   // assistant audible (or just ended): echo gate
+      if (this.greeting) pcm = new Uint8Array(pcm.length);
+      else if (this.next + GATE_TAIL > now) {   // assistant audible (or just ended): echo gate
         if (e.data.rms > BARGE_RMS) this.passUntil = now + PASS_HOLD;
         else if (now > this.passUntil) pcm = new Uint8Array(pcm.length);
       }

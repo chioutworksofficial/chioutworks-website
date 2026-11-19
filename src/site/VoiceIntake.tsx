@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { addLiveChunk } from '../lib/liveTranscript';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Lang } from '../translations';
@@ -113,6 +114,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const reconnected = useRef(false);
   const liveRole = useRef<'user' | 'assistant' | null>(null);
   const outBuf = useRef('');
+  const liveCut = useRef(false);   // last assistant bubble was interrupted
   const corrections = useRef(0);
   const nameResolve = useRef<() => void>(() => {});
   const lastLevel = useRef(0);
@@ -185,7 +187,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       emptyRuns.current = 0; manualStop.current = false; unavailSaid.current = false;
       visitorRef.current = NO_VISITOR; setVFirst(''); setVLast(''); setVSal('none'); setNameDone(false); voiceId.current = null; deletedRef.current = false;
       deadlineRef.current = 0; setTimeLeft(LIVE_SECONDS); endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; reconnected.current = false;
-      liveRole.current = null; outBuf.current = ''; corrections.current = 0; setReconnecting(false); setCard(null); setCardSent(false); setCardErr(''); setCardBusy(false);
+      liveRole.current = null; liveCut.current = false; outBuf.current = ''; corrections.current = 0; setReconnecting(false); setCard(null); setCardSent(false); setCardErr(''); setCardBusy(false);
       preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false);
       goPhase('consent'); startedAt.current = Date.now(); setOpen(true);
       if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('voicedemo')) {
@@ -369,9 +371,10 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
 
   // ── Live call (Gemini Live) ─────────────────────────────────────────────────────────────────
   const addLive = (role: 'user' | 'assistant', text: string) => {
-    const all = turnsRef.current, last = all[all.length - 1];
-    if (liveRole.current === role && last?.role === role) turnsRef.current = [...all.slice(0, -1), { ...last, text: last.text + text }];
-    else { turnsRef.current = [...all, { role, text: text.trimStart(), at: Date.now() }]; liveRole.current = role; }
+    if (role === 'user') liveCut.current = false;
+    const r = addLiveChunk(turnsRef.current, role, text, liveRole.current === role, liveCut.current);
+    turnsRef.current = r.turns; liveRole.current = role;
+    if (r.cutUsed || role === 'user') liveCut.current = false;
     setTurns(turnsRef.current);
   };
 
@@ -461,7 +464,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
           ref.c?.sendText("Speak in first person singular as the assistant; never 'we'.");
         }
       },
-      onInterrupted: () => { liveRole.current = null; outBuf.current = ''; },
+      onInterrupted: () => { liveCut.current = turnsRef.current[turnsRef.current.length - 1]?.role === 'assistant'; liveRole.current = null; outBuf.current = ''; },
       onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; if (finishPending.current) drain(); },
       onFinish: (reason) => { if (reason === 'abuse') abuseRef.current = true; finishPending.current = true; setTimeout(drain, 3000); },
       onLevel: (rms) => { const n = performance.now(); if (n - lastLevel.current > 80) { lastLevel.current = n; setLevel(Math.min(1, rms * 8)); } },
