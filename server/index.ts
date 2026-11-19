@@ -794,18 +794,18 @@ function reserveTts(len: number, sessionId: string): boolean {
   return true;
 }
 // Chat abuse: visitor status (client checks before a new chat, no model call) and admin unlock (owner 2026-11-19)
-app.post('/api/assistant/status', (req, res) => {
+app.post('/api/assistant/status', async (req, res) => {
   const lang = ['tr', 'en', 'de', 'el'].includes(req.body?.lang) ? req.body.lang : 'en';
   if (abuseExempt(req.ip ?? 'anon')) return res.json({ blocked: false });
-  const cs = chatState(abuseIds(req.ip ?? 'anon', req.body?.bid));
+  const cs = await chatState(abuseIds(req.ip ?? 'anon', req.body?.bid));
   res.json(cs.blocked ? { blocked: true, permanent: cs.permanent, until: cs.until, message: blockedMsg(lang, cs) } : { blocked: false });
 });
-app.get('/api/admin/abuse', (req, res) => { if (!requireAdmin(req, res)) return; res.json(adminList()); });
-app.post('/api/admin/abuse/unlock', (req, res) => {
+app.get('/api/admin/abuse', async (req, res) => { if (!requireAdmin(req, res)) return; res.json(await adminList()); });
+app.post('/api/admin/abuse/unlock', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const k = typeof req.body?.k === 'string' && /^[0-9a-f]{24}$/.test(req.body.k) ? req.body.k : '';
   if (!k) return res.status(400).json({ error: 'bad_key' });
-  res.json({ ok: adminUnlock(k) });
+  res.json({ ok: await adminUnlock(k) });
 });
 
 app.get('/api/admin/tts-usage', (req, res) => {
@@ -1139,7 +1139,7 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
   if (b.consent !== true || b.consentVersion !== VOICE_CONSENT_VERSION) return res.status(400).json({ error: 'consent_required' });
   if (!liveConfigured()) return res.status(501).json({ error: 'unavailable' });
   const lang = DEMO_LANGS.has(b.lang) ? String(b.lang) : 'en';
-  if (voiceBlocked(abuseIds(req.ip ?? 'anon', b.bid))) return res.status(403).json({ error: 'voice_unavailable', message: ABUSE_MSG.voice(lang) });
+  if (await voiceBlocked(abuseIds(req.ip ?? 'anon', b.bid))) return res.status(403).json({ error: 'voice_unavailable', message: ABUSE_MSG.voice(lang) });
   // A reconnect hands back the slot of the dropped call (verified): it takes the same place and does not count again.
   const prev = typeof b.prevSessionId === 'string' ? b.prevSessionId : '';
   const resumed = Boolean(prev) && pool.has(prev);
@@ -1166,9 +1166,9 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
 
 app.get('/api/voice/live-status', liveLimiter, (_req, res) => res.json(livePressure()));
 app.post('/api/voice/live-heartbeat', liveLimiter, (req, res) => res.json({ ok: pool.beat(String(req.body?.sessionId ?? '')) }));
-app.post('/api/voice/live-end', liveLimiter, (req, res) => {
+app.post('/api/voice/live-end', liveLimiter, async (req, res) => {
   pool.release(String(req.body?.sessionId ?? ''));
-  if (req.body?.abuse === true) recordAbuse(abuseIds(req.ip ?? 'anon', req.body?.bid));   // call ended by finish_conversation(reason=abuse)
+  if (req.body?.abuse === true) await recordAbuse(abuseIds(req.ip ?? 'anon', req.body?.bid));   // call ended by finish_conversation(reason=abuse)
   return res.json({ ok: true });
 });
 
@@ -1308,12 +1308,12 @@ app.post('/api/assistant/chat', async (req, res) => {
   const ah = abuseIds(req.ip ?? 'anon', req.body?.bid);
   const endRes = (m: string) => res.json({ message: m, action: null, end: true });
   const exempt = abuseExempt(req.ip ?? 'anon');
-  const cs = exempt ? null : chatState(ah);
+  const cs = exempt ? null : await chatState(ah);
   if (cs?.blocked) return res.json({ message: blockedMsg(lang, cs), action: null, end: true, blocked: true, permanent: cs.permanent, until: cs.until });   // no model call
   if (sanitized.filter((m) => m.role === 'user').length > TEXT_SESSION_MAX()) return endRes(ABUSE_MSG.limit(lang));
   if (!exempt && !rateOk(ah)) return res.json({ message: ABUSE_MSG.slow(lang), action: null });   // too fast: no model call
-  if (!globalOk()) { console.warn('[assistant/chat] daily budget fuse reached'); return endRes(ABUSE_MSG.busy(lang)); }
-  if (sanitized.length > 0 && !textMsgAllowed(ah)) return endRes(ABUSE_MSG.limit(lang));
+  if (!(await globalOk())) { console.warn('[assistant/chat] daily budget fuse reached'); return endRes(ABUSE_MSG.busy(lang)); }
+  if (sanitized.length > 0 && !(await textMsgAllowed(ah))) return endRes(ABUSE_MSG.limit(lang));
 
   // Text chat: Groq first (fast; the visitor gave explicit consent in the chat), Google Gemini as silent fallback
   // (EU-U.S. Data Privacy Framework, covered by the same notice). Owner, 2026-11-19.
@@ -1443,7 +1443,7 @@ app.post('/api/assistant/chat', async (req, res) => {
       offTally.set(k, n);
       if (n.length >= 3 && !exempt) {
         offTally.delete(k);
-        const r = recordStrike(ah);
+        const r = await recordStrike(ah);
         const m = r.level === 1 ? ABUSE_MSG.end1(lang, r.until ?? now) : r.level === 2 ? ABUSE_MSG.end2(lang) : ABUSE_MSG.perm(lang);
         return res.json({ message: m, action: null, end: true, blocked: true, permanent: r.level === 3, until: r.until });
       }

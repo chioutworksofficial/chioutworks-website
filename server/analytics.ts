@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { dbOn, dbInsert, dbSelect, dbDelete } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIR = path.join(__dirname, '../data/analytics');
@@ -17,9 +18,23 @@ export const BOT_UA = /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|pyth
 
 const day = (d = new Date()) => d.toISOString().slice(0, 10);
 let saltDay = ''; let salt = '';
-function dailySalt(): string {
+let dbCleanDay = '';
+async function dbDailySalt(today: string): Promise<string> {
+  const read = async () => (await dbSelect<{ salt: string }>('daily_salts', `select=salt&day=eq.${today}`))[0]?.salt;
+  let s = await read();
+  if (!s) { await dbInsert('daily_salts', { day: today, salt: crypto.randomBytes(32).toString('hex') }).catch(() => { /* race: re-read */ }); s = await read(); }
+  if (!s) throw new Error('[analytics] no salt');
+  if (dbCleanDay !== today) {   // once per process per day: old salts (unlinkability) and retention
+    dbCleanDay = today;
+    dbDelete('daily_salts', `day=lt.${today}`).catch(() => { /* retry next restart */ });
+    dbDelete('analytics_events', `day=lt.${day(new Date(Date.now() - KEEP_DAYS * 864e5))}`).catch(() => { /* ignore */ });
+  }
+  return s;
+}
+async function dailySalt(): Promise<string> {
   const today = day();
   if (saltDay === today) return salt;
+  if (dbOn()) { salt = await dbDailySalt(today); saltDay = today; return salt; }
   fs.mkdirSync(DIR, { recursive: true });
   const f = path.join(DIR, `.salt-${today}`);
   try { salt = fs.readFileSync(f, 'utf8'); } catch { salt = crypto.randomBytes(32).toString('hex'); fs.writeFileSync(f, salt); }
@@ -40,10 +55,12 @@ const clean = (v: unknown, n: number) => String(v ?? '').replace(/[\u0000-\u001f
 interface Ev { t: number; k: 'pv' | 'leave' | 'click'; id: string; v: string; bot: string; path?: string; ref?: string; lang?: string; cc?: string; dev?: string; br?: string; os?: string; ms?: number; label?: string }
 
 function append(ev: Ev) {
+  if (dbOn()) { dbInsert('analytics_events', { day: day(new Date(ev.t)), t: new Date(ev.t).toISOString(), data: ev }).catch((e) => console.warn('[analytics] insert failed', String(e).slice(0, 120))); return; }
   fs.mkdirSync(DIR, { recursive: true });
   fs.appendFileSync(path.join(DIR, `${day(new Date(ev.t))}.jsonl`), JSON.stringify(ev) + '\n');
 }
-function readDays(n: number): Ev[] {
+async function readDays(n: number): Promise<Ev[]> {
+  if (dbOn()) return (await dbSelect<{ data: Ev }>('analytics_events', `select=data&day=gte.${day(new Date(Date.now() - (n - 1) * 864e5))}&order=t.asc`)).map((r) => r.data);
   const out: Ev[] = [];
   for (let i = 0; i < n; i++) {
     const f = path.join(DIR, `${day(new Date(Date.now() - i * 864e5))}.jsonl`);
@@ -59,14 +76,14 @@ export function registerAnalytics(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
   const perVisitor = new Map<string, number>();   // events per visitor hash per day (in memory)
 
-  app.post('/api/a', limiter, (req: Request, res: Response) => {
+  app.post('/api/a', limiter, async (req: Request, res: Response) => {
     res.status(204).end();   // answer at once; never leak anything back
     try {
       const b = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
       const k = b.k === 'leave' || b.k === 'click' ? b.k : 'pv';
       const ua = String(req.get('user-agent') ?? '');
       const ip = String(req.ip ?? '');
-      const v = crypto.createHash('sha256').update(`${dailySalt()}|${ip}|${ua}`).digest('hex').slice(0, 16);
+      const v = crypto.createHash('sha256').update(`${await dailySalt()}|${ip}|${ua}`).digest('hex').slice(0, 16);
       const n = (perVisitor.get(`${day()}|${v}`) ?? 0) + 1; perVisitor.set(`${day()}|${v}`, n);
       if (perVisitor.size > 50000) perVisitor.clear();
       // Bot signals: self-declared bot UA, automation flag, no Accept-Language, no human interaction before the beacon, flood
@@ -84,10 +101,10 @@ export function registerAnalytics(app: Express, d: Deps) {
     } catch { /* never fail the visitor */ }
   });
 
-  app.get('/api/admin/analytics', (req, res) => {
+  app.get('/api/admin/analytics', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
     const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
-    const evs = readDays(days);
+    let evs: Ev[]; try { evs = await readDays(days); } catch { return res.status(502).json({ error: 'db' }); }
     const pvs = evs.filter((e) => e.k === 'pv');
     const human = pvs.filter((e) => !e.bot);
     const humanIds = new Set(human.map((e) => e.id));

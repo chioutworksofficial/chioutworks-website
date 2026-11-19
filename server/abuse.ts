@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { dbOn, dbInsert, dbSelect, dbDelete } from './db.js';
 
 const FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../data/abuse.json');
 interface Ev { h: string[]; t: number; k: 'msg' }
@@ -38,32 +39,102 @@ function save() {
   s.perm = s.perm!.filter((e) => e.t > now - 365 * DAY);
   try { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs.writeFileSync(FILE, JSON.stringify(s)); } catch { /* best effort */ }
 }
-const hash = (v: string) => crypto.createHash('sha256').update(load().salt + '|' + v).digest('hex').slice(0, 24);
+// Salt: with Supabase the salt must come from ABUSE_SALT (the file does not exist on Vercel); without it, the file salt is used.
+let saltWarned = false;
+const salt = () => {
+  if (dbOn()) {
+    if (process.env.ABUSE_SALT) return process.env.ABUSE_SALT;
+    if (!saltWarned) { saltWarned = true; console.warn('[abuse] ABUSE_SALT is not set: falling back to a local salt (hashes change on every restart). Set ABUSE_SALT.'); }
+  }
+  return load().salt;
+};
+const hash = (v: string) => crypto.createHash('sha256').update(salt() + '|' + v).digest('hex').slice(0, 24);
 /** [ipHash, browserIdHash?] */
 export const ids = (ip: string, bid?: unknown): string[] => {
   const b = typeof bid === 'string' && /^[\w-]{8,64}$/.test(bid) ? bid : '';
   return [hash('ip:' + ip), ...(b ? [hash('b:' + b)] : [])];
 };
-const countMsg = (h: string[], ms: number) => {
-  const cut = Date.now() - ms;
+
+// ---- Supabase helpers (hashes are hex, safe in filters; never logged) ----
+const iso = (ms: number) => new Date(ms).toISOString();
+const ov = (h: string[]) => `ov.${encodeURIComponent(`{${h.join(',')}}`)}`;
+const inList = (h: string[]) => `in.(${h.join(',')})`;
+const ms = (v: string) => Date.parse(v);
+/** Exact row count via PostgREST (HEAD-style, no rows transferred). */
+async function dbCount(table: string, filter: string, col = 'id'): Promise<number> {
+  const r = await fetch(`${(process.env.SUPABASE_URL ?? '').replace(/\/$/, '')}/rest/v1/${table}?select=${col}&${filter}`, {
+    headers: { apikey: process.env.SUPABASE_SECRET_KEY ?? '', Prefer: 'count=exact', Range: '0-0', 'Range-Unit': 'items' },
+  });
+  if (!r.ok) throw new Error(`[db] count ${table} → ${r.status}`);
+  return Number(r.headers.get('content-range')?.split('/')[1] ?? 0);
+}
+let lastPrune = 0;
+async function prune() {
+  const now = Date.now();
+  if (now - lastPrune < HOUR) return;
+  lastPrune = now;
+  await Promise.all([
+    dbDelete('abuse_msgs', `t=lt.${iso(now - 48 * HOUR)}`),
+    dbDelete('abuse_strikes', `t=lt.${iso(now - 30 * DAY)}`),
+    dbDelete('abuse_pauses', `until=lte.${iso(now)}`),
+    dbDelete('abuse_perm', `t=lt.${iso(now - 365 * DAY)}`),
+  ]);
+}
+/** Guard must not take the site down when the database hiccups: log (no identifiers) and use the fallback. */
+async function guard<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try { return await fn(); } catch (e) { console.warn('[abuse] database error:', String((e as Error).message).split('?')[0].slice(0, 80)); return fallback; }
+}
+
+const countMsg = (h: string[], span: number) => {
+  const cut = Date.now() - span;
   return load().ev.filter((e) => e.k === 'msg' && e.t > cut && e.h.includes(h[0])).length;
 };
 
 export interface ChatState { blocked: boolean; permanent: boolean; until: number | null }
 /** Is this visitor paused or closed? Checked before every model call. */
-export function chatState(h: string[]): ChatState {
-  const s = load(), now = Date.now();
+export async function chatState(h: string[]): Promise<ChatState> {
+  const open: ChatState = { blocked: false, permanent: false, until: null };
+  const now = Date.now();
+  if (dbOn()) return guard(async () => {
+    if (h[1] && (await dbSelect('abuse_perm', `select=k&k=eq.${h[1]}&t=gte.${iso(now - 365 * DAY)}`)).length) return { blocked: true, permanent: true, until: null };
+    const rows = await dbSelect<{ until: string }>('abuse_pauses', `select=until&k=${inList(h)}&until=gt.${iso(now)}`);
+    const until = Math.max(0, ...rows.map((p) => ms(p.until)));
+    return until ? { blocked: true, permanent: false, until } : open;
+  }, open);
+  const s = load();
   if (h[1] && s.perm!.some((p) => p.k === h[1])) return { blocked: true, permanent: true, until: null };
   const until = Math.max(0, ...s.pauses!.filter((p) => h.includes(p.k) && p.until > now).map((p) => p.until));
-  return until ? { blocked: true, permanent: false, until } : { blocked: false, permanent: false, until: null };
+  return until ? { blocked: true, permanent: false, until } : open;
 }
 
 /** Record one strike (a chat ended for abuse) and apply the next level. Returns the level reached (1, 2, 3). */
-export function recordStrike(h: string[]): { level: 1 | 2 | 3; until: number | null } {
-  const s = load(), now = Date.now();
+export async function recordStrike(h: string[]): Promise<{ level: 1 | 2 | 3; until: number | null }> {
+  const now = Date.now();
+  if (dbOn()) return guard(async () => {
+    await dbInsert('abuse_strikes', { h, t: iso(now) });
+    const mine = await dbSelect<{ h: string[] }>('abuse_strikes', `select=h&h=${ov(h)}&t=gte.${iso(now - 30 * DAY)}`);
+    const n = mine.length;
+    const pause = async (span: number, keys: string[]) => { await dbInsert('abuse_pauses', keys.map((k) => ({ k, until: iso(now + span) }))); return now + span; };
+    let res: { level: 1 | 2 | 3; until: number | null };
+    if (n <= 1) res = { level: 1, until: await pause(FIRST_PAUSE_MIN() * 60_000, h) };
+    else if (n === 2) res = { level: 2, until: await pause(DAY, h) };
+    else {
+      const bids = [...new Set(mine.map((e) => e.h[1]).filter(Boolean))];
+      if (bids.length) {
+        const have = new Set((await dbSelect<{ k: string }>('abuse_perm', `select=k&k=${inList(bids)}`)).map((p) => p.k));
+        const fresh = bids.filter((k) => !have.has(k));
+        if (fresh.length) await dbInsert('abuse_perm', fresh.map((k) => ({ k, t: iso(now) })));
+      }
+      await pause(DAY, [h[0]]);
+      res = { level: 3, until: null };
+    }
+    await prune().catch(() => {});
+    return res;
+  }, { level: 1, until: now + FIRST_PAUSE_MIN() * 60_000 });
+  const s = load();
   s.strikes!.push({ h, t: now });
   const n = s.strikes!.filter((e) => e.t > now - 30 * DAY && e.h.some((x) => h.includes(x))).length;
-  const pause = (ms: number) => { for (const k of h) s.pauses!.push({ k, until: now + ms }); return now + ms; };
+  const pause = (span: number) => { for (const k of h) s.pauses!.push({ k, until: now + span }); return now + span; };
   let res: { level: 1 | 2 | 3; until: number | null };
   if (n <= 1) res = { level: 1, until: pause(FIRST_PAUSE_MIN() * 60_000) };
   else if (n === 2) res = { level: 2, until: pause(DAY) };
@@ -78,12 +149,18 @@ export function recordStrike(h: string[]): { level: 1 | 2 | 3; until: number | n
   return res;
 }
 /** Voice: closed when the chat is closed/paused for this visitor. */
-export const voiceBlocked = (h: string[]) => chatState(h).blocked;
+export const voiceBlocked = async (h: string[]) => (await chatState(h)).blocked;
 /** Voice client reports abuse → counts as a strike. */
-export const recordAbuse = (h: string[]) => { recordStrike(h); };
+export const recordAbuse = async (h: string[]) => { await recordStrike(h); };
 
 /** Count one text message; false when the per-IP daily cap is exceeded. */
-export const textMsgAllowed = (h: string[]) => {
+export const textMsgAllowed = async (h: string[]) => {
+  if (dbOn()) return guard(async () => {
+    if (await dbCount('abuse_msgs', `h=${ov(h.slice(0, 1))}&t=gte.${iso(Date.now() - DAY)}`) >= TEXT_IP_DAY()) return false;
+    await dbInsert('abuse_msgs', { h: h.slice(0, 1), t: iso(Date.now()) });
+    await prune().catch(() => {});
+    return true;
+  }, true);
   if (countMsg(h, DAY) >= TEXT_IP_DAY()) return false;
   load().ev.push({ h: h.slice(0, 1), t: Date.now(), k: 'msg' }); save(); return true;
 };
@@ -100,7 +177,11 @@ export const rateOk = (h: string[]) => {
 };
 /** Daily budget fuse for the whole site: once this many chat messages were answered in 24 h, the assistant
  *  pauses (no model calls) and points to the form. Protects the bill even against many IPs. */
-export const globalOk = () => load().ev.filter((e) => e.k === 'msg' && e.t > Date.now() - DAY).length < num('ABUSE_GLOBAL_DAY_MAX', 2000);
+export const globalOk = async () => {
+  const max = num('ABUSE_GLOBAL_DAY_MAX', 2000);
+  if (dbOn()) return guard(async () => (await dbCount('abuse_msgs', `t=gte.${iso(Date.now() - DAY)}`)) < max, true);
+  return load().ev.filter((e) => e.k === 'msg' && e.t > Date.now() - DAY).length < max;
+};
 
 /** Owner testing: on a non-production server, this machine and the local network are never paused
  *  (set ABUSE_TEST=1 to test the guard locally). ABUSE_ALLOW_IPS = comma list of IPs that are never paused. */
@@ -112,14 +193,29 @@ export const abuseExempt = (ip: string) => {
 };
 
 /** Admin panel: closed and paused visitors (hashes only) and unlocking. */
-export function adminList() {
-  const s = load(), now = Date.now();
+export async function adminList() {
+  const now = Date.now();
+  if (dbOn()) return guard(async () => {
+    const perm = await dbSelect<{ k: string; t: string }>('abuse_perm', `select=k,t&t=gte.${iso(now - 365 * DAY)}`);
+    const paused = await dbSelect<{ k: string; until: string }>('abuse_pauses', `select=k,until&until=gt.${iso(now)}`);
+    const strikes = perm.length ? await dbSelect<{ h: string[] }>('abuse_strikes', `select=h&h=${ov(perm.map((p) => p.k))}&t=gte.${iso(now - 30 * DAY)}`) : [];
+    return {
+      permanent: perm.map((p) => ({ k: p.k, t: ms(p.t), strikes: strikes.filter((e) => e.h.includes(p.k)).length })),
+      paused: paused.map((p) => ({ k: p.k, until: ms(p.until) })),
+    };
+  }, { permanent: [], paused: [] });
+  const s = load();
   return {
     permanent: s.perm!.map((p) => ({ k: p.k, t: p.t, strikes: s.strikes!.filter((e) => e.h.includes(p.k)).length })),
     paused: s.pauses!.filter((p) => p.until > now).map((p) => ({ k: p.k, until: p.until })),
   };
 }
-export function adminUnlock(k: string): boolean {
+export async function adminUnlock(k: string): Promise<boolean> {
+  if (dbOn()) return guard(async () => {
+    const n = (await dbCount('abuse_perm', `k=eq.${k}`, 'k')) + (await dbCount('abuse_pauses', `k=eq.${k}`)) + (await dbCount('abuse_strikes', `h=${ov([k])}`));
+    await Promise.all([dbDelete('abuse_perm', `k=eq.${k}`), dbDelete('abuse_pauses', `k=eq.${k}`), dbDelete('abuse_strikes', `h=${ov([k])}`)]);
+    return n > 0;
+  }, false);
   const s = load(), before = s.perm!.length + s.pauses!.length + s.strikes!.length;
   s.perm = s.perm!.filter((p) => p.k !== k);
   s.pauses = s.pauses!.filter((p) => p.k !== k);
