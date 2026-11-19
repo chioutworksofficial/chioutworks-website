@@ -87,3 +87,8 @@
 4. Site haritası derlemede otomatik üretilsin, blog yazıları da girsin; alan adı kesinleşince adresler güncellensin
 5. Hizmetler, SSS ve blog için ek yapısal veri
 6. Karar bekliyor: ana sayfa açıklamasındaki kişi adı (site metni kuralı: ad yok)
+
+## Güncel durum özeti (2026-11-20)
+- Yapıldı: GitHub deposu (şu an herkese açık, anahtar kontrolü + push koruması), Vercel ortam değişkenleri (gizli), Supabase Frankfurt + RLS (dışarıya kapalı), özel dosya kutusu (25 MB, tür kontrolü), Vercel fonksiyonları fra1, günlük bakım görevi, kötüye kullanım sınırları Supabase'te (örnekler arası ortak), sitemap/robots/llms, loglarda kişisel veri yok.
+- Kısmen: hız sınırının bir kısmı hâlâ bellek içi; Turnstile yok; Zod yok; Supabase yedek ayarı (ücretsiz planda sınırlı) kontrol edilmedi.
+- Yapılmadı: alan adı + DNS, Resend alan adı doğrulama, CORS sıkılaştırma, securityheaders/PageSpeed testi, kod bölme, ön render, hata izleme, Search Console, eski tarayıcı istatistiğinin kaldırılması (karar), Impressum e-postası, avukat kontrolü.
