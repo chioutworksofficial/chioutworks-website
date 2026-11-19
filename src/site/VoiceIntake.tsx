@@ -669,7 +669,8 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     if (!name) { setCardErr(t.cardNeedContact); return; }
     const mailOk = EMAIL_RE.test(email) && /@.+\./.test(email), phoneOk = phone.replace(/\D/g, '').length >= 7;
     if (!mailOk && !phoneOk) { setCardErr(t.cardNeedEither); return; }
-    if (email && !mailOk) { setCardErr(t.dlBadEmail); return; }
+    if (!mailOk) { setCardErr(email ? t.dlBadEmail : t.cardNeedEither); return; }
+    if (!phoneOk) { setCardErr(t.cardNeedEither); return; }
     setCardBusy(true); setCardErr('');
     try {
       const v = voiceId.current ?? await saveSession();
@@ -773,8 +774,8 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
               <p style={{ margin: 0, color: 'var(--lq-silver)', fontSize: 13.5, textAlign: 'center' }}>{t.cardHint}</p>
               {([['service', t.cardService, 'text', 120], ['business', t.cardBusiness, 'text', 100], ['city', t.cardCity, 'text', 80], ['firstName', t.cardFirst, 'text', 40], ['lastName', t.cardLast, 'text', 40], ['phone', t.cardPhone, 'tel', 40], ['email', t.cardEmail, 'email', 254]] as const).map(([k, label, type, max]) => (
                 <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: 'var(--lq-silver)' }}>
-                  {label}{(k === 'phone' || k === 'email') ? ` ${t.cardOneOf}` : ''}
-                  <input type={type} value={card[k]} maxLength={max} onChange={(e) => setCard({ ...card, [k]: e.target.value })}
+                  {label}{(k === 'phone' || k === 'email') ? ` * ${t.cardRequired}` : ''}
+                  <input type={type} aria-required={(k === 'phone' || k === 'email') ? 'true' : undefined} value={card[k]} maxLength={max} onChange={(e) => setCard({ ...card, [k]: e.target.value })}
                     style={{ padding: '10px 14px', borderRadius: 'var(--lq-radius-sm)', border: '1px solid var(--lq-line-strong)', background: 'var(--lq-kelp)', color: 'var(--lq-white)', fontFamily: 'inherit', fontSize: 15 }} />
                 </label>
               ))}

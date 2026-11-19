@@ -694,6 +694,7 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
     const vs = await getVoice(vid) as VoiceSession | null;
     if (vs && safeEq(vs.secret, req.body?.voiceSecret)) voiceLink = vs;
   }
+  if (req.body?.via === 'assistant' && voiceLink && voiceLink.kind !== 'text' && (!email || !/@.+\./.test(email) || /\s/.test(email) || phone.replace(/\D/g, '').length < 7)) return res.status(400).json({ ok: false, error: 'voice_contact_required' });
   const roiCalc = sanitizeRoi(req.body?.roiCalc);
   const topicIn = String(req.body?.topic ?? '');
   // Where the request was sent from: the assistant's summary card (voice or text chat), the calculator, a resource card, or the plain form

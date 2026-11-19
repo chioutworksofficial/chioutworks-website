@@ -127,10 +127,10 @@ const FAREWELL: Record<string, [string, string, string]> = {
   el: ['Καλή σας μέρα', 'Καλό σας βράδυ', 'Καληνύχτα'],
 };
 const CLOSING: Record<string, string> = {
-  tr: 'Başka sormak istediğiniz bir şey yoksa görüşmeyi burada sonlandıralım. Ekranda açılacak talep kartına e-posta adresinizi ya da telefon numaranızı yazın; en kısa sürede sizinle iletişime geçilecek. {FAREWELL}!',
-  en: "If you have no further questions, let's end the call here. Please type your e-mail address or phone number into the request card that opens on the screen; you will be contacted as soon as possible. {FAREWELL}!",
-  de: 'Wenn Sie keine weiteren Fragen haben, beenden wir das Gespräch an dieser Stelle. Bitte tragen Sie Ihre E-Mail-Adresse oder Telefonnummer in die Anfragekarte ein, die sich gleich am Bildschirm öffnet; Sie werden so schnell wie möglich kontaktiert. {FAREWELL}!',
-  el: 'Αν δεν έχετε άλλες ερωτήσεις, ας ολοκληρώσουμε εδώ την κλήση. Γράψτε το e-mail ή το τηλέφωνό σας στην κάρτα αιτήματος που θα ανοίξει στην οθόνη· θα υπάρξει επικοινωνία μαζί σας το συντομότερο. {FAREWELL}!',
+  tr: 'Başka sormak istediğiniz bir şey yoksa görüşmeyi burada sonlandıralım. Ekranda açılacak talep kartına e-posta adresinizi ve telefon numaranızı yazın; en kısa sürede sizinle iletişime geçilecek. {FAREWELL}!',
+  en: "If you have no further questions, let's end the call here. Please type your e-mail address and phone number into the request card that opens on the screen; you will be contacted as soon as possible. {FAREWELL}!",
+  de: 'Wenn Sie keine weiteren Fragen haben, beenden wir das Gespräch an dieser Stelle. Bitte tragen Sie Ihre E-Mail-Adresse und Telefonnummer in die Anfragekarte ein, die sich gleich am Bildschirm öffnet; Sie werden so schnell wie möglich kontaktiert. {FAREWELL}!',
+  el: 'Αν δεν έχετε άλλες ερωτήσεις, ας ολοκληρώσουμε εδώ την κλήση. Γράψτε το e-mail και το τηλέφωνό σας στην κάρτα αιτήματος που θα ανοίξει στην οθόνη· θα υπάρξει επικοινωνία μαζί σας το συντομότερο. {FAREWELL}!',
 };
 export function closingText(lang: string, hour?: number): string {
   const f = FAREWELL[lang] ?? FAREWELL.en;
