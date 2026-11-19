@@ -7,16 +7,18 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { EN, EN_SECTIONS } from '../src/data/intakeEn.js';
 import { dbOn, dbSelect, dbUpsert, dbDelete, kvGet, kvSet } from './db.js';
 import {
-  AI_Q, APP_Q, AUTO_Q, BOOKING_Q, CONSENT, FINAL_Q, INV_Q, QR_Q, CONSENT_AI, CRM_Q, NOTSURE_Q, SECTION_STATIC, SECTOR_LABEL, START_Q, WEB_Q, YN_LABEL, isSector, l4,
+  AI_Q, APP_Q, AUTO_Q, BOOKING_Q, CONSENT, FINAL_Q, INV_Q, QR_Q, CONSENT_AI, CRM_Q, SECTION_STATIC, SECTOR_LABEL, SECTOR_OVERRIDE, START_Q, TECH_Q, YN_LABEL, isSector, l4,
   type L, type L4, type Market, type SectorKey, type StaticQ, type QDef, type SecDef, type Definition,
 } from '../src/data/intakeSectors.js';
 import { INTAKE_SLUG } from '../src/lib/routes.js';
-import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, EXTRA_SYSTEM, LEGAL_Q, MESSENGER_Q, QUESTION_HELP, SECTION_INTRO, SECTION_ORDER } from '../src/data/intakeHelp.js';
+import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, DREAM_IDS, DREAM_TITLE, EXTRA_SYSTEM, LEGAL_Q, MESSENGER_Q, QUESTION_HELP, SECTION_INTRO, SECTION_ORDER } from '../src/data/intakeHelp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORE = path.join(__dirname, '../data/intakes.json');
+const SCHEMA = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/data/intakeSchema.json'), 'utf8'));
 const LANGS: L[] = ['tr', 'en', 'de', 'el'];
 const DAY = 24 * 3600e3;
 
@@ -71,29 +73,82 @@ const write = (all: Intake[]) => {
 };
 
 // ── Definition ──────────────────────────────────────────────────────────────
+const pick = (d: Record<string, string> | undefined, lang: L, market: Market): string => {
+  if (!d) return '';
+  const key = lang === 'tr' && market === 'TR' ? 'tr_TR' : lang === 'el' && market === 'GR' ? 'el_GR' : lang;
+  return d[key] ?? d[lang] ?? '';
+};
+const all4 = (d: Record<string, string> | undefined, enText: string | undefined, market: Market): L4 =>
+  l4(LANGS.map((l) => (l === 'en' ? enText ?? '' : pick(d, l, market))) as [string, string, string, string]);
+
 export const wantsOf = (a: Record<string, string | boolean>) => ['website', 'booking', 'qr', 'automation', 'crm', 'invoices', 'app', 'ai', 'all'].filter((k) => a[`wants__${k}`] === true);
 
+const COMPACT = ['booking', 'qr', 'invoices', 'ai', 'crm', 'automation'];
 export function buildDefinition(market: Market, sector: SectorKey, wants: string[]): Definition {
+  const ov = SECTOR_OVERRIDE[sector] ?? {};
+  const websiteFlow = wants.length === 0 || wants.includes('website') || wants.includes('all');
+  const skip = new Set(websiteFlow ? [] : ['website', 'design', 'marketing']);
   const fromStatic = (q: StaticQ): QDef => ({ id: q.id, type: q.type, t: q.t, required: q.required, detail: q.detail,
     opts: q.type === 'yn' ? ['yes', 'no', 'unsure'].map((id) => ({ id, t: YN_LABEL[id] })) : q.options?.map((o) => ({ id: o.id, t: o.t })) });
-  const sec = (id: SecDef['id'], qs: StaticQ[]): SecDef => ({ id, title: SECTION_STATIC[id as 'qr'], qs: qs.map(fromStatic) });
-  // One short block per wanted item (5-10 questions each, tailored per product); the long schema sections are gone on purpose.
-  const BLOCKS: [string, StaticQ[]][] = [['website', WEB_Q], ['booking', BOOKING_Q], ['qr', QR_Q], ['crm', CRM_Q], ['invoices', INV_Q], ['automation', AUTO_Q], ['app', APP_Q], ['ai', AI_Q]];
-  const secs: SecDef[] = [sec('start', START_Q)];
-  if (!wants.length || wants.includes('all')) secs.push(sec('notsure', NOTSURE_Q));
-  else for (const [k, qs] of BLOCKS) if (wants.includes(k)) secs.push(sec(k, qs));
-  secs.push(sec('final', FINAL_Q));
-  return { sections: friendly(secs), consent: consentOf(market), market, sector, wants };
+
+  const secs: SecDef[] = [{ id: 'start', title: SECTION_STATIC.start, qs: START_Q.map(fromStatic) }];
+  const toolsQ = TECH_Q.filter((q) => q.id === 'tech_tools');
+  const BLOCKS: Record<string, [SecDef['id'], StaticQ[]]> = {
+    booking: ['booking', BOOKING_Q], qr: ['qr', QR_Q], crm: ['crm', CRM_Q], invoices: ['invoices', INV_Q], ai: ['ai', AI_Q], automation: ['automation', AUTO_Q],
+  };
+  const blockSec = (k: string, tools = false): SecDef => ({ id: BLOCKS[k][0], title: SECTION_STATIC[BLOCKS[k][0] as 'qr'], qs: [...BLOCKS[k][1], ...(tools && (k === 'crm' || k === 'invoices') && !(k === 'invoices' && wants.includes('crm')) ? toolsQ : [])].map(fromStatic) });
+  const focused = wants.length > 0 && wants.every((w) => COMPACT.includes(w));
+  if (focused) {
+    for (const k of COMPACT) if (wants.includes(k)) secs.push(blockSec(k, true));
+    secs.push({ id: 'final', title: SECTION_STATIC.final, qs: FINAL_Q.map(fromStatic) });
+    return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants };
+  }
+  for (const s of SCHEMA.sections as any[]) {
+    if (skip.has(s.id)) continue;
+    const qs: QDef[] = [];
+    for (const q of s.questions as any[]) {
+      if (q.type === 'consent' || q.id === 'domain') continue; // consent has its own step; domain is covered by the tech block
+      const en = EN[q.id];
+      let type: QDef['type'] = q.type;
+      const t = ov.text?.[q.id] ?? all4(q.text, en?.t, market);
+      if (ov.toText?.includes(q.id)) type = 'text';
+      let opts: { id: string; t: L4 }[] | undefined;
+      if (type === 'yn') opts = ['yes', 'no', 'unsure'].map((id) => ({ id, t: YN_LABEL[id] }));
+      else if (q.options && type !== 'text') {
+        const base: { id: string; t: L4 }[] = ov.replace?.[q.id] ?? (q.options as any[]).map((o) => ({ id: o.id, t: all4(o.text, en?.o?.[o.id], market) }));
+        const drop = new Set(ov.drop?.[q.id] ?? []);
+        opts = [...base.filter((o) => !drop.has(o.id) && !(o.id === 'viber' && market !== 'GR')), ...(ov.add?.[q.id] ?? [])];
+      }
+      qs.push({ id: q.id, no: q.no, type, t, opts, other: !!q.other, detail: !!q.detail });
+    }
+    if (s.id === 'current') {
+      secs.push({ id: s.id, title: all4(s.title, EN_SECTIONS[s.id], market), qs });
+      secs.push({ id: 'tech', title: SECTION_STATIC.tech, qs: TECH_Q.map(fromStatic) });
+      if (wants.includes('crm') || wants.includes('all')) secs.push({ id: 'crm', title: SECTION_STATIC.crm, qs: CRM_Q.map(fromStatic) });
+      if (wants.includes('app') || wants.includes('all')) secs.push({ id: 'app', title: SECTION_STATIC.app, qs: APP_Q.map(fromStatic) });
+      if (wants.includes('automation') || wants.includes('all')) secs.push({ id: 'autodetail', title: SECTION_STATIC.auto, qs: AUTO_Q.map(fromStatic) });
+      continue;
+    }
+    if (qs.length) secs.push({ id: s.id, title: all4(s.title, EN_SECTIONS[s.id], market), qs });
+  }
+  for (const k of ['booking', 'qr', 'invoices', 'ai']) if (wants.includes(k)) secs.push(blockSec(k));
+  return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants };
 }
 
+const dedupe = (secs: SecDef[]): SecDef[] => { const seen = new Set<string>(); for (const s of secs) s.qs = s.qs.filter((q) => !seen.has(q.id) && !!seen.add(q.id)); return secs; };
 const consentOf = (market: Market) => {
   const base = market === 'TR' ? CONSENT.kvkk : CONSENT.gdpr;
   return l4(LANGS.map((l) => `${base[l]} ${CONSENT_AI[l]}`) as [string, string, string, string]);
 };
-/** Plain-language help and intros per section, in the fixed page order. */
+/** Friendlier flow: motivating "dream" page second, technical + budget pages last, plain-language help and intros. No question is dropped. */
 function friendly(secs: SecDef[]): SecDef[] {
+  const dream: QDef[] = [];
+  for (const id of DREAM_IDS) for (const s of secs) { const i = s.qs.findIndex((q) => q.id === id); if (i >= 0) { dream.push(s.qs[i]); s.qs.splice(i, 1); break; } }
+  const project = secs.find((s) => s.id === 'project');
+  if (project && !project.qs.some((q) => q.id === LEGAL_Q.id)) { const at = project.qs.findIndex((q) => q.id === 'budget_onetime'); project.qs.splice(at < 0 ? project.qs.length : at, 0, LEGAL_Q); }
+  const all = [...secs.filter((s) => s.qs.length), ...(dream.length ? [{ id: 'dream', title: DREAM_TITLE, qs: dream }] : [])];
   const rank = (id: string) => { const r = SECTION_ORDER.indexOf(id); return r < 0 ? SECTION_ORDER.length : r; };
-  return secs.filter((s) => s.qs.length).sort((a, b) => rank(a.id) - rank(b.id)).map((s) => ({
+  return all.sort((a, b) => rank(a.id) - rank(b.id)).map((s) => ({
     ...s, ...(SECTION_INTRO[s.id] ? { intro: SECTION_INTRO[s.id] } : {}), ...(s.id === 'automation' ? { flow: AUTOMATION_FLOW } : {}),
     qs: s.qs.map((q) => {
       if (q.id === MESSENGER_Q.id) return MESSENGER_Q;

@@ -35,7 +35,7 @@
 | Sesli asistan kapanışı: veda bitmeden kapanmaz (konuşma turu bitti + ses çalındı + 1,5 sn sessizlik; en az 4 sn bekleme, en çok 15 sn); 3 dakika; duraklamada araya girmez, tur başına tek cevap; 4 dilde özel kelime listesi (2026-11-19) | `src/lib/geminiLive.ts`, `server/geminiLive.ts`, `VoiceIntake.tsx` |
 | Sesli talep kartı: e-posta VE telefon zorunlu (arayüz + sunucu), işletme/şehir alanları, tarz bağlantısı kartın üstünde (2026-11-19) | `VoiceIntake.tsx`, `server/index.ts` |
 | Yazılı sohbet kapanışı: gerçek talep kaydı, "eklemek istediğiniz bir şey var mı?", saate göre veda, düzenlenebilir "Talep bilgileriniz" kartı, web/tasarım ise tarz bağlantısı; sohbet talepleri için de sahip bildirimi (2026-11-19) | `AIAssistant.tsx`, `server/index.ts` |
-| Form ürüne özel sorular: web sitesi 13 (açıklamalı, barındırma, kurumsal e-posta, zorunlu okumalı yasal metinler), otomasyon 9, CRM 10, özel uygulama 10, QR/randevu 5; onay metninde sağlayıcı adı yok (2026-11-19) | `src/data/intakeSectors.ts`, `intakeHelp.ts` |
+| Analiz formu: web sitesi/uygulama/hepsi için eski sayfalı uzun form geri geldi (web 12 sayfa, web+otomasyon 13 sayfa; açıklamalar, zorunlu okuma, hayal sayfası); tek ürün isteyenlere kısa form (QR/randevu 5, CRM 10, otomasyon 9); onay metninde sağlayıcı adı yok (2026-11-20) | `src/data/intakeSectors.ts`, `intakeHelp.ts` |
 
 ## B. Bitti ama bir şey bekliyor (küçük eksik / yayında kontrol)
 | Parça | Ne eksik / ne yapılacak | Kim |

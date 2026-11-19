@@ -7,7 +7,7 @@ export const DREAM_IDS = ['success_definition', 'repetitive_tasks', 'growth_12m'
 export const DREAM_TITLE: L4 = l4(['Hayaliniz', 'Your vision', 'Ihre Vision', 'Το όραμά σας']);
 
 /** Page order after "start" and "dream": the technical and budget pages come last. */
-export const SECTION_ORDER = ['start', 'website', 'booking', 'qr', 'crm', 'invoices', 'automation', 'app', 'ai', 'notsure', 'final'];
+export const SECTION_ORDER = ['start', 'dream', 'company', 'current', 'website', 'process', 'crm', 'app', 'automation', 'autodetail', 'design', 'marketing', 'tech', 'project', 'additional', 'booking', 'qr', 'invoices', 'ai', 'final'];
 
 /** Short encouraging text at the top of a page. */
 export const SECTION_INTRO: Record<string, L4> = {

@@ -90,7 +90,7 @@ export default function IntakeProgress({ lang, token, step, total, def, answers,
     const picked = (id: string) => (qs.get(id)?.opts ?? []).filter((o) => on(`${id}__${o.id}`)).map((o) => label(id, o.id));
     const out: string[] = [];
     const all = on('wants__all');
-    if (all || on('wants__website')) { const n = picked('web_parts').length; out.push(n ? `${t.website} · ${t.pages(n)}` : t.website); }
+    if (all || on('wants__website')) { const n = (picked('web_parts').length || picked('pages').length); out.push(n ? `${t.website} · ${t.pages(n)}` : t.website); }
     if (all || on('wants__automation')) out.push(t.automation);
     if (all || on('wants__crm')) out.push(t.crm);
     if (all || on('wants__app')) out.push(t.app);
