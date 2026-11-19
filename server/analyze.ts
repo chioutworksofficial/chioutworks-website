@@ -7,10 +7,10 @@ import { answersForAi, readIntakes, writeIntakes } from './intake.js';
 interface Deps {
   requireAdmin: (req: Request, res: Response) => boolean;
   getGroq: () => Groq | null;
-  readQuotes: () => any[];
-  writeQuotes: (all: any[]) => void;
-  loadVoice: () => any[];
-  saveVoice: (all: any[]) => void;
+  readQuotes: () => Promise<any[]>;
+  writeQuotes: (all: any[]) => Promise<void>;
+  loadVoice: () => Promise<any[]>;
+  saveVoice: (all: any[]) => Promise<void>;
 }
 
 const SYSTEM = `You are a senior solutions analyst for a one-person studio (Chioutworks) that builds websites, automations and AI assistants for small businesses.
@@ -79,22 +79,22 @@ export function registerAnalyze(app: Express, d: Deps) {
     const groq = d.getGroq();
     if (!groq) return res.status(503).json({ error: 'ai_unavailable', message: 'GROQ_API_KEY tanımlı değil.' });
 
-    let input = ''; let store: { all: any[]; rec: any; save: () => void } | null = null;
+    let input = ''; let store: { all: any[]; rec: any; save: () => Promise<void> } | null = null;
     if (type === 'intake') {
-      const all = readIntakes(); const rec = all.find((x) => x.id === id);
+      const all = await readIntakes(); const rec = all.find((x) => x.id === id);
       if (!rec) return res.status(404).json({ error: 'not_found' });
       input = `INTAKE FORM ANSWERS\n${answersForAi(rec)}`;
       store = { all, rec, save: () => writeIntakes(all) };
     } else if (type === 'request') {
-      const all = d.readQuotes(); const rec = all.find((x) => x.id === id);
+      const all = await d.readQuotes(); const rec = all.find((x) => x.id === id);
       if (!rec) return res.status(404).json({ error: 'not_found' });
       const f = { kind: rec.kind, business: rec.business, message: rec.message, language: rec.lang, modules: rec.modules, preferredStart: rec.preferredStart, topic: rec.topic, roiCalc: rec.roiCalc ? { sector: rec.roiCalc.sectorLabel, staff: rec.roiCalc.staff, tasks: rec.roiCalc.tasks, savedHoursPerMonth: rec.roiCalc.results?.monthH } : undefined };
       input = `CONTACT / QUOTE REQUEST\n${JSON.stringify(f)}`;
-      const sess = rec.voiceSessionId ? d.loadVoice().find((v) => v.id === rec.voiceSessionId) : null;
+      const sess = rec.voiceSessionId ? (await d.loadVoice()).find((v) => v.id === rec.voiceSessionId) : null;
       if (sess) input += `\n\nRELATED CHAT TRANSCRIPT\n${turnsText(sess.turns)}`;
       store = { all, rec, save: () => d.writeQuotes(all) };
     } else {
-      const all = d.loadVoice(); const rec = all.find((x) => x.id === id && !x.deleted);
+      const all = await d.loadVoice(); const rec = all.find((x) => x.id === id && !x.deleted);
       if (!rec) return res.status(404).json({ error: 'not_found' });
       input = `CHAT TRANSCRIPT (language ${rec.lang})\n${turnsText(rec.turns)}${rec.contact?.message ? `\n\nMessage left by the visitor: ${String(rec.contact.message).slice(0, 1500)}` : ''}`;
       store = { all, rec, save: () => d.saveVoice(all) };
@@ -112,7 +112,7 @@ export function registerAnalyze(app: Express, d: Deps) {
         const data = normalize(JSON.parse(c.choices[0]?.message?.content ?? '{}'));
         if (!data.summary) throw Object.assign(new Error('empty'), { status: 422 });
         const analysis = { at: new Date().toISOString(), model: models[m], data };
-        store.rec.analysis = analysis; store.save();
+        store.rec.analysis = analysis; await store.save();
         return res.json({ analysis });
       } catch (e: any) {
         if (m < models.length - 1) { console.warn(`[analyze] ${models[m]} failed (${e?.status ?? e?.message}), trying fallback`); continue; }

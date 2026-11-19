@@ -107,21 +107,21 @@ interface Deps { getGroq: () => Groq | null; rateSkip?: () => boolean }
 
 export function registerPreview(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 8, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
-  const find = (token: string) => {
-    const all = readIntakes(); const i = all.find((x) => x.token === token);
+  const find = async (token: string) => {
+    const all = await readIntakes(); const i = all.find((x) => x.token === token);
     return { all, i: i && !i.cancelledAt && Date.parse(i.expiresAt) > Date.now() ? i : null };
   };
   const pub = (p: any) => (p ? { data: p.data as PreviewData, at: p.at as string, left: Math.max(0, MAX_GENERATIONS - (p.count ?? 1)) } : null);
 
-  app.get('/api/intake/:token/preview', (req: Request, res: Response) => {
-    const { i } = find(String(req.params.token));
+  app.get('/api/intake/:token/preview', async (req: Request, res: Response) => {
+    const { i } = await find(String(req.params.token));
     if (!i) return res.status(404).json({ error: 'not_found' });
     res.set('Cache-Control', 'no-store');
     return res.json({ preview: pub((i as any).preview) });
   });
 
   app.post('/api/intake/:token/preview', limiter, async (req: Request, res: Response) => {
-    const { i } = find(String(req.params.token));
+    const { i } = await find(String(req.params.token));
     if (!i) return res.status(404).json({ error: 'not_found' });
     if (i.status !== 'submitted') return res.status(409).json({ error: 'not_submitted' });
     const prev = (i as any).preview;
@@ -141,10 +141,10 @@ export function registerPreview(app: Express, d: Deps) {
         } as any) as any;
         const data = normalize(JSON.parse(c.choices[0]?.message?.content ?? '{}'), company, views, features);
         if (!data.heroTitle || data.services.length < 2) throw new Error('thin');
-        const fresh = readIntakes(); const x = fresh.find((y) => y.id === i.id);
+        const fresh = await readIntakes(); const x = fresh.find((y) => y.id === i.id);
         if (!x) return res.status(404).json({ error: 'not_found' });
         (x as any).preview = { at: new Date().toISOString(), model, data, count: (prev?.count ?? 0) + 1 };
-        writeIntakes(fresh);
+        await writeIntakes(fresh);
         return res.json({ preview: pub((x as any).preview) });
       } catch (e) { console.warn(`[preview] ${model} failed`, (e as Error).message); }
     }

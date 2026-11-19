@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { dbOn, dbSelect, dbUpsert, dbDelete, kvGet, kvSet } from './db.js';
 import {
   AI_Q, APP_Q, AUTO_Q, BOOKING_Q, CONSENT, FINAL_Q, INV_Q, QR_Q, CONSENT_AI, CRM_Q, NOTSURE_Q, SECTION_STATIC, SECTOR_LABEL, START_Q, WEB_Q, YN_LABEL, isSector, l4,
   type L, type L4, type Market, type SectorKey, type StaticQ, type QDef, type SecDef, type Definition,
@@ -30,8 +31,12 @@ export interface Intake {
 }
 
 const TRANS = path.join(__dirname, '../data/intake-translations.json');
-const readTrans = (): Record<string, Record<string, string>> => { try { return JSON.parse(fs.readFileSync(TRANS, 'utf8')); } catch { return {}; } };
-const writeTrans = (all: Record<string, Record<string, string>>) => {
+const readTrans = async (): Promise<Record<string, Record<string, string>>> => {
+  if (dbOn()) return (await kvGet<Record<string, Record<string, string>>>('intake_translations')) ?? {};
+  try { return JSON.parse(fs.readFileSync(TRANS, 'utf8')); } catch { return {}; }
+};
+const writeTrans = async (all: Record<string, Record<string, string>>) => {
+  if (dbOn()) return kvSet('intake_translations', all);
   fs.mkdirSync(path.dirname(TRANS), { recursive: true });
   const tmp = `${TRANS}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(all));
@@ -40,8 +45,24 @@ const writeTrans = (all: Record<string, Record<string, string>>) => {
 
 const read = (): Intake[] => { try { return JSON.parse(fs.readFileSync(STORE, 'utf8')); } catch { return []; } };
 /** For the style picker: the intake behind a client link (only once it was submitted). */
-export const intakeById = (id: string) => read().find((i) => i.id === id) ?? null;
-export const submittedIntake = (token: string) => read().find((i) => i.token === token && i.status === 'submitted') ?? null;
+const col = async (filter: string) => (await dbSelect<{ data: Intake }>('intakes', `select=data&${filter}&limit=1`))[0]?.data ?? null;
+export const getIntake = async (id: string): Promise<Intake | null> => (dbOn() ? col(`id=eq.${encodeURIComponent(id)}`) : read().find((i) => i.id === id) ?? null);
+export const getIntakeByToken = async (token: string): Promise<Intake | null> => (dbOn() ? col(`token=eq.${encodeURIComponent(token)}`) : read().find((i) => i.token === token) ?? null);
+export const intakeById = getIntake;
+export const submittedIntake = async (token: string) => { const i = await getIntakeByToken(token); return i && i.status === 'submitted' ? i : null; };
+export const listIntakes = async (): Promise<Intake[]> => (dbOn() ? (await dbSelect<{ data: Intake }>('intakes', 'select=data')).map((r) => r.data) : read());
+const toRow = (i: Intake) => ({ id: i.id, token: i.token, request_id: i.requestId ?? null, status: i.status, created_at: i.createdAt, updated_at: i.updatedAt ?? new Date().toISOString(), data: i });
+export async function saveIntake(rec: Intake): Promise<void> {
+  if (dbOn()) return dbUpsert('intakes', toRow(rec), 'id');
+  const all = read(); const k = all.findIndex((x) => x.id === rec.id);
+  if (k < 0) all.push(rec); else all[k] = rec;
+  write(all);
+}
+export async function deleteIntake(id: string): Promise<boolean> {
+  if (!(await getIntake(id))) return false;
+  if (dbOn()) await dbDelete('intakes', `id=eq.${encodeURIComponent(id)}`); else write(read().filter((x) => x.id !== id));
+  return true;
+}
 const write = (all: Intake[]) => {
   fs.mkdirSync(path.dirname(STORE), { recursive: true });
   const tmp = `${STORE}.${process.pid}.${Date.now()}.tmp`;
@@ -167,9 +188,9 @@ const REQUIRED = ['meta_company', 'meta_contact', 'meta_email', 'biz_type'];
 
 export function registerIntake(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 60 * 1000, max: 90, skip: d.rateSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
-  const live = (token: string): Intake | null => {
+  const live = async (token: string): Promise<Intake | null> => {
     if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) return null;
-    const i = read().find((x) => x.token === token);
+    const i = await getIntakeByToken(token);
     return i && !i.cancelledAt && !expired(i) ? i : null;
   };
   const pub = (i: Intake) => ({
@@ -177,12 +198,11 @@ export function registerIntake(app: Express, d: Deps) {
     definition: defOf(i), answers: i.answers,
   });
 
-  app.get('/api/intake/:token', limiter, (req, res) => {
-    const i = live(String(req.params.token));
+  app.get('/api/intake/:token', limiter, async (req, res) => {
+    const i = await live(String(req.params.token));
     if (!i) return res.status(404).json({ error: 'not_found' });
     if (i.status === 'sent') {
-      const all = read(); const x = all.find((y) => y.id === i.id)!;
-      x.status = 'opened'; x.openedAt = new Date().toISOString(); write(all); i.status = 'opened';
+      i.status = 'opened'; i.openedAt = new Date().toISOString(); await saveIntake(i);
     }
     res.set('Cache-Control', 'no-store');
     return res.json(pub(i));
@@ -192,7 +212,7 @@ export function registerIntake(app: Express, d: Deps) {
   // never answers or contact details). Cached per language in data/intake-translations.json, so each text is translated once.
   const transLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 12, skip: d.rateSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
   app.get('/api/intake/:token/translate', transLimiter, async (req, res) => {
-    const i = live(String(req.params.token));
+    const i = await live(String(req.params.token));
     if (!i) return res.status(404).json({ error: 'not_found' });
     const to = String(req.query.to ?? '');
     if (!/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(to) || LANGS.includes(to as L)) return res.status(400).json({ error: 'bad_lang' });
@@ -201,7 +221,7 @@ export function registerIntake(app: Express, d: Deps) {
     const add = (x?: L4) => { if (x?.en) src.add(x.en); };
     for (const s of def.sections) { add(s.title); add(s.intro); s.flow?.forEach(add); for (const q of s.qs) { add(q.t); add(q.help); add(q.costNote); q.opts?.forEach((o) => add(o.t)); } }
     add(def.consent);
-    const cache = readTrans(); const have = (cache[to] ??= {});
+    const cache = await readTrans(); const have = (cache[to] ??= {});
     const missing = [...src].filter((x) => !have[x]);
     if (missing.length) {
       const groq = d.getGroq?.();
@@ -222,7 +242,7 @@ export function registerIntake(app: Express, d: Deps) {
           if (!Array.isArray(out) || out.length !== batch.length) throw new Error('shape');
           batch.forEach((x, j) => { const v = String(out[j] ?? '').trim().slice(0, 2000); if (v) have[x] = v; });
         }
-        writeTrans(cache);
+        await writeTrans(cache);
       } catch (e) {
         console.error('[intake] translate failed', (e as Error).message);
         return res.status(502).json({ error: 'ai_failed' });
@@ -232,9 +252,8 @@ export function registerIntake(app: Express, d: Deps) {
     return res.json({ to, map: Object.fromEntries([...src].filter((x) => have[x]).map((x) => [x, have[x]])) });
   });
 
-  app.patch('/api/intake/:token', limiter, (req, res) => {
-    const all = read();
-    const i = all.find((x) => x.token === String(req.params.token));
+  app.patch('/api/intake/:token', limiter, async (req, res) => {
+    const i = await getIntakeByToken(String(req.params.token));
     if (!i || i.cancelledAt || expired(i)) return res.status(404).json({ error: 'not_found' });
     const inc = req.body?.answers;
     if (!inc || typeof inc !== 'object' || Array.isArray(inc)) return res.status(400).json({ error: 'bad_request' });
@@ -255,14 +274,13 @@ export function registerIntake(app: Express, d: Deps) {
     if (i.status === 'sent' || i.status === 'opened') i.status = 'in_progress';
     // Edits after submission update the same record (no new intake); admin sees "updated" and a stale-analysis hint
     if (i.status === 'submitted') i.updatedAt = new Date().toISOString();
-    write(all);
+    await saveIntake(i);
     const changed = before !== JSON.stringify([i.answers.biz_type, wantsOf(i.answers)]);
     return res.json(changed ? { ok: true, definition: defOf(i) } : { ok: true });
   });
 
-  app.post('/api/intake/:token/submit', limiter, (req, res) => {
-    const all = read();
-    const i = all.find((x) => x.token === String(req.params.token));
+  app.post('/api/intake/:token/submit', limiter, async (req, res) => {
+    const i = await getIntakeByToken(String(req.params.token));
     if (!i || i.cancelledAt || expired(i)) return res.status(404).json({ error: 'not_found' });
     const missing = REQUIRED.filter((k) => !str0(i.answers[k]));
     if (!wantsOf(i.answers).length) missing.push('wants');
@@ -271,7 +289,7 @@ export function registerIntake(app: Express, d: Deps) {
     if (i.status === 'submitted') return res.json({ ok: true });
     const now = new Date().toISOString();
     i.status = 'submitted'; i.submittedAt = now; i.consentAt = now;
-    write(all);
+    await saveIntake(i);
     return res.json({ ok: true });
   });
 
@@ -284,7 +302,7 @@ export function registerIntake(app: Express, d: Deps) {
     analysisStale: !!(i.analysis && i.updatedAt && i.updatedAt > ((i.analysis as { at?: string }).at ?? '')), path: pathOf(i), expired: expired(i),
   });
 
-  app.post('/api/admin/intakes', (req, res) => {
+  app.post('/api/admin/intakes', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
     const b = req.body ?? {};
     const lang: L = isL(b.lang) ? b.lang : 'tr';
@@ -301,45 +319,43 @@ export function registerIntake(app: Express, d: Deps) {
       status: 'sent', createdAt: new Date(now).toISOString(), openedAt: null, submittedAt: null, expiresAt: new Date(now + 30 * DAY).toISOString(),
     };
     for (const k of Object.keys(i.answers)) if (!i.answers[k]) delete i.answers[k];
-    const all = read(); all.push(i); write(all);
+    await saveIntake(i);
     return res.json({ intake: brief(i) });
   });
 
-  app.get('/api/admin/intakes', (req, res) => {
+  app.get('/api/admin/intakes', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
-    return res.json({ intakes: read().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(brief) });
+    return res.json({ intakes: (await listIntakes()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(brief) });
   });
 
-  app.get('/api/admin/intakes/:id', (req, res) => {
+  app.get('/api/admin/intakes/:id', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
-    const i = read().find((x) => x.id === req.params.id);
+    const i = await getIntake(String(req.params.id));
     if (!i) return res.status(404).json({ error: 'not_found' });
     return res.json({ intake: brief(i), formatted: formatAnswers(i, 'tr'), markdown: answersMarkdown(i, 'tr'), analysis: i.analysis ?? null, preview: (i as { preview?: { data: unknown } }).preview?.data ?? null });
   });
 
-  app.patch('/api/admin/intakes/:id', (req, res) => {
+  app.patch('/api/admin/intakes/:id', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
-    const all = read(); const i = all.find((x) => x.id === req.params.id);
+    const i = await getIntake(String(req.params.id));
     if (!i) return res.status(404).json({ error: 'not_found' });
     if (req.body?.action === 'cancel') i.cancelledAt = new Date().toISOString();
     else if (req.body?.action === 'renew') { i.token = mkToken(); i.cancelledAt = null; i.expiresAt = new Date(Date.now() + 30 * DAY).toISOString(); }
     else return res.status(400).json({ error: 'bad_action' });
-    write(all);
+    await saveIntake(i);
     return res.json({ intake: brief(i) });
   });
 
-  app.delete('/api/admin/intakes/:id', (req, res) => {
+  app.delete('/api/admin/intakes/:id', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
-    const all = read(); const rest = all.filter((x) => x.id !== req.params.id);
-    if (rest.length === all.length) return res.status(404).json({ error: 'not_found' });
-    write(rest);
+    if (!(await deleteIntake(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
     return res.json({ ok: true });
   });
 
   // Never throws, never 5xx for "no verified domain": the admin UI shows a clear message instead.
   app.post('/api/admin/intakes/:id/email', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
-    const all = read(); const i = all.find((x) => x.id === req.params.id);
+    const i = await getIntake(String(req.params.id));
     if (!i) return res.status(404).json({ error: 'not_found' });
     const to = clean(req.body?.to, 120);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: 'bad_email' });
@@ -353,7 +369,7 @@ export function registerIntake(app: Express, d: Deps) {
         body: JSON.stringify({ from: cfg.from, to: [to], subject: tpl.s, text: tpl.b(str0(i.answers.meta_contact).split(' ')[0] || '', origin + pathOf(i)) }),
       });
       if (!r.ok) { console.error('[intake] Resend error', r.status); return res.json({ ok: false, reason: 'send_failed' }); }
-      i.emailedAt = new Date().toISOString(); write(all);
+      i.emailedAt = new Date().toISOString(); await saveIntake(i);
       return res.json({ ok: true });
     } catch (e) {
       console.error('[intake] Resend request failed', (e as Error).message);
@@ -363,5 +379,5 @@ export function registerIntake(app: Express, d: Deps) {
 }
 
 // helpers for the analysis module
-export const readIntakes = read;
-export const writeIntakes = write;
+export const readIntakes = listIntakes;
+export const writeIntakes = async (all: Intake[]): Promise<void> => { if (dbOn()) { if (all.length) await dbUpsert('intakes', all.map(toRow), 'id'); } else write(all); };

@@ -41,8 +41,8 @@ async function stripe<T = any>(path: string, body: Record<string, unknown>, idem
 const cents = (eur: number) => Math.round(eur * 100);
 const origin = () => (process.env.PUBLIC_URL ?? '').replace(/\/$/, '');
 const offerUrl = (o: Offer) => `${origin()}${offerPath(o.lang, o.token)}`;
-const clientEmail = (o: Offer) => {
-  const i = o.intakeId ? readIntakes().find((x) => x.id === o.intakeId) : undefined;
+const clientEmail = async (o: Offer) => {
+  const i = o.intakeId ? (await readIntakes()).find((x) => x.id === o.intakeId) : undefined;
   const e = typeof i?.answers.meta_email === 'string' ? i.answers.meta_email.trim() : '';
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : undefined;
 };
@@ -74,7 +74,7 @@ export function registerBilling(app: Express, d: Deps) {
     const now = dueNow(o);
     const setupName = `${o.title || 'Projekt'} · ${o.depositPct > 0 && o.depositPct < 100 ? `${o.depositPct}%` : '100%'}`;
     const common = {
-      client_reference_id: o.id, customer_email: o.billing?.customerId ? undefined : clientEmail(o), customer: o.billing?.customerId,
+      client_reference_id: o.id, customer_email: o.billing?.customerId ? undefined : await clientEmail(o), customer: o.billing?.customerId,
       locale: LOCALE[lang] ?? 'auto', success_url: `${offerUrl(o)}?paid=1`, cancel_url: offerUrl(o), metadata: { offerId: o.id, kind: 'first' },
       billing_address_collection: 'required', tax_id_collection: { enabled: true },
     };
@@ -98,14 +98,14 @@ export function registerBilling(app: Express, d: Deps) {
 
   // 1b) TEST payment (owner's wish, 2026-11-17): only while Stripe is NOT configured and NEVER in production.
   //     Lets the owner see the whole flow (pay → live project page). No money moves; the offer is marked as test-paid.
-  app.post('/api/offer/:token/test-pay', limiter, (req, res) => {
+  app.post('/api/offer/:token/test-pay', limiter, async (req, res) => {
     if (!testPayOn()) return res.status(404).json({ error: 'not_available' });
     const all = readOffers(); const o = live(all, String(req.params.token));
     if (!o || !o.contract || !o.billing?.payRequestedAt) return res.status(404).json({ error: 'not_found' });
     const at = new Date().toISOString(); const b = o.billing;
     if (!b.firstPaidAt) { b.firstPaidAt = at; b.firstAmount = dueNow(o); b.test = true; }
     if (setupTotal(o) - dueNow(o) <= 0) o.paidAt = o.paidAt ?? at;
-    openProject(o); o.unreadOwner += 1; writeOffers(all);
+    await openProject(o); o.unreadOwner += 1; writeOffers(all);
     console.log('[billing] TEST payment recorded (no money)');
     return res.json({ ok: true, project: o.projectToken });
   });
@@ -166,7 +166,7 @@ export function registerBilling(app: Express, d: Deps) {
   });
 
   // 4) Webhook (raw body). Each event is processed once (event ids kept per offer).
-  app.post('/api/stripe/webhook', (req, res) => {
+  app.post('/api/stripe/webhook', async (req, res) => {
     const secret = process.env.STRIPE_WEBHOOK_SECRET;
     const raw = req.body as Buffer;
     if (!secret || !Buffer.isBuffer(raw) || !verify(raw, req.get('stripe-signature'), secret)) return res.status(400).json({ error: 'bad_signature' });
@@ -185,7 +185,7 @@ export function registerBilling(app: Express, d: Deps) {
         if (obj.payment_status !== 'paid' && obj.payment_status !== 'no_payment_required') break;
         if (obj.customer) b.customerId = obj.customer;
         if (obj.subscription) b.subscriptionId = obj.subscription;
-        if (obj.metadata?.kind === 'rest') { b.restPaidAt = at; b.restUrl = undefined; } else { b.firstPaidAt = at; b.firstAmount = (obj.amount_total ?? 0) / 100; openProject(o); }
+        if (obj.metadata?.kind === 'rest') { b.restPaidAt = at; b.restUrl = undefined; } else { b.firstPaidAt = at; b.firstAmount = (obj.amount_total ?? 0) / 100; await openProject(o); }
         if (b.firstPaidAt && (b.restPaidAt || setupTotal(o) - dueNow(o) <= 0)) o.paidAt = o.paidAt ?? at;
         o.unreadOwner += 1;
         break;

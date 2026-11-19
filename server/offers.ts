@@ -86,9 +86,9 @@ export const testPayOn = () => !stripeOn() && process.env.NODE_ENV !== 'producti
 /** First payment in → the live project page opens (once). */
 /** Live project page only for the bigger plans (owner, 2026-11-17): above 1000 EUR setup or set by the owner (panel / CRM / automation). */
 export const portalOn = (o: Offer) => o.portal ?? setupTotal(o) > 1000;
-export const openProject = (o: Offer) => {
+export const openProject = async (o: Offer) => {
   if (o.projectToken || !portalOn(o)) return;
-  o.projectToken = ensureProject({ id: o.id, lang: o.lang as 'tr' | 'en' | 'de' | 'el', company: o.company, contact: o.contact, title: o.title });
+  o.projectToken = await ensureProject({ id: o.id, lang: o.lang as 'tr' | 'en' | 'de' | 'el', company: o.company, contact: o.contact, title: o.title });
   void mailProject(o);
 };
 const PROJECT_MAIL: Record<string, { s: string; b: (n: string, l: string) => string }> = {
@@ -101,7 +101,7 @@ const PROJECT_MAIL: Record<string, { s: string; b: (n: string, l: string) => str
 async function mailProject(o: Offer) {
   const key = process.env.RESEND_API_KEY; const from = process.env.DEMO_EMAIL_FROM; const origin = (process.env.PUBLIC_URL ?? '').replace(/\/$/, '');
   if (!key || !from || !origin || !o.projectToken) return;
-  const i = o.intakeId ? readIntakes().find((x) => x.id === o.intakeId) : undefined;
+  const i = o.intakeId ? (await readIntakes()).find((x) => x.id === o.intakeId) : undefined;
   const to = typeof i?.answers.meta_email === 'string' ? i.answers.meta_email.trim() : '';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return;
   const tpl = PROJECT_MAIL[o.lang] ?? PROJECT_MAIL.en;
@@ -183,28 +183,28 @@ function normalizePlan(o: any) {
 interface Deps {
   requireAdmin: (req: Request, res: Response) => boolean;
   getGroq: () => Groq | null;
-  readQuotes: () => any[];
+  readQuotes: () => Promise<any[]>;
   rateSkip?: (req: Request) => boolean;
 }
 
 /** Style the client picked on the "choose my style" page, for the AI planner (owner, 2026-11-17). */
-const styleLine = (o: Offer) => { const st = o.intakeId ? styleSummary(styleFor([`intake:${o.intakeId}`])) : ''; return st ? `\n\nCLIENT'S STYLE CHOICE (use it for design-related items and wording): ${st}` : ''; };
+const styleLine = async (o: Offer) => { const st = o.intakeId ? styleSummary(await styleFor([`intake:${o.intakeId}`])) : ''; return st ? `\n\nCLIENT'S STYLE CHOICE (use it for design-related items and wording): ${st}` : ''; };
 
 export function registerOffers(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
   const msgLimiter = rateLimit({ windowMs: 10 * 60_000, max: 20, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
 
-  const clientInput = (o: Offer): string => {
+  const clientInput = async (o: Offer): Promise<string> => {
     let s = '';
     if (o.intakeId) {
-      const i = readIntakes().find((x) => x.id === o.intakeId);
+      const i = (await readIntakes()).find((x) => x.id === o.intakeId);
       if (i) {
         s += `CLIENT ANSWERS (market ${i.market}, sector ${i.sector})\n${answersForAi(i)}`;
         const a = (i.analysis as { data?: unknown } | undefined)?.data;
         if (a) s += `\n\nEARLIER ANALYSIS\n${JSON.stringify(a)}`;
       }
     } else if (o.requestId) {
-      const r = d.readQuotes().find((x) => x.id === o.requestId);
+      const r = (await d.readQuotes()).find((x) => x.id === o.requestId);
       if (r) {
         s += `CLIENT REQUEST\n${JSON.stringify({ kind: r.kind, business: r.business, message: r.message, language: r.lang, modules: r.modules, roiCalc: r.roiCalc?.results })}`;
         if (r.analysis?.data) s += `\n\nEARLIER ANALYSIS\n${JSON.stringify(r.analysis.data)}`;
@@ -245,17 +245,17 @@ export function registerOffers(app: Express, d: Deps) {
     market: o.market ?? null, marketLang: marketLang(o.market), portal: o.portal ?? null, portalAuto: setupTotal(o) > 1000, showcase: o.showcase ?? null,
     billing: { on: stripeOn(), test: testPayOn(), payRequestedAt: o.billing?.payRequestedAt ?? null, testPaid: !!o.billing?.test, due: dueNow(o), rest: Math.max(0, Math.round((setupTotal(o) - dueNow(o)) * 100) / 100), ...(o.billing ? { customer: !!o.billing.customerId, subStatus: o.billing.subStatus ?? null, firstPaidAt: o.billing.firstPaidAt ?? null, restUrl: o.billing.restUrl ?? null, restPaidAt: o.billing.restPaidAt ?? null, paymentFailedAt: o.billing.paymentFailedAt ?? null, lastInvoiceAt: o.billing.lastInvoiceAt ?? null } : {}) } });
 
-  app.post('/api/admin/offers', (req, res) => {
+  app.post('/api/admin/offers', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
     const intakeId = clean(req.body?.intakeId, 64) || null; const requestId = clean(req.body?.requestId, 64) || null;
     let lang: L = 'tr'; let company = ''; let contact = ''; let currency: Offer['currency'] = 'EUR'; let market = '';
     if (intakeId) {
-      const i = readIntakes().find((x) => x.id === intakeId);
+      const i = (await readIntakes()).find((x) => x.id === intakeId);
       if (!i) return res.status(404).json({ error: 'not_found' });
       lang = i.lang; currency = i.market === 'TR' ? 'TRY' : 'EUR'; market = i.market;
       company = clean(i.answers.meta_company, 120) || i.prefill.company; contact = clean(i.answers.meta_contact, 120) || i.prefill.contact;
     } else if (requestId) {
-      const r = d.readQuotes().find((x) => x.id === requestId);
+      const r = (await d.readQuotes()).find((x) => x.id === requestId);
       if (!r) return res.status(404).json({ error: 'not_found' });
       lang = (LANGS as readonly string[]).includes(r.lang) ? r.lang : 'en'; company = clean(r.business, 120); contact = clean(r.name, 120);
     } else return res.status(400).json({ error: 'bad_request' });
@@ -287,7 +287,7 @@ export function registerOffers(app: Express, d: Deps) {
   });
 
   // Save draft fields, or run an action: send | cancel | paid | unpaid | reopen
-  app.patch('/api/admin/offers/:id', (req, res) => {
+  app.patch('/api/admin/offers/:id', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
     const all = read(); const o = all.find((x) => x.id === req.params.id);
     if (!o) return res.status(404).json({ error: 'not_found' });
@@ -316,7 +316,7 @@ export function registerOffers(app: Express, d: Deps) {
         o.status = 'sent'; o.sentAt = o.sentAt ?? now; o.cancelledAt = null; break;
       case 'cancel': o.cancelledAt = now; break;
       case 'reopen': o.cancelledAt = null; if (o.status === 'declined') o.status = 'sent'; break;
-      case 'paid': if (o.status !== 'accepted') return res.status(409).json({ error: 'not_accepted', message: 'Teklif henüz kabul edilmedi.' }); o.paidAt = now; openProject(o); break;
+      case 'paid': if (o.status !== 'accepted') return res.status(409).json({ error: 'not_accepted', message: 'Teklif henüz kabul edilmedi.' }); o.paidAt = now; await openProject(o); break;
       case 'unpaid': o.paidAt = null; break;
       case 'payreq':
         if (o.status !== 'accepted' || !o.contract) return res.status(409).json({ error: 'not_ready', message: 'Önce teklif kabul edilmeli ve sözleşme imzalanmalı.' });
@@ -342,7 +342,7 @@ export function registerOffers(app: Express, d: Deps) {
     if (!o) return res.status(404).json({ error: 'not_found' });
     if (typeof req.body?.ownerNotes === 'string') o.ownerNotes = clean(req.body.ownerNotes, 4000);
     try {
-      const r = await ask(groq, [{ role: 'system', content: PLAN_SYSTEM }, { role: 'user', content: clientInput(o) + styleLine(o) }], true);
+      const r = await ask(groq, [{ role: 'system', content: PLAN_SYSTEM }, { role: 'user', content: (await clientInput(o)) + (await styleLine(o)) }], true);
       const data = normalizePlan(JSON.parse(r.content));
       if (!data.summary) throw new Error('empty');
       const fresh = read(); const x = fresh.find((y) => y.id === o.id);
@@ -403,7 +403,7 @@ Return ONE JSON object with exactly the same keys and array lengths as the input
     const history = o.planChat.slice(-12).map((m) => ({ role: (m.role === 'owner' ? 'user' : 'assistant') as 'user' | 'assistant', content: m.text }));
     try {
       const r = await ask(groq, [
-        { role: 'system', content: `${PLAN_SYSTEM.split('Return ONE JSON')[0]}\nNow answer the owner's follow-up questions in TURKISH, briefly and concretely (plain text, max ~12 lines). Context:\n${clientInput(o)}\n\nCURRENT PLAN\n${JSON.stringify(o.plan?.data ?? null)}\n\nCURRENT OFFER DRAFT\n${JSON.stringify({ items: o.items, depositPct: o.depositPct, installments: o.installments, monthly: o.monthly })}` },
+        { role: 'system', content: `${PLAN_SYSTEM.split('Return ONE JSON')[0]}\nNow answer the owner's follow-up questions in TURKISH, briefly and concretely (plain text, max ~12 lines). Context:\n${await clientInput(o)}\n\nCURRENT PLAN\n${JSON.stringify(o.plan?.data ?? null)}\n\nCURRENT OFFER DRAFT\n${JSON.stringify({ items: o.items, depositPct: o.depositPct, installments: o.installments, monthly: o.monthly })}` },
         ...history, { role: 'user', content: q },
       ], false);
       const fresh = read(); const x = fresh.find((y) => y.id === o.id);
@@ -521,7 +521,7 @@ Return ONE JSON object with exactly the same keys and array lengths as the input
   async function mailSigned(o: Offer) {
     const key = process.env.RESEND_API_KEY; const from = process.env.DEMO_EMAIL_FROM; const origin = (process.env.PUBLIC_URL ?? '').replace(/\/$/, '');
     if (!key || !from || !origin || !o.contract) return;
-    const intake = o.intakeId ? readIntakes().find((x) => x.id === o.intakeId) : undefined;
+    const intake = o.intakeId ? (await readIntakes()).find((x) => x.id === o.intakeId) : undefined;
     const to = typeof intake?.answers.meta_email === 'string' ? intake.answers.meta_email.trim() : '';
     const send = (rcpt: string, subject: string, text: string) => fetch('https://api.resend.com/emails', {
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to: [rcpt], subject, text }),

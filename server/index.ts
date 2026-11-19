@@ -383,6 +383,39 @@ app.post('/api/demo/verify', demoVerifyLimiter, async (req, res) => {
 // Stored in data/quote-requests.json. If RESEND_API_KEY, DEMO_EMAIL_FROM and
 // QUOTE_NOTIFY_EMAIL are set, the owner also gets an email per request.
 const QUOTE_STORE = path.join(__dirname, '../data/quote-requests.json');
+type Rec = { id: string; createdAt: string; [k: string]: any };
+const inList = (ids: string[]) => `id=in.(${ids.map((i) => encodeURIComponent(`"${i.replace(/"/g, '')}"`)).join(',')})`;
+// Stores: Supabase (table with id, created_at, data jsonb) when dbOn(), otherwise the local JSON file (unchanged behaviour).
+function fileRead(file: string): Rec[] { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return []; } }
+function fileUpsert(file: string, recs: Rec[]) {
+  const all = fileRead(file);
+  for (const rec of recs) { const i = all.findIndex((x) => x.id === rec.id); if (i < 0) all.push(rec); else all[i] = rec; }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  atomicWrite(file, all);
+}
+async function listRows(table: string, file: string): Promise<Rec[]> {
+  return dbOn() ? (await dbSelect<{ data: Rec }>(table, 'select=data&order=created_at.asc')).map((r) => r.data) : fileRead(file);
+}
+async function getRow(table: string, file: string, id: string): Promise<Rec | null> {
+  if (!dbOn()) return fileRead(file).find((x) => x.id === id) ?? null;
+  return (await dbSelect<{ data: Rec }>(table, `select=data&${inList([id])}`))[0]?.data ?? null;
+}
+async function saveRows(table: string, file: string, recs: Rec[]) {
+  if (!recs.length) return;
+  if (dbOn()) await dbUpsert(table, recs.map((r) => ({ id: r.id, created_at: r.createdAt, data: r })), 'id');
+  else fileUpsert(file, recs);
+}
+async function deleteRows(table: string, file: string, ids: string[]) {
+  if (!ids.length) return;
+  if (dbOn()) { await dbDelete(table, inList(ids)); return; }
+  const set = new Set(ids); const all = fileRead(file);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  atomicWrite(file, all.filter((x) => !set.has(x.id)));
+}
+const listRequests = () => listRows('quote_requests', QUOTE_STORE);
+const getRequest = (id: string) => getRow('quote_requests', QUOTE_STORE, id);
+const saveRequest = (rec: Rec | Rec[]) => saveRows('quote_requests', QUOTE_STORE, Array.isArray(rec) ? rec : [rec]);
+const deleteRequests = (ids: string[]) => deleteRows('quote_requests', QUOTE_STORE, ids);
 const QUOTE_MODULES = new Set(['core', 'qr', 'whatsapp', 'telegram', 'ai', 'payments', 'calendar', 'reviews', 'hosting']);
 
 const quoteLimiter = rateLimit({
@@ -416,11 +449,7 @@ app.post('/api/demo/quote', quoteLimiter, async (req, res) => {
   };
 
   try {
-    let all: unknown[] = [];
-    try { all = JSON.parse(fs.readFileSync(QUOTE_STORE, 'utf8')); } catch { all = []; }
-    all.push(quote);
-    fs.mkdirSync(path.dirname(QUOTE_STORE), { recursive: true });
-    fs.writeFileSync(QUOTE_STORE, JSON.stringify(all, null, 2));
+    await saveRequest(quote);
 
     const notify = process.env.QUOTE_NOTIFY_EMAIL;
     if (process.env.RESEND_API_KEY && process.env.DEMO_EMAIL_FROM && notify) {
@@ -536,7 +565,7 @@ app.get('/api/rates', async (_req, res) => {
 
 // Savings calculator: optional e-mail left when downloading the PDF report → request in admin (source "calculator").
 // Stored only to reply in writing; no newsletter (marketing needs a separate double opt-in, see server/newsletter.ts).
-app.post('/api/roi-report', quoteLimiter, (req, res) => {
+app.post('/api/roi-report', quoteLimiter, async (req, res) => {
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const email = str(req.body?.email, 254).toLowerCase();
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
@@ -549,9 +578,7 @@ app.post('/api/roi-report', quoteLimiter, (req, res) => {
     ...(roiCalc ? { roiCalc } : {}),
   };
   try {
-    let all: unknown[] = [];
-    try { all = JSON.parse(fs.readFileSync(QUOTE_STORE, 'utf8')); } catch { all = []; }
-    all.push(rec); atomicWrite(QUOTE_STORE, all);
+    await saveRequest(rec);
     return res.json({ ok: true });
   } catch (err) {
     console.error('[roi-report] save failed', err);
@@ -652,7 +679,7 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
   let voiceLink: VoiceSession | null = null;
   const vid = str(req.body?.voiceSessionId, 64);
   if (vid) {
-    const vs = loadVoice().find((x) => x.id === vid);
+    const vs = await getVoice(vid) as VoiceSession | null;
     if (vs && safeEq(vs.secret, req.body?.voiceSecret)) voiceLink = vs;
   }
   const roiCalc = sanitizeRoi(req.body?.roiCalc);
@@ -680,15 +707,10 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
     ...(/^([01]\d|2[0-3]):[0-5]\d$/.test(String(req.body?.callTime)) ? { callTime: String(req.body.callTime) } : {}),
   };
   try {
-    let all: unknown[] = [];
-    try { all = JSON.parse(fs.readFileSync(QUOTE_STORE, 'utf8')); } catch { all = []; }
-    all.push(rec);
-    fs.mkdirSync(path.dirname(QUOTE_STORE), { recursive: true });
-    fs.writeFileSync(QUOTE_STORE, JSON.stringify(all, null, 2));
+    await saveRequest(rec);
     if (voiceLink) {
-      const vall = loadVoice();
-      const vs = vall.find((x) => x.id === voiceLink!.id);
-      if (vs) { vs.contactSubmitted = true; vs.contactId = rec.id; vs.contact = { name: rec.name, email: rec.email, phone: rec.phone, message: rec.message }; saveVoice(vall); }
+      const vs = await getVoice(voiceLink.id) as VoiceSession | null;
+      if (vs) { vs.contactSubmitted = true; vs.contactId = rec.id; vs.contact = { name: rec.name, email: rec.email, phone: rec.phone, message: rec.message }; await saveVoice(vs); }
     }
     const notify = process.env.QUOTE_NOTIFY_EMAIL;
     if (process.env.RESEND_API_KEY && process.env.DEMO_EMAIL_FROM && notify) {
@@ -709,7 +731,7 @@ app.post('/api/contact', quoteLimiter, async (req, res) => {
 });
 
 // Owner adds a person by hand (details given by phone, in person, etc.); then creates an intake link from it as usual
-app.post('/api/admin/quote-requests', (req, res) => {
+app.post('/api/admin/quote-requests', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const name = str(req.body?.name, 80); const email = str(req.body?.email, 254).toLowerCase(); const phone = str(req.body?.phone, 40);
@@ -721,9 +743,7 @@ app.post('/api/admin/quote-requests', (req, res) => {
     replyPreference: 'written', lang: DEMO_LANGS.has(req.body?.lang) ? String(req.body.lang) : 'tr', page: 'admin', read: true,
   };
   try {
-    let all: unknown[] = [];
-    try { all = JSON.parse(fs.readFileSync(QUOTE_STORE, 'utf8')); } catch { all = []; }
-    all.push(rec); atomicWrite(QUOTE_STORE, all);
+    await saveRequest(rec);
     return res.json({ request: rec });
   } catch (err) {
     console.error('[admin] manual add failed', err);
@@ -731,32 +751,25 @@ app.post('/api/admin/quote-requests', (req, res) => {
   }
 });
 
-app.get('/api/admin/quote-requests', (req, res) => {
+app.get('/api/admin/quote-requests', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  let all: { createdAt: string }[] = [];
-  try { all = JSON.parse(fs.readFileSync(QUOTE_STORE, 'utf8')); } catch { all = []; }
-  const sessions = new Map(loadVoice().map((v) => [v.id, v.kind]));
+  const all = await listRequests();
+  const sessions = new Map((await listVoice() as VoiceSession[]).map((v) => [v.id, v.kind]));
   const withSource = (all as LegacyReq[]).map((r) => (r.source ? r : { ...r, source: legacySource(r, sessions) }));
   return res.json({ requests: withSource.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
 });
-const readQuotes = (): { id: string; createdAt: string; read?: boolean }[] => {
-  try { return JSON.parse(fs.readFileSync(QUOTE_STORE, 'utf8')); } catch { return []; }
-};
-app.patch('/api/admin/quote-requests/:id', (req, res) => {
+app.patch('/api/admin/quote-requests/:id', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const all = readQuotes();
-  const r = all.find((x) => x.id === req.params.id);
+  const r = await getRequest(String(req.params.id));
   if (!r) return res.status(404).json({ error: 'not_found' });
   r.read = req.body?.read === true;
-  fs.writeFileSync(QUOTE_STORE, JSON.stringify(all, null, 2));
+  await saveRequest(r);
   return res.json({ ok: true });
 });
-app.delete('/api/admin/quote-requests/:id', (req, res) => {
+app.delete('/api/admin/quote-requests/:id', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const all = readQuotes();
-  const rest = all.filter((x) => x.id !== req.params.id);
-  if (rest.length === all.length) return res.status(404).json({ error: 'not_found' });
-  fs.writeFileSync(QUOTE_STORE, JSON.stringify(rest, null, 2));
+  if (!(await getRequest(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
+  await deleteRequests([String(req.params.id)]);
   return res.json({ ok: true });
 });
 
@@ -883,13 +896,10 @@ interface VoiceSession {
   lastName?: string;
   salutation?: 'm' | 'f';
 }
-function loadVoice(): VoiceSession[] {
-  try { return JSON.parse(fs.readFileSync(VOICE_STORE, 'utf8')) as VoiceSession[]; } catch { return []; }
-}
-function saveVoice(all: VoiceSession[]) {
-  fs.mkdirSync(path.dirname(VOICE_STORE), { recursive: true });
-  fs.writeFileSync(VOICE_STORE, JSON.stringify(all, null, 2));
-}
+const listVoice = () => listRows('voice_sessions', VOICE_STORE) as Promise<VoiceSession[]>;
+const getVoice = (id: string) => getRow('voice_sessions', VOICE_STORE, id) as Promise<VoiceSession | null>;
+const saveVoice = (rec: VoiceSession | VoiceSession[]) => saveRows('voice_sessions', VOICE_STORE, (Array.isArray(rec) ? rec : [rec]) as unknown as Rec[]);
+const deleteVoice = (ids: string[]) => deleteRows('voice_sessions', VOICE_STORE, ids);
 
 const sessionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, max: 150, skip: demoLimitSkip,
@@ -911,7 +921,7 @@ const safeEq = (a: unknown, b: unknown) => {
 };
 
 // Create, or update when {id, secret} of an existing session are supplied (id+secret is the capability).
-app.post('/api/voice/session', sessionLimiter, (req, res) => {
+app.post('/api/voice/session', sessionLimiter, async (req, res) => {
   const { lang, turns, startedAt, endedAt, id, secret } = req.body ?? {};
   if (!DEMO_LANGS.has(lang) || !Array.isArray(turns) || turns.length === 0 || turns.length > 30) {
     return res.status(400).json({ error: 'invalid_session' });
@@ -924,13 +934,12 @@ app.post('/api/voice/session', sessionLimiter, (req, res) => {
     clean.push({ role: t.role, text: t.text, at: Number.isFinite(t.at) ? Number(t.at) : Date.now() });
   }
   try {
-    const all = loadVoice();
     if (typeof id === 'string' && id) {
-      const ex = all.find((x) => x.id === id);
+      const ex = await getVoice(id);
       if (ex && !ex.deleted && ex.secret && safeEq(ex.secret, secret)) {
         ex.turns = clean; ex.lang = lang; Object.assign(ex, visitorFields(req.body));
         ex.endedAt = Number.isFinite(endedAt) ? Number(endedAt) : Date.now();
-        saveVoice(all);
+        await saveVoice(ex);
         return res.json({ id: ex.id, secret: ex.secret });
       }
     }
@@ -950,8 +959,7 @@ app.post('/api/voice/session', sessionLimiter, (req, res) => {
       contactSubmitted: false,
       ...visitorFields(req.body),
     };
-    all.push(session);
-    saveVoice(all);
+    await saveVoice(session);
     return res.json({ id: session.id, secret: session.secret });
   } catch (err) {
     console.error('[voice] save failed', err);
@@ -960,26 +968,28 @@ app.post('/api/voice/session', sessionLimiter, (req, res) => {
 });
 
 // Read-only transcript for the visitor: only with the matching secret (404 unknown id, 403 wrong secret).
-app.get('/api/voice/session/:id', sessionLimiter, (req, res) => {
-  const s = loadVoice().find((x) => x.id === req.params.id);
+app.get('/api/voice/session/:id', sessionLimiter, async (req, res) => {
+  const s = await getVoice(String(req.params.id));
   if (!s || s.deleted) return res.status(404).json({ error: 'not_found' });
   if (!safeEq(s.secret, req.header('x-voice-secret'))) return res.status(404).json({ error: 'not_found' });   // same answer as a missing session (no enumeration)
   return res.json({ lang: s.lang, createdAt: s.createdAt, turns: s.turns });
 });
 
 // Delete unlinked transcripts after 90 days (on start + daily).
-function pruneVoice() {
+async function pruneVoice() {
   try {
-    const all = loadVoice();
     const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
-    const keep = all.filter((x) => x.contactSubmitted || new Date(x.createdAt).getTime() > cutoff);
-    if (keep.length !== all.length) { saveVoice(keep); console.log(`[voice] pruned ${all.length - keep.length} old sessions`); }
+    const all = dbOn()
+      ? (await dbSelect<{ data: VoiceSession }>('voice_sessions', `select=data&created_at=lt.${encodeURIComponent(new Date(cutoff).toISOString())}`)).map((r) => r.data)
+      : await listVoice();
+    const old = all.filter((x) => !x.contactSubmitted && !(new Date(x.createdAt).getTime() > cutoff));
+    if (old.length) { await deleteVoice(old.map((x) => x.id)); console.log(`[voice] pruned ${old.length} old sessions`); }
   } catch (err) { console.error('[voice] prune failed', err); }
 }
-pruneVoice();
-setInterval(pruneVoice, 24 * 60 * 60 * 1000).unref();
+void pruneVoice();
+setInterval(() => void pruneVoice(), 24 * 60 * 60 * 1000).unref();
 
-app.post('/api/voice/session/:id/contact', voiceLimiter, (req, res) => {
+app.post('/api/voice/session/:id/contact', voiceLimiter, async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase();
   if (!EMAIL_RE.test(email) || email.length > 254) return res.status(400).json({ error: 'invalid_email' });
   const contact = {
@@ -989,13 +999,12 @@ app.post('/api/voice/session/:id/contact', voiceLimiter, (req, res) => {
     message: String(req.body?.message ?? '').trim().slice(0, 1000),
   };
   try {
-    const all = loadVoice();
-    const s = all.find((x) => x.id === req.params.id);
+    const s = await getVoice(String(req.params.id));
     if (!s) return res.status(404).json({ error: 'not_found' });
     if (!safeEq(s.secret, req.body?.secret)) return res.status(404).json({ error: 'not_found' });   // same answer as a missing session (no enumeration)
     s.contact = contact;
     s.contactSubmitted = true;
-    saveVoice(all);
+    await saveVoice(s);
     return res.json({ ok: true });
   } catch (err) {
     console.error('[voice] contact failed', err);
@@ -1004,15 +1013,13 @@ app.post('/api/voice/session/:id/contact', voiceLimiter, (req, res) => {
 });
 
 // Visitor deletes their conversation (right to erasure). Unlinked: record removed. Linked to a submitted request: transcript wiped, record kept as deleted.
-app.delete('/api/voice/session/:id', sessionLimiter, (req, res) => {
+app.delete('/api/voice/session/:id', sessionLimiter, async (req, res) => {
   try {
-    const all = loadVoice();
-    const i = all.findIndex((x) => x.id === req.params.id);
-    if (i < 0 || all[i].deleted) return res.status(404).json({ error: 'not_found' });
-    if (!safeEq(all[i].secret, req.header('x-voice-secret'))) return res.status(404).json({ error: 'not_found' });   // same answer as a missing session (no enumeration)
-    if (all[i].contactSubmitted) { all[i] = { ...all[i], turns: [], deleted: true, secret: undefined }; }
-    else all.splice(i, 1);
-    saveVoice(all);
+    const s = await getVoice(String(req.params.id));
+    if (!s || s.deleted) return res.status(404).json({ error: 'not_found' });
+    if (!safeEq(s.secret, req.header('x-voice-secret'))) return res.status(404).json({ error: 'not_found' });   // same answer as a missing session (no enumeration)
+    if (s.contactSubmitted) await saveVoice({ ...s, turns: [], deleted: true, secret: undefined });
+    else await deleteVoice([s.id]);
     return res.json({ ok: true });
   } catch (err) {
     console.error('[voice] delete failed', err);
@@ -1021,14 +1028,13 @@ app.delete('/api/voice/session/:id', sessionLimiter, (req, res) => {
 });
 
 // Optional: visitor sends the conversation as a written-evaluation request (kind 'voice-download'). No marketing use.
-app.post('/api/voice/session/:id/request', voiceLimiter, (req, res) => {
+app.post('/api/voice/session/:id/request', voiceLimiter, async (req, res) => {
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const email = str(req.body?.email, 254).toLowerCase();
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
   const name = [str(req.body?.firstName, 40), str(req.body?.lastName, 40)].filter(Boolean).join(' ');
   try {
-    const vall = loadVoice();
-    const s = vall.find((x) => x.id === req.params.id);
+    const s = await getVoice(String(req.params.id));
     if (!s || s.deleted) return res.status(404).json({ error: 'not_found' });
     if (!safeEq(s.secret, req.body?.secret)) return res.status(404).json({ error: 'not_found' });   // same answer as a missing session (no enumeration)
     const rec = {
@@ -1036,13 +1042,9 @@ app.post('/api/voice/session/:id/request', voiceLimiter, (req, res) => {
       name, address: '', phone: '', email, message: '', replyPreference: 'written',
       lang: s.lang, page: str(req.body?.page, 200), voiceSessionId: s.id,
     };
-    let all: unknown[] = [];
-    try { all = JSON.parse(fs.readFileSync(QUOTE_STORE, 'utf8')); } catch { all = []; }
-    all.push(rec);
-    fs.mkdirSync(path.dirname(QUOTE_STORE), { recursive: true });
-    fs.writeFileSync(QUOTE_STORE, JSON.stringify(all, null, 2));
+    await saveRequest(rec);
     s.contactSubmitted = true; s.contactId = rec.id; s.contact = { name, email, phone: '', message: '' };
-    saveVoice(vall);
+    await saveVoice(s);
     console.log('[voice] written-evaluation request received');
     return res.json({ ok: true });
   } catch (err) {
@@ -1051,21 +1053,19 @@ app.post('/api/voice/session/:id/request', voiceLimiter, (req, res) => {
   }
 });
 
-app.get('/api/admin/voice-sessions', (req, res) => {
+app.get('/api/admin/voice-sessions', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const sessions = loadVoice()
+  const sessions = (await listVoice())
     .filter((x) => !x.deleted)
     .map(({ ipHash: _ip, secret: _s, ...rest }) => rest)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return res.json({ sessions });
 });
 
-app.delete('/api/admin/voice-sessions/:id', (req, res) => {
+app.delete('/api/admin/voice-sessions/:id', async (req, res) => {
   if (!requireAdmin(req, res)) return;
-  const all = loadVoice();
-  const rest = all.filter((x) => x.id !== req.params.id);
-  if (rest.length === all.length) return res.status(404).json({ error: 'not_found' });
-  saveVoice(rest);
+  if (!(await getVoice(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
+  await deleteVoice([String(req.params.id)]);
   return res.json({ ok: true });
 });
 
@@ -1080,25 +1080,24 @@ function bulkIds(b: any): string[] | null {
   if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500 || ids.some((x: unknown) => typeof x !== 'string' || !x || x.length > 100)) return null;
   return [...new Set(ids as string[])];
 }
-app.post('/api/admin/quote-requests/bulk', (req, res) => {
+app.post('/api/admin/quote-requests/bulk', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const ids = bulkIds(req.body);
   const action = req.body?.action;
   if (!ids || !['read', 'unread', 'delete'].includes(action)) return res.status(400).json({ error: 'invalid' });
   try {
     const set = new Set(ids);
-    const all = readQuotes();
+    const all = await listRequests();
     const hit = all.filter((x) => set.has(x.id));
     if (action === 'delete') {
-      atomicWrite(QUOTE_STORE, all.filter((x) => !set.has(x.id)));
+      await deleteRequests(hit.map((x) => x.id));
       const found = new Set(hit.map((x) => x.id));
-      const vall = loadVoice();
-      let ch = false;
-      for (const v of vall) if (v.contactId && found.has(v.contactId)) { delete v.contactId; v.contactSubmitted = false; ch = true; }
-      if (ch) { fs.mkdirSync(path.dirname(VOICE_STORE), { recursive: true }); atomicWrite(VOICE_STORE, vall); }
+      const changed: VoiceSession[] = [];
+      for (const v of await listVoice()) if (v.contactId && found.has(v.contactId)) { delete v.contactId; v.contactSubmitted = false; changed.push(v); }
+      await saveVoice(changed);
     } else {
       for (const x of hit) x.read = action === 'read';
-      atomicWrite(QUOTE_STORE, all);
+      await saveRequest(hit);
     }
     return res.json({ ok: true, affected: hit.length, missing: ids.length - hit.length });
   } catch (err) {
@@ -1106,21 +1105,18 @@ app.post('/api/admin/quote-requests/bulk', (req, res) => {
     return res.status(500).json({ error: 'server' });
   }
 });
-app.post('/api/admin/voice-sessions/bulk', (req, res) => {
+app.post('/api/admin/voice-sessions/bulk', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const ids = bulkIds(req.body);
   if (!ids || req.body?.action !== 'delete') return res.status(400).json({ error: 'invalid' });
   try {
     const set = new Set(ids);
-    const vall = loadVoice();
-    const hit = vall.filter((x) => set.has(x.id));
-    fs.mkdirSync(path.dirname(VOICE_STORE), { recursive: true });
-    atomicWrite(VOICE_STORE, vall.filter((x) => !set.has(x.id)));
+    const hit = (await listVoice()).filter((x) => set.has(x.id));
+    await deleteVoice(hit.map((x) => x.id));
     const found = new Set(hit.map((x) => x.id));
-    const qall = readQuotes() as { id: string; voiceSessionId?: string }[];
-    let ch = false;
-    for (const q of qall) if (q.voiceSessionId && found.has(q.voiceSessionId)) { delete q.voiceSessionId; ch = true; }
-    if (ch) atomicWrite(QUOTE_STORE, qall);
+    const changed: Rec[] = [];
+    for (const q of await listRequests()) if (q.voiceSessionId && found.has(q.voiceSessionId)) { delete q.voiceSessionId; changed.push(q); }
+    await saveRequest(changed);
     return res.json({ ok: true, affected: hit.length, missing: ids.length - hit.length });
   } catch (err) {
     console.error('[admin bulk] voice failed', err);
@@ -1474,27 +1470,34 @@ app.post('/api/assistant/chat', async (req, res) => {
   }
 });
 
+// Compat for modules still written against the old sync whole-array API (analyze.ts, offers.ts): file mode stays sync and
+// identical; with Supabase on they get promises (callers must await) and whole-array writes become upserts.
+const readQuotesCompat = (async () => (dbOn() ? await listRequests() : fileRead(QUOTE_STORE))) as () => Promise<any[]>;
+const writeQuotesCompat = (async (all: Rec[]) => { if (dbOn()) await saveRequest(all); else atomicWrite(QUOTE_STORE, all); }) as (all: any[]) => Promise<void>;
+const loadVoiceCompat = (async () => (dbOn() ? await listVoice() : fileRead(VOICE_STORE))) as () => Promise<any[]>;
+const saveVoiceCompat = (async (all: Rec[]) => { if (dbOn()) await saveVoice(all as any); else { fs.mkdirSync(path.dirname(VOICE_STORE), { recursive: true }); atomicWrite(VOICE_STORE, all); } }) as (all: any[]) => Promise<void>;
+
 // Client intake form + AI analysis (see server/intake.ts, server/analyze.ts)
 registerIntake(app, {
   requireAdmin, rateSkip: demoLimitSkip, getGroq,
   emailFrom: () => (emailConfigured() ? { key: process.env.RESEND_API_KEY!, from: process.env.DEMO_EMAIL_FROM! } : null),
 });
 registerAnalyze(app, {
-  requireAdmin, getGroq, readQuotes: readQuotes as () => any[], writeQuotes: (all) => atomicWrite(QUOTE_STORE, all),
-  loadVoice: loadVoice as () => any[], saveVoice: saveVoice as (all: any[]) => void,
+  requireAdmin, getGroq, readQuotes: readQuotesCompat, writeQuotes: writeQuotesCompat,
+  loadVoice: loadVoiceCompat, saveVoice: saveVoiceCompat,
 });
 
 // Offers: admin planning + private client offer link (see server/offers.ts)
-registerOffers(app, { requireAdmin, getGroq, readQuotes: readQuotes as () => any[], rateSkip: demoLimitSkip });
+registerOffers(app, { requireAdmin, getGroq, readQuotes: readQuotesCompat, rateSkip: demoLimitSkip });
 registerBilling(app, { requireAdmin, rateSkip: demoLimitSkip });
 registerProjects(app, { requireAdmin, rateSkip: demoLimitSkip, getGroq });
 registerStyles(app, {
   requireAdmin, rateSkip: demoLimitSkip,
-  requestOf: (ref) => (ref.startsWith('intake:') ? intakeById(ref.slice(7))?.requestId ?? null : null),
-  verify: (b) => {
+  requestOf: async (ref) => (ref.startsWith('intake:') ? (await intakeById(ref.slice(7)))?.requestId ?? null : null),
+  verify: async (b) => {
     const lang = (DEMO_LANGS.has(String(b.lang)) ? String(b.lang) : 'en') as 'tr' | 'en' | 'de' | 'el';
-    if (b.kind === 'intake' && typeof b.token === 'string') { const i = submittedIntake(b.token); return i ? { ref: `intake:${i.id}`, lang: i.lang } : null; }
-    if (b.kind === 'voice' && typeof b.sessionId === 'string') { const v = loadVoice().find((x) => x.id === b.sessionId); return v && safeEq(v.secret, b.secret) ? { ref: `voice:${v.id}`, lang } : null; }
+    if (b.kind === 'intake' && typeof b.token === 'string') { const i = await submittedIntake(b.token); return i ? { ref: `intake:${i.id}`, lang: i.lang } : null; }
+    if (b.kind === 'voice' && typeof b.sessionId === 'string') { const ok = (v: Rec | null) => (v && safeEq(v.secret, b.secret) ? { ref: `voice:${v.id}`, lang } : null); return ok(dbOn() ? await getVoice(b.sessionId) : fileRead(VOICE_STORE).find((x) => x.id === b.sessionId) ?? null); }
     return null;
   },
 });

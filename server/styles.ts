@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { dbOn, dbSelect, dbUpsert } from './db';
 import { PALETTES, FONT_PAIRS, customPalette } from '../src/data/styleOptions';
 
 const STORE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../data/styles.json');
@@ -35,12 +36,21 @@ const clean = (v: unknown, n: number) => String(v ?? '').replace(/[\u0000-\u001f
 
 export const stylePath = (lang: L, token: string) => `/${lang}/${STYLE_SLUG[lang]}/${token}`;
 /** Creates (once) the style link for a request reference such as "intake:<id>" or "voice:<sessionId>". */
-export function ensureStyle(ref: string, lang: L): StyleRec {
-  const all = read(); const ex = all.find((s) => s.ref === ref); if (ex) return ex;
-  const s: StyleRec = { token: crypto.randomBytes(16).toString('base64url'), ref, lang, createdAt: new Date().toISOString(), doneAt: null, likes: [], dislikes: [], refs: [], note: '' };
-  all.push(s); write(all); return s;
+const q = async (filter: string) => (await dbSelect<{ data: StyleRec }>('styles', `select=data&${filter}`)).map((r) => r.data);
+const all_ = async (): Promise<StyleRec[]> => (dbOn() ? q('order=created_at.asc') : read());
+const getByToken = async (token: string) => (dbOn() ? (await q(`token=eq.${encodeURIComponent(token)}&limit=1`))[0] ?? null : read().find((x) => x.token === token) ?? null);
+async function saveStyle(s: StyleRec): Promise<void> {
+  if (dbOn()) return dbUpsert('styles', { token: s.token, ref: s.ref, done_at: s.doneAt, created_at: s.createdAt, data: s }, 'token');
+  const all = read(); const k = all.findIndex((x) => x.token === s.token);
+  if (k < 0) all.push(s); else all[k] = s;
+  write(all);
 }
-export const styleFor = (refs: string[]) => { const all = read(); return refs.map((r) => all.find((s) => s.ref === r && s.doneAt)).find(Boolean) ?? null; };
+export async function ensureStyle(ref: string, lang: L): Promise<StyleRec> {
+  const ex = (await all_()).find((s) => s.ref === ref); if (ex) return ex;
+  const s: StyleRec = { token: crypto.randomBytes(16).toString('base64url'), ref, lang, createdAt: new Date().toISOString(), doneAt: null, likes: [], dislikes: [], refs: [], note: '' };
+  await saveStyle(s); return s;
+}
+export const styleFor = async (refs: string[]) => { const all = await all_(); return refs.map((r) => all.find((s) => s.ref === r && s.doneAt)).find(Boolean) ?? null; };
 /** Owner-facing summary in Turkish (admin + AI offer planner). */
 export function styleSummary(s: StyleRec | null): string {
   if (!s?.doneAt) return '';
@@ -58,22 +68,22 @@ interface Deps {
   requireAdmin: (req: Request, res: Response) => boolean; rateSkip?: () => boolean;
   /** Proves the visitor owns this request: intake token, or voice session id + secret. Returns the reference + language. */
   /** request id behind a reference (intake → its request), so the admin can show the style on the request */
-  requestOf?: (ref: string) => string | null;
-  verify: (b: { kind?: string; token?: string; sessionId?: string; secret?: string; lang?: string }) => { ref: string; lang: L } | null;
+  requestOf?: (ref: string) => string | null | Promise<string | null>;
+  verify: (b: { kind?: string; token?: string; sessionId?: string; secret?: string; lang?: string }) => Promise<{ ref: string; lang: L } | null>;
 }
 export function registerStyles(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 40, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
-  app.post('/api/style/start', limiter, express.json({ limit: '2kb' }), (req, res) => {
-    const v = d.verify(req.body ?? {}); if (!v) return res.status(404).json({ error: 'not_found' });
-    const s = ensureStyle(v.ref, v.lang); return res.json({ token: s.token, path: stylePath(s.lang, s.token), done: !!s.doneAt });
+  app.post('/api/style/start', limiter, express.json({ limit: '2kb' }), async (req, res) => {
+    const v = await d.verify(req.body ?? {}); if (!v) return res.status(404).json({ error: 'not_found' });
+    const s = await ensureStyle(v.ref, v.lang); return res.json({ token: s.token, path: stylePath(s.lang, s.token), done: !!s.doneAt });
   });
-  app.get('/api/style/:token', limiter, (req, res) => {
-    const s = read().find((x) => x.token === req.params.token); if (!s) return res.status(404).json({ error: 'not_found' });
+  app.get('/api/style/:token', limiter, async (req, res) => {
+    const s = await getByToken(String(req.params.token)); if (!s) return res.status(404).json({ error: 'not_found' });
     res.set('Cache-Control', 'no-store');
     return res.json({ lang: s.lang, done: !!s.doneAt, likes: s.likes, dislikes: s.dislikes, refs: s.refs, note: s.note, palette: s.palette ?? null, font: s.font ?? null });
   });
-  app.post('/api/style/:token', limiter, express.json({ limit: '8kb' }), (req, res) => {
-    const all = read(); const s = all.find((x) => x.token === req.params.token); if (!s) return res.status(404).json({ error: 'not_found' });
+  app.post('/api/style/:token', limiter, express.json({ limit: '8kb' }), async (req, res) => {
+    const s = await getByToken(String(req.params.token)); if (!s) return res.status(404).json({ error: 'not_found' });
     const b = req.body ?? {};
     const ids = (v: unknown) => [...new Set((Array.isArray(v) ? v : []).map((x) => clean(x, 20)).filter((x) => TAGS[x]))].slice(0, 8);
     const likes = ids(b.likes); if (!likes.length) return res.status(400).json({ error: 'min_one' });
@@ -85,11 +95,12 @@ export function registerStyles(app: Express, d: Deps) {
       : pb?.custom && HEX.test(String(pb.custom.accent)) ? { custom: { accent: String(pb.custom.accent).toLowerCase(), dark: pb.custom.dark === true,
         ...Object.fromEntries((['bg', 'surface', 'text', 'muted'] as const).filter((k) => HEX.test(String(pb.custom[k]))).map((k) => [k, String(pb.custom[k]).toLowerCase()])) } } : null;
     s.font = typeof b.font === 'string' && FONT_PAIRS.some((x) => x.id === b.font) ? b.font : null;
-    s.note = clean(b.note, 600); s.doneAt = new Date().toISOString(); write(all);
+    s.note = clean(b.note, 600); s.doneAt = new Date().toISOString(); await saveStyle(s);
     return res.json({ ok: true });
   });
-  app.get('/api/admin/styles', (req, res) => {
+  app.get('/api/admin/styles', async (req, res) => {
     if (!d.requireAdmin(req, res)) return;
-    return res.json({ styles: read().filter((s) => s.doneAt).map((s) => ({ ref: s.ref, requestId: d.requestOf?.(s.ref) ?? null, summary: styleSummary(s), at: s.doneAt })) });
+    const done = (await all_()).filter((s) => s.doneAt);
+    return res.json({ styles: await Promise.all(done.map(async (s) => ({ ref: s.ref, requestId: (await d.requestOf?.(s.ref)) ?? null, summary: styleSummary(s), at: s.doneAt }))) });
   });
 }
