@@ -757,6 +757,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
             <p role="status" aria-live="polite" style={{ textAlign: 'center', color: 'var(--lq-silver)' }}>{t.extracting}</p>
           ) : (
             <form onSubmit={(e) => { e.preventDefault(); void sendCard(); }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p role="note" style={{ margin: 0, display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: 'var(--lq-white)', border: '1px solid var(--lq-line-strong)', borderRadius: 'var(--lq-radius-card)' }}><span aria-hidden>✎</span><span>{t.cardReview}</span></p>
               <p style={{ margin: 0, color: 'var(--lq-silver)', fontSize: 13.5, textAlign: 'center' }}>{t.cardHint}</p>
               {([['service', t.cardService, 'text', 120], ['firstName', t.cardFirst, 'text', 40], ['lastName', t.cardLast, 'text', 40], ['phone', t.cardPhone, 'tel', 40], ['email', t.cardEmail, 'email', 254]] as const).map(([k, label, type, max]) => (
                 <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: 'var(--lq-silver)' }}>
