@@ -35,7 +35,7 @@ function ackName(lang: Lang, v: Visitor): string {
 interface Turn { role: 'user' | 'assistant'; text: string; at: number }
 type Phase = 'consent' | 'preparing' | 'queue' | 'blocked' | 'live' | 'card' | 'idle' | 'listening' | 'thinking' | 'speaking';
 interface Card { service: string; business: string; city: string; firstName: string; lastName: string; phone: string; email: string; notes: string }
-const LIVE_SECONDS = 150;
+const LIVE_SECONDS = 180;   // owner 2026-11-19: 3 minutes, never hurry
 const LANG_EN: Record<string, string> = { tr: 'Turkish', de: 'German', el: 'Greek', en: 'English' };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 

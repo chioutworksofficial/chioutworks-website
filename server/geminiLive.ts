@@ -173,6 +173,8 @@ TIME AWARENESS: never hurry the visitor. If the time is nearly up, briefly summa
 
 ACCURACY FIRST (more important than speed): after the visitor gives the business name, the city/country and the need, read each back once in a short natural sentence to confirm (e.g. "So the business is called Papi, in Frankfurt, Germany, is that right?", in ${L}). If the visitor corrects it, use the correction. If a word is unclear, ask to repeat it or to spell the business name letter by letter. If the need is vague, ask one or two short follow-up questions (what exactly it should do, for whom), never interrogate. Never move to the closing while something important is unclear or unconfirmed; only when need, business name and city are confirmed give the summary, ask once if they want to add anything, then say the closing.
 
+LET THE VISITOR FINISH: visitors often pause in the middle of a sentence to think. Never answer half a thought; if what you heard sounds unfinished, wait or say a very short "yes, go on" in the visitor's language. Give ONE reply per visitor turn and never start a second reply on your own before the visitor has spoken again.
+
 LISTENING CAREFULLY (very important, every language): speech recognition on phones can mishear. If a word is unclear, does not fit the conversation, or sounds like another language, do NOT guess: briefly and kindly ask the visitor to repeat it, for example "${REPEAT[lang] ?? REPEAT.en}". Visitors often use words from other languages (e.g. "coiffeur" or "Friseur" = hairdresser); understand them and answer with the ${L} word. Repeat the business name back once to confirm. NEVER change the visitor's name because of something you hear: the name in the ADDRESS section is correct; a word that sounds like a different name is almost certainly something else (e.g. Turkish "adımı" = "my name"), so keep the known name. Say the visitor's name at most once every few replies and never twice in the same reply. If your reply was cut off, continue naturally; never repeat a sentence you already said.
 
 NO RUSHING THE END: never end the call on your own while the visitor is still talking or before they confirmed the summary. After the summary ask once if they want to add anything. Then say EXACTLY this closing, word for word, nothing before or after it: "${closingText(lang, v.hour)}" and only then call finish_conversation with reason "done".
@@ -205,7 +207,7 @@ const VOCAB: Record<string, string[]> = {
 export async function mintToken(lang: string, instruction: string): Promise<{ token: string; model: string; expiresAt: string }> {
   const model = LIVE_MODEL();
   const start = new Date(Date.now() + 2 * 60_000);      // time allowed to open the socket
-  const expire = new Date(Date.now() + 5 * 60_000);     // hard end of the message window
+  const expire = new Date(Date.now() + 6 * 60_000);     // hard end of the message window
   const t = await ai().authTokens.create({
     config: {
       uses: 1, expireTime: expire.toISOString(), newSessionExpireTime: start.toISOString(),
@@ -217,7 +219,7 @@ export async function mintToken(lang: string, instruction: string): Promise<{ to
           speechConfig: { languageCode: LIVE_LOCALE[lang] ?? 'en-GB', voiceConfig: { prebuiltVoiceConfig: { voiceName: LIVE_VOICE() } } },
           // calmer turn detection on phones (owner 2026-11-19): less likely to treat echo/noise as the visitor and
           // to cut the visitor off mid-word
-          realtimeInputConfig: { automaticActivityDetection: { startOfSpeechSensitivity: 'START_SENSITIVITY_LOW', endOfSpeechSensitivity: 'END_SENSITIVITY_LOW', prefixPaddingMs: 200, silenceDurationMs: 700 } } as never,
+          realtimeInputConfig: { automaticActivityDetection: { startOfSpeechSensitivity: 'START_SENSITIVITY_LOW', endOfSpeechSensitivity: 'END_SENSITIVITY_LOW', prefixPaddingMs: 200, silenceDurationMs: 1300 } } as never,
           // Transcription in the call language + business vocabulary (owner 2026-11-19: "kuaför" was written as
           // "coiffure"; automatic language detection picked look-alike foreign words). Applies to every language.
           inputAudioTranscription: { languageCodes: [LIVE_LOCALE[lang] ?? 'en-GB'], customVocabulary: VOCAB[lang] ?? VOCAB.en } as never,

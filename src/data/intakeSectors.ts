@@ -431,10 +431,10 @@ export const CONSENT: Record<'gdpr' | 'kvkk', L4> = {
   ]),
 };
 export const CONSENT_AI: L4 = l4([
-  'Teklifi hazırlamak için yanıtlarım, ABD\'deki bir yapay zekâ hizmet sağlayıcısı (Groq, Inc.) tarafından analiz edilebilir.',
-  'To prepare the offer, my answers may be analysed by an AI service provider in the USA (Groq, Inc.).',
-  'Zur Erstellung des Angebots dürfen meine Antworten von einem KI-Dienstleister in den USA (Groq, Inc.) analysiert werden.',
-  'Για τη σύνταξη της προσφοράς, οι απαντήσεις μου μπορεί να αναλυθούν από πάροχο υπηρεσιών τεχνητής νοημοσύνης στις ΗΠΑ (Groq, Inc.).',
+  'Teklifi hazırlamak için yanıtlarım, ABD\'deki bir yapay zekâ hizmet sağlayıcısı tarafından analiz edilebilir.',
+  'To prepare the offer, my answers may be analysed by an AI service provider in the USA.',
+  'Zur Erstellung des Angebots dürfen meine Antworten von einem KI-Dienstleister in den USA analysiert werden.',
+  'Για τη σύνταξη της προσφοράς, οι απαντήσεις μου μπορεί να αναλυθούν από πάροχο υπηρεσιών τεχνητής νοημοσύνης στις ΗΠΑ.',
 ]);
 
 // ── Definition shape served by GET /api/intake/:token (shared with the client page) ──
