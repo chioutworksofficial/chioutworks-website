@@ -77,7 +77,7 @@ export function buildDefinition(market: Market, sector: SectorKey, wants: string
   const fromStatic = (q: StaticQ): QDef => ({ id: q.id, type: q.type, t: q.t, required: q.required, detail: q.detail,
     opts: q.type === 'yn' ? ['yes', 'no', 'unsure'].map((id) => ({ id, t: YN_LABEL[id] })) : q.options?.map((o) => ({ id: o.id, t: o.t })) });
   const sec = (id: SecDef['id'], qs: StaticQ[]): SecDef => ({ id, title: SECTION_STATIC[id as 'qr'], qs: qs.map(fromStatic) });
-  // One short block per wanted item (max 5 questions each); the long schema sections are gone on purpose.
+  // One short block per wanted item (5-10 questions each, tailored per product); the long schema sections are gone on purpose.
   const BLOCKS: [string, StaticQ[]][] = [['website', WEB_Q], ['booking', BOOKING_Q], ['qr', QR_Q], ['crm', CRM_Q], ['invoices', INV_Q], ['automation', AUTO_Q], ['app', APP_Q], ['ai', AI_Q]];
   const secs: SecDef[] = [sec('start', START_Q)];
   if (!wants.length || wants.includes('all')) secs.push(sec('notsure', NOTSURE_Q));
