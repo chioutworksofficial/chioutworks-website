@@ -34,6 +34,16 @@ async function main() {
   const preloader = /<div id="cw-pre"[\s\S]*?<\/span><\/div>/.exec(shell)?.[0];
   const paths = [...readFileSync(join(ROOT, 'public/sitemap.xml'), 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname).filter((p) => !process.argv[2] || p.includes(process.argv[2]));
 
+  const GROUPS = [['ana-sayfa', 'home', 'startseite', 'arxiki'], ['paketler', 'packages', 'pakete', 'paketa'], ['hizmetler', 'services', 'leistungen', 'ypiresies'], ['sss', 'faq', 'faq', 'syxnes-erotiseis'], ['iletisim', 'contact', 'kontakt', 'epikoinonia'], ['hakkimda', 'about', 'ueber-mich', 'schetika']];
+  const rank = (p) => {
+    const [, , seg, ...rest] = p.split('/');
+    const g = GROUPS.findIndex((names) => names.includes(seg));
+    if (g >= 0) return g;
+    if (seg === 'blog' || seg === 'arthra') return rest.filter(Boolean).length ? GROUPS.length + 1 : GROUPS.length;
+    return GROUPS.length + 2;
+  };
+  paths.sort((a, b) => rank(a) - rank(b)); // stable: keeps sitemap order within a rank
+
   const server = createServer((req, res) => {
     const p = decodeURIComponent((req.url || '/').split('?')[0]);
     if (p.startsWith('/api/')) { res.writeHead(404); return res.end(); }
@@ -94,5 +104,5 @@ async function main() {
   console.log(`[prerender] ${done}/${paths.length} pages written`);
 }
 
-const timer = setTimeout(() => { console.warn('[prerender] 3.5 min cap reached, shipping pages written so far'); process.exit(0); }, 3.5 * 60 * 1000);
+const timer = setTimeout(() => { console.warn('[prerender] 6 min cap reached, shipping pages written so far'); process.exit(0); }, 6 * 60 * 1000);
 main().catch((e) => console.warn('[prerender] skipped:', e.message)).finally(() => { clearTimeout(timer); process.exit(0); });
