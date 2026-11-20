@@ -341,7 +341,7 @@ const demoVerS = z.object({ code: s(16) });
 const quoteS = z.object({ ...WS, email, name: s(80), business: s(100), message: s(1000), demo: s(40), lang: LANG.nullish(), kind: s(20), modules: z.array(z.string().max(30)).max(20).nullish() });
 const loginS = z.object({ password: s(500), remember: bool });
 const roiS = z.object({ ...WS, email, name: s(80), company: s(100), lang: LANG.nullish(), page: s(200), roiCalc: z.any().optional() });
-const consentS = z.object({ id: z.string().regex(/^[0-9a-f-]{36}$/i), v: z.number().int(), functional: bool, statistics: bool });
+const consentS = z.object({ id: z.string().regex(/^[0-9a-f-]{36}$/i), v: z.number().int(), functional: bool, statistics: bool.optional() });
 const availS = z.object({ blocked: z.array(z.string().max(10)).max(1000) });
 const contactS = z.object({ ...WS, email: emailOpt, phone: s(40), name: s(80), message: s(1000), preferredStart: s(10), callTime: s(5), voiceSessionId: s(64), voiceSecret: s(200),
   roiCalc: z.any().optional(), topic: s(20), via: s(20), business: s(100), city: s(80), address: s(200), replyPreference: s(10), lang: LANG.nullish(), page: s(200) });
@@ -662,7 +662,7 @@ app.post('/api/consent', consentLimiter, v(consentS), async (req, res) => {
   const b = req.body ?? {};
   const id = String(b.id ?? '');
   if (!/^[0-9a-f-]{36}$/i.test(id) || !Number.isInteger(b.v)) return res.status(400).json({ error: 'bad_request' });
-  const rec = { id, v: b.v, functional: b.functional === true, statistics: b.statistics === true, at: new Date().toISOString() };
+  const rec = { id, v: b.v, functional: b.functional === true, at: new Date().toISOString() };
   try {
     if (dbOn()) {
       await dbInsert('consents', { consent_id: id, at: rec.at, data: rec });

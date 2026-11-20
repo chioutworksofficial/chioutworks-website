@@ -3,7 +3,7 @@
 // /admin panel and the public booking form (CTASection) can work without
 // a backend. Designed so it can later be swapped for a Supabase-backed
 // implementation without changing the consumers much (same shape as
-// src/lib/analytics.ts's readStore/writeStore pattern).
+// the old client analytics readStore/writeStore pattern).
 //
 // LIMITATION: localStorage is per-browser. A visitor who books from their
 // phone will not show up in the admin panel unless the admin opens it in

@@ -1,10 +1,9 @@
 import { uid } from './uid';
-// Cookie / device-storage consent (TDDDG §25, GDPR). Necessary storage is always allowed; "functional" and
-// "statistics" only after the visitor's choice. The choice is kept in localStorage (itself necessary) and an
+// Cookie / device-storage consent (TDDDG §25, GDPR). Necessary storage is always allowed; "functional" only after the visitor's choice. The choice is kept in localStorage (itself necessary) and an
 // anonymous proof record (random id, version, choices, time; no IP) is sent to the server.
 
-export type ConsentCategory = 'necessary' | 'functional' | 'statistics';
-export interface Consent { v: number; id: string; at: string; functional: boolean; statistics: boolean }
+export type ConsentCategory = 'necessary' | 'functional';
+export interface Consent { v: number; id: string; at: string; functional: boolean }
 
 export const CONSENT_VERSION = 1;              // bump when categories or texts change materially → visitors are asked again
 const KEY = 'cw-consent';
@@ -25,14 +24,15 @@ export const hasConsent = (cat: ConsentCategory): boolean => cat === 'necessary'
 /** Remove what an optional category stored once it is switched off. */
 function cleanup(c: Consent) {
   try {
-    if (!c.statistics) { localStorage.removeItem('cw_analytics_v1'); localStorage.removeItem('cw_analytics_visitor'); sessionStorage.removeItem('cw_analytics_session'); }
+    // old statistics data of earlier versions (no longer used) is removed in any case
+    localStorage.removeItem('cw_analytics_v1'); localStorage.removeItem('cw_analytics_visitor'); sessionStorage.removeItem('cw_analytics_session');
     if (!c.functional) sessionStorage.removeItem('cw-pre');
   } catch { /* storage blocked */ }
 }
 
-export function saveConsent(choice: { functional: boolean; statistics: boolean }): Consent {
+export function saveConsent(choice: { functional: boolean }): Consent {
   const prev = (() => { try { return JSON.parse(localStorage.getItem(KEY) ?? 'null') as Consent | null; } catch { return null; } })();
-  const c: Consent = { v: CONSENT_VERSION, id: prev?.id ?? uid(), at: new Date().toISOString(), ...choice };
+  const c: Consent = { v: CONSENT_VERSION, id: prev?.id ?? uid(), at: new Date().toISOString(), functional: choice.functional };
   try { localStorage.setItem(KEY, JSON.stringify(c)); } catch { /* storage blocked: banner shows again next visit */ }
   cleanup(c);
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: c }));

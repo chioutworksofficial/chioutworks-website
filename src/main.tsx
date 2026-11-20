@@ -1,7 +1,6 @@
 import React, { Suspense, lazy } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import AnalyticsTracker from './components/AnalyticsTracker.tsx'
 import CookieConsent from './components/CookieConsent.tsx'
 import ServerTracker from './components/ServerTracker.tsx'
 import { DemoRoute, LegacyDemoRedirect, LegacyRedirect, LinkInterceptor, PageRoute, RootRedirect } from './components/Routing.tsx'
@@ -29,7 +28,6 @@ const DevTts = import.meta.env.DEV ? lazy(() => import('./pages/DevTts.tsx')) : 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AnalyticsTracker />
       <CookieConsent />
       <ServerTracker />
       <LinkInterceptor />

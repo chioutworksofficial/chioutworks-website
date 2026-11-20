@@ -20,13 +20,12 @@ export default function CookieConsent() {
   const [banner, setBanner] = useState(false);
   const [dialog, setDialog] = useState(false);
   const [functional, setFunctional] = useState(false);
-  const [statistics, setStatistics] = useState(false);
   const dlgRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (!readConsent()) setBanner(true); }, []);
   useEffect(() => onConsentOpen(() => {
     const c = readConsent();
-    setFunctional(!!c?.functional); setStatistics(!!c?.statistics); setDialog(true);
+    setFunctional(!!c?.functional); setDialog(true);
   }), []);
   useEffect(() => {
     if (!dialog) return;
@@ -36,7 +35,7 @@ export default function CookieConsent() {
     return () => window.removeEventListener('keydown', onKey);
   }, [dialog]);
 
-  const decide = (choice: { functional: boolean; statistics: boolean }) => { saveConsent(choice); setBanner(false); setDialog(false); };
+  const decide = (choice: { functional: boolean}) => { saveConsent(choice); setBanner(false); setDialog(false); };
 
   if (admin) return null;
 
@@ -68,9 +67,9 @@ export default function CookieConsent() {
           <h2 style={{ margin: '0 0 6px', fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, color: 'var(--c-quartz)' }}>{u.title}</h2>
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55 }}>{u.body} <Link to={pagePath(lang, 'privacy')} style={{ color: 'var(--c-lilac)', textDecoration: 'underline' }}>{u.privacy}</Link></p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-            <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: true, statistics: true })}>{u.acceptAll}</button>
-            <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: false, statistics: false })}>{u.necessaryOnly}</button>
-            <button type="button" className="lq-btn-ghost" style={btn} onClick={() => { setFunctional(false); setStatistics(false); setDialog(true); }}>{u.settings}</button>
+            <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: true })}>{u.acceptAll}</button>
+            <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: false })}>{u.necessaryOnly}</button>
+            <button type="button" className="lq-btn-ghost" style={btn} onClick={() => { setFunctional(false); setDialog(true); }}>{u.settings}</button>
           </div>
         </section>
       )}
@@ -84,14 +83,13 @@ export default function CookieConsent() {
             <p style={{ margin: '0 0 8px', fontSize: 14, lineHeight: 1.55 }}>{u.body}</p>
             <Row name={u.necessary.name} desc={u.necessary.desc} on note={u.always} />
             <Row name={u.functional.name} desc={u.functional.desc} on={functional} set={setFunctional} />
-            <Row name={u.statistics.name} desc={u.statistics.desc} on={statistics} set={setStatistics} />
             <p style={{ margin: '4px 0 16px', paddingTop: 12, borderTop: '1px solid var(--c-edge)', fontSize: 13, color: 'var(--c-ash)' }}>
               {u.noMarketing} <Link to={pagePath(lang, 'privacy')} onClick={() => setDialog(false)} style={{ color: 'var(--c-lilac)', textDecoration: 'underline' }}>{u.privacy}</Link>
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional, statistics })}>{u.save}</button>
-              <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: true, statistics: true })}>{u.acceptAll}</button>
-              <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: false, statistics: false })}>{u.necessaryOnly}</button>
+              <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional })}>{u.save}</button>
+              <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: true })}>{u.acceptAll}</button>
+              <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: false })}>{u.necessaryOnly}</button>
             </div>
           </div>
         </div>
