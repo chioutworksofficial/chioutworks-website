@@ -130,16 +130,22 @@ const FAREWELL: Record<string, [string, string, string]> = {
   el: ['Καλή σας μέρα', 'Καλό σας βράδυ', 'Καληνύχτα'],
 };
 const CLOSING: Record<string, string> = {
-  tr: 'Başka sormak istediğiniz bir şey yoksa görüşmeyi burada sonlandıralım. Ekranda açılacak talep kartına e-posta adresinizi ve telefon numaranızı yazın; en kısa sürede sizinle iletişime geçilecek. {FAREWELL}!',
-  en: "If you have no further questions, let's end the call here. Please type your e-mail address and phone number into the request card that opens on the screen; you will be contacted as soon as possible. {FAREWELL}!",
-  de: 'Wenn Sie keine weiteren Fragen haben, beenden wir das Gespräch an dieser Stelle. Bitte tragen Sie Ihre E-Mail-Adresse und Telefonnummer in die Anfragekarte ein, die sich gleich am Bildschirm öffnet; Sie werden so schnell wie möglich kontaktiert. {FAREWELL}!',
-  el: 'Αν δεν έχετε άλλες ερωτήσεις, ας ολοκληρώσουμε εδώ την κλήση. Γράψτε το e-mail και το τηλέφωνό σας στην κάρτα αιτήματος που θα ανοίξει στην οθόνη· θα υπάρξει επικοινωνία μαζί σας το συντομότερο. {FAREWELL}!',
+  tr: 'Bu konuşmamızın sonunda bir talep formu açılacak; oradan bütün bilgilerinizi inceleyebilir, düzeltebilir ve ekleyebilirsiniz. Ardından renk paleti ve tarz seçimi gelecek. {FAREWELL}!',
+  en: 'At the end of our conversation a request form will open; there you can review, correct and add to all your details. After that comes the colour palette and style selection. {FAREWELL}!',
+  de: 'Am Ende unseres Gesprächs öffnet sich ein Anfrageformular; dort können Sie alle Ihre Angaben prüfen, korrigieren und ergänzen. Danach folgt die Auswahl von Farbpalette und Stil. {FAREWELL}!',
+  el: 'Στο τέλος της συζήτησής μας θα ανοίξει μια φόρμα αιτήματος· εκεί μπορείτε να ελέγξετε, να διορθώσετε και να συμπληρώσετε όλα τα στοιχεία σας. Μετά θα ακολουθήσει η επιλογή χρωματικής παλέτας και στυλ. {FAREWELL}!',
 };
 export function closingText(lang: string, hour?: number): string {
   const f = FAREWELL[lang] ?? FAREWELL.en;
   const fw = hour === undefined ? f[0] : hour >= 5 && hour <= 16 ? f[0] : hour >= 17 && hour <= 21 ? f[1] : f[2];
   return (CLOSING[lang] ?? CLOSING.en).replace('{FAREWELL}', fw);
 }
+const LANGMISMATCH: Record<string, string> = {
+  tr: '"Şu an size yalnızca Türkçe hizmet verebiliyorum. Farklı bir dilde konuşmak isterseniz görüşmeyi sonlandırıp menüden dilinizi seçmeniz ve ardından tekrar mikrofona tıklamanız yeterli. Nasıl devam etmek istersiniz: Türkçe devam edelim mi, yoksa görüşmeyi sonlandıralım mı?"',
+  en: '"I can currently only help you in English. If you would like to speak another language, simply end the call, choose your language from the menu and click the microphone again. How would you like to continue: shall we carry on in English, or end the call?"',
+  de: '"Ich kann Ihnen im Moment nur auf Deutsch helfen. Wenn Sie eine andere Sprache sprechen möchten, beenden Sie einfach das Gespräch, wählen Sie Ihre Sprache im Menü und klicken Sie erneut auf das Mikrofon. Wie möchten Sie fortfahren: Sollen wir auf Deutsch weitermachen oder das Gespräch beenden?"',
+  el: '"Αυτή τη στιγμή μπορώ να σας εξυπηρετήσω μόνο στα ελληνικά. Αν θέλετε να μιλήσετε σε άλλη γλώσσα, τερματίστε την κλήση, επιλέξτε τη γλώσσα σας από το μενού και πατήστε ξανά το μικρόφωνο. Πώς θέλετε να συνεχίσουμε: να συνεχίσουμε στα ελληνικά ή να τερματίσουμε την κλήση;"',
+};
 const REPEAT: Record<string, string> = {
   tr: 'Kusura bakmayın, tam anlayamadım, tekrar eder misiniz?',
   en: "Sorry, I didn't quite catch that. Could you say it again?",
@@ -180,9 +186,11 @@ LET THE VISITOR FINISH: visitors often pause in the middle of a sentence to thin
 
 LISTENING CAREFULLY (very important, every language): speech recognition on phones can mishear. If a word is unclear, does not fit the conversation, or sounds like another language, do NOT guess: briefly and kindly ask the visitor to repeat it, for example "${REPEAT[lang] ?? REPEAT.en}". Visitors often use words from other languages (e.g. "coiffeur" or "Friseur" = hairdresser); understand them and answer with the ${L} word. Repeat the business name back once to confirm. NEVER change the visitor's name because of something you hear: the name in the ADDRESS section is correct; a word that sounds like a different name is almost certainly something else (e.g. Turkish "adımı" = "my name"), so keep the known name. Say the visitor's name at most once every few replies and never twice in the same reply. If your reply was cut off, continue naturally; never repeat a sentence you already said.
 
-NO RUSHING THE END: never end the call on your own while the visitor is still talking or before they confirmed the summary. After the summary ask once if they want to add anything. Then say EXACTLY this closing, word for word, nothing before or after it: "${closingText(lang, v.hour)}" and only then call finish_conversation with reason "done".
+LOCATION (any country: Türkiye, Greece, Germany, UK, USA, anywhere): a city or region name alone is enough as the service area; never ask for a district, street or "where in <city>". Confirm it naturally in ${L} with the city the visitor actually said (tr "Anladım, <şehir> bölgesinde hizmet veriyorsunuz.", en "Understood, you operate in the <city> area.", de "Verstanden, Sie sind im Raum <Stadt> tätig.", el "Κατάλαβα, δραστηριοποιείστε στην περιοχή <πόλη>.").
+LANGUAGE MISMATCH: this call runs only in ${L}, the language selected on the site. If the visitor starts speaking another language, answer politely IN ${L} (never switch language; this is NOT abuse, no strike) with this message: ${LANGMISMATCH[lang] ?? LANGMISMATCH.en} If they choose to end, say one short farewell and then call finish_conversation with reason "language"; if they choose to continue in ${L}, simply continue normally.
+NO RUSHING THE END: never end the call on your own while the visitor is still talking or before they confirmed the summary. After the summary ask once if they want to add anything. Then say EXACTLY this closing, word for word, nothing before or after it: "${closingText(lang, v.hour)}" and only then, after you have finished speaking the closing and the farewell completely, call finish_conversation with reason "done" as your very last action; never call it before or while speaking, and say nothing after it.
 
-FORM FLOW (collect in this order, one question at a time, and pick up anything the visitor already said instead of asking again): 1) the need (use DISCOVERY above, adaptively); 2) the business name; 3) the city and country it is in (skip anything already said). The visitor's name is already known from the ADDRESS section; never ask for it again. NEVER ask for or repeat a phone number or e-mail address; if the visitor volunteers one, do not repeat or spell it, just say it can be typed on the request card. The LAST NAME is never spoken. When you have everything, summarise briefly (service, business, city; no surname spoken) and ask for confirmation. Ask ONE short question whether there is anything else they would like to add (tr "Eklemek istediğiniz başka bir şey var mı?", de "Möchten Sie noch etwas ergänzen?", el "Θέλετε να προσθέσετε κάτι ακόμη;", en "Is there anything else you would like to add?"). If they add something, note it and confirm in one sentence; if not, say the closing. If the session is renewed, never greet again. If you receive the text TIME_UP, say one short polite goodbye (the time for this call is over; the details can be sent on the request card that appears) and call finish_conversation.
+FORM FLOW (collect in this order, one question at a time, and pick up anything the visitor already said instead of asking again): 1) the need (use DISCOVERY above, adaptively); 2) the business name; 3) the city and country it is in (skip anything already said). The visitor's name is already known from the ADDRESS section; never ask for it again. NEVER ask for or repeat a phone number or e-mail address; if the visitor volunteers one, do not repeat or spell it, just say it can be typed on the request card. The LAST NAME is never spoken. When you have everything, summarise briefly (service, business, city; no surname spoken) and ask for confirmation. Ask ONE short question whether there is anything else they would like to add (tr "Eklemek istediğiniz başka bir şey var mı?", de "Möchten Sie noch etwas ergänzen?", el "Θέλετε να προσθέσετε κάτι ακόμη;", en "Is there anything else you would like to add?"). If they add something, note it and confirm in one sentence; if not, say the closing. If the session is renewed, never greet again. If you receive the text TIME_UP or WRAP_UP, finish your current sentence, briefly summarise what was confirmed, then say the closing exactly as instructed (complete, with the farewell) and only then call finish_conversation with reason done as your very last action.
 
 ADDRESS: ${addressBlock(lang, v)}
 ${resumeBlock}
@@ -210,7 +218,7 @@ const VOCAB: Record<string, string[]> = {
 export async function mintToken(lang: string, instruction: string): Promise<{ token: string; model: string; expiresAt: string }> {
   const model = LIVE_MODEL();
   const start = new Date(Date.now() + 2 * 60_000);      // time allowed to open the socket
-  const expire = new Date(Date.now() + 6 * 60_000);     // hard end of the message window
+  const expire = new Date(Date.now() + 15 * 60_000);    // message window: 5 min call + soft wrap-up + drain, with margin
   const t = await ai().authTokens.create({
     config: {
       uses: 1, expireTime: expire.toISOString(), newSessionExpireTime: start.toISOString(),
@@ -227,7 +235,7 @@ export async function mintToken(lang: string, instruction: string): Promise<{ to
           // "coiffure"; automatic language detection picked look-alike foreign words). Applies to every language.
           inputAudioTranscription: { languageCodes: [LIVE_LOCALE[lang] ?? 'en-GB'], customVocabulary: VOCAB[lang] ?? VOCAB.en } as never,
           outputAudioTranscription: {},
-          tools: [{ functionDeclarations: [{ name: 'finish_conversation', description: 'Call after the visitor confirmed the summary, after your goodbye, or when ending an off-topic call.', parameters: { type: Type.OBJECT, properties: { reason: { type: Type.STRING, description: 'abuse or done' } } } }] }],
+          tools: [{ functionDeclarations: [{ name: 'finish_conversation', description: 'Call after the visitor confirmed the summary, after your goodbye, or when ending an off-topic call.', parameters: { type: Type.OBJECT, properties: { reason: { type: Type.STRING, description: 'abuse, language or done' } } } }] }],
         },
       },
     },

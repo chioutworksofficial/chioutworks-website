@@ -14,7 +14,7 @@ import { hasConsent, fallbackAllowed, CONSENT_VERSION } from '../lib/assistantCo
 import { createAudio, LiveCall, fetchToken, liveDayExceeded, bumpLiveDay, postLiveEnd, SilenceWatch, type LiveHandlers } from '../lib/geminiLive';
 import { wrongScript, namesOwner, usesWe } from '../lib/scriptGuard';
 import { writeVoiceSession, clearVoiceSession, downloadTranscript, printTranscript } from '../lib/voiceSession';
-import { StyleCta } from './pages/StylePage';
+import RequestWizard, { loadWizardDraft, type WizDraft } from './RequestWizard';
 import { guardFields, prefetchFormToken } from '../lib/formGuard';
 
 const cleanName = (v: string) => v.replace(/[^\p{L}\s.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 40);
@@ -36,7 +36,7 @@ function ackName(lang: Lang, v: Visitor): string {
 interface Turn { role: 'user' | 'assistant'; text: string; at: number }
 type Phase = 'consent' | 'preparing' | 'queue' | 'blocked' | 'live' | 'card' | 'idle' | 'listening' | 'thinking' | 'speaking';
 interface Card { service: string; business: string; city: string; firstName: string; lastName: string; phone: string; email: string; notes: string }
-const LIVE_SECONDS = 180;   // owner 2026-11-19: 3 minutes, never hurry
+const LIVE_SECONDS = 300;   // owner 2026-11-20: 5 minutes, complete conversations; internal soft limit, never shown
 const LANG_EN: Record<string, string> = { tr: 'Turkish', de: 'German', el: 'Greek', en: 'English' };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -53,14 +53,12 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const [nameDone, setNameDone] = useState(false);
   const [queuePos, setQueuePos] = useState(1);
   const [blockedMsg, setBlockedMsg] = useState('');
-  const [timeLeft, setTimeLeft] = useState(LIVE_SECONDS);
   const [reconnecting, setReconnecting] = useState(false);
   const [liveSpeak, setLiveSpeak] = useState(false);
   const [card, setCard] = useState<Card | null>(null);
-  const [cardBusy, setCardBusy] = useState(false);
-  const [cardSent, setCardSent] = useState(false);
-  const [styleRef, setStyleRef] = useState<{ id: string; secret: string } | null>(null);   // for the "choose my style" link after sending
-  const [cardErr, setCardErr] = useState('');
+  const [, setCardBusy] = useState(false);
+  const [, setCardSent] = useState(false);
+  const [, setCardErr] = useState('');
   const [vFirst, setVFirst] = useState('');
   const [vLast, setVLast] = useState('');
   const [vSal, setVSal] = useState<Salutation>('none');
@@ -113,6 +111,13 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const silenceEndRef = useRef<() => void>(() => {});
   const draining = useRef(false);
   const softSent = useRef(false);
+  const endReasonRef = useRef('');          // finish_tool | time_limit | go_away | ws_close:<code> | error:<short> | user_hangup | abuse | language
+  const endedAtRef = useRef(0);
+  const talkStart = useRef(0);
+  const timingRef = useRef<{ lastAudioChunkAt: number; lastTurnCompleteAt: number; playbackDoneAt: number } | null>(null);
+  const wrapSent = useRef(false);
+  const goAway = useRef(false);
+  const limitAt = useRef(0);
   const reconnected = useRef(false);
   const liveRole = useRef<'user' | 'assistant' | null>(null);
   const outBuf = useRef('');
@@ -143,6 +148,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     if (hbRef.current) { clearInterval(hbRef.current); hbRef.current = null; }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     watchRef.current?.stop(); watchRef.current = null;
+    if (callRef.current && !endedAtRef.current) { endedAtRef.current = Date.now(); timingRef.current = callRef.current.timing(); if (!endReasonRef.current) endReasonRef.current = 'user_hangup'; }
     callRef.current?.close(); callRef.current = null;
     streamRef.current?.getTracks().forEach((x) => x.stop()); streamRef.current = null;
     const c = ctxRef.current; ctxRef.current = null; c?.close().catch(() => {});
@@ -167,7 +173,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       try {
         const r = await fetch('/api/voice/session', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lang, turns: turnsRef.current.slice(0, 30), startedAt: startedAt.current, endedAt: Date.now(), consent: true, ...visitorRef.current, ...(voiceId.current ?? {}) }),
+          body: JSON.stringify({ lang, turns: turnsRef.current.slice(0, 30), startedAt: startedAt.current, endedAt: Date.now(), ...(endedAtRef.current ? { durationSec: Math.max(0, Math.round((endedAtRef.current - (talkStart.current || startedAt.current)) / 1000)), endReason: endReasonRef.current, timings: timingRef.current } : {}), consent: true, ...visitorRef.current, ...(voiceId.current ?? {}) }),
         });
         if (!r.ok || deletedRef.current) return null;
         const j = await r.json() as { id: string; secret: string };
@@ -188,7 +194,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       sessionRef.current++; autoRef.current = true; deniedRef.current = false; inFlight.current = false;
       emptyRuns.current = 0; manualStop.current = false; unavailSaid.current = false;
       visitorRef.current = NO_VISITOR; setVFirst(''); setVLast(''); setVSal('none'); setNameDone(false); voiceId.current = null; deletedRef.current = false;
-      deadlineRef.current = 0; setTimeLeft(LIVE_SECONDS); endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; softSent.current = false; reconnected.current = false;
+      deadlineRef.current = 0; endReasonRef.current = ''; endedAtRef.current = 0; talkStart.current = 0; wrapSent.current = false; goAway.current = false; limitAt.current = 0; endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; softSent.current = false; reconnected.current = false;
       liveRole.current = null; liveCut.current = false; outBuf.current = ''; corrections.current = 0; setReconnecting(false); setCard(null); setCardSent(false); setCardErr(''); setCardBusy(false);
       preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false);
       goPhase('consent'); startedAt.current = Date.now(); setOpen(true);
@@ -414,32 +420,41 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     draining.current = true;
     const c = callRef.current;
     if (!c) { setTimeout(endCall, 700); return; }
-    c.hold(true);
-    if (abuseRef.current) { void c.whenPlaybackDone(8000).then(() => setTimeout(endCall, 700)); return; }   // abuse: old behaviour
+    c.hold(true);   // mic muted; the end waits for the assistant's whole spoken turn (see shouldEnd)
     void c.whenReallyDone().then(endCall);
+  };
+
+  const WRAP = 'WRAP_UP: the call time is over. Finish your current sentence, summarise briefly what was confirmed, then say the closing sentence exactly as instructed, completely with the farewell, and only then call finish_conversation with reason done as your very last action.';
+  /** Soft limit / goAway: ask the model to wrap up, only while it is quiet (a text message would interrupt its speech). */
+  const wrapNow = () => {
+    const c = callRef.current;
+    if (!c || wrapSent.current || finishPending.current || c.busy()) return;
+    wrapSent.current = true; c.sendText(WRAP);
   };
 
   const startTimerOnce = () => {
     if (deadlineRef.current) return;
+    talkStart.current = Date.now();
     deadlineRef.current = Date.now() + LIVE_SECONDS * 1000;
     timerRef.current = setInterval(() => {
-      const left = Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000));
-      setTimeLeft(left);
-      if (left <= 25 && !softSent.current && !finishPending.current) {
-        softSent.current = true;
-        callRef.current?.sendText('TIME_UP: the call time is almost over. In at most two short sentences, summarise what was confirmed and then say the closing sentence exactly as instructed, then call finish_conversation with reason done.');
-      }
-      if (left > 0 || finishPending.current) return;
-      finishPending.current = true;
-      setNotice(t.timeUp);
+      const left = Math.ceil((deadlineRef.current - Date.now()) / 1000);
       const c = callRef.current;
-      if (!c) { endCall(); return; }
-      c.hold();   // hard end: wait for the real end of speech (capped at 15 s)
-      void c.whenReallyDone().then(endCall);
+      if (finishPending.current) return;
+      if (left <= 25 && !softSent.current && c && !c.busy()) {
+        softSent.current = true;
+        c.sendText('TIME_UP: the call time is almost over. Finish your current sentence, summarise what was confirmed, then say the closing sentence exactly as instructed, completely with the farewell, then call finish_conversation with reason done as your very last action.');
+      }
+      if (left > 0 && !goAway.current) return;
+      if (!c) { endReasonRef.current ||= goAway.current ? 'go_away' : 'time_limit'; endCall(); return; }
+      if (!limitAt.current) { limitAt.current = Date.now(); endReasonRef.current ||= goAway.current ? 'go_away' : 'time_limit'; }
+      wrapNow();
+      // safety only: the model never finished its closing 60 s after the limit and is silent now
+      if (Date.now() - limitAt.current > 60000 && !c.busy()) { finishPending.current = true; drain(); }
     }, 500);
   };
 
   const silenceEnd = () => {
+    endReasonRef.current ||= 'error:silence';
     setNotice(t.silenceEnd);
     if (turnsRef.current.some((x) => x.role === 'user')) { endCall(); return; }
     endingRef.current = true; endLive(); setBlockedMsg(t.silenceEnd); goPhase('blocked');
@@ -477,12 +492,21 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       },
       onInterrupted: () => { liveCut.current = turnsRef.current[turnsRef.current.length - 1]?.role === 'assistant'; liveRole.current = null; outBuf.current = ''; },
       onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; if (finishPending.current && abuseRef.current) drain(); },
-      onFinish: (reason) => { if (reason === 'abuse') abuseRef.current = true; finishPending.current = true; if (reason === 'abuse') setTimeout(drain, 3000); else drain(); },
+      onFinish: (reason) => {
+        if (reason === 'abuse') { abuseRef.current = true; endReasonRef.current = 'abuse'; } else if (reason === 'language') endReasonRef.current = 'language'; else endReasonRef.current ||= 'finish_tool';
+        finishPending.current = true; if (reason === 'abuse') setTimeout(drain, 3000); else drain();
+      },
+      onGoAway: () => { goAway.current = true; wrapNow(); },
       onLevel: (rms) => { const n = performance.now(); if (n - lastLevel.current > 80) { lastLevel.current = n; setLevel(Math.min(1, rms * 8)); } },
-      onClosed: () => {
+      onClosed: (_clean, code) => {
         if (callRef.current !== ref.c || endingRef.current || sid !== sessionRef.current) return;
-        if (deadlineRef.current && Date.now() >= deadlineRef.current) { endCall(); return; }
-        void reconnect();
+        const finishing = finishPending.current || goAway.current || (!!deadlineRef.current && Date.now() >= deadlineRef.current);
+        // never cut the assistant: let the audio already received play out before ending or reconnecting
+        void ref.c?.whenPlaybackDone(45000).then(() => {
+          if (callRef.current !== ref.c || endingRef.current || sid !== sessionRef.current) return;
+          if (finishing) { endReasonRef.current ||= `ws_close:${code}`; setTimeout(endCall, 500); return; }
+          void reconnect();
+        });
       },
     };
     const c = new LiveCall(ctxRef.current!, streamRef.current!, h);
@@ -528,6 +552,10 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     const named = new Promise<void>((r) => { nameResolve.current = r; });
     try {
       streamRef.current = await micP;
+      streamRef.current?.getAudioTracks()[0]?.addEventListener('ended', () => {   // mic unplugged / permission revoked mid-call
+        if (endingRef.current || finishPending.current || !callRef.current) return;
+        endReasonRef.current ||= 'error:mic_ended'; finishPending.current = true; drain();
+      });
       setMics(await micInputs());
     } catch { audioP.then((c) => c.close()).catch(() => {}); if (sid === sessionRef.current) toTextChat(t.deniedToText); return; }
     setPrep(25);
@@ -664,33 +692,18 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     void toCard();
   };
 
+  // Request wizard: restore an unfinished draft (24 h) after a reload; leaving the card phase drops the restored copy.
+  const [restored, setRestored] = useState<WizDraft | null>(null);
+  useEffect(() => { if (phase !== 'card') setRestored(null); }, [phase]);
   useEffect(() => {
-    if (phase !== 'card' || !card || styleRef) return;
-    void saveSession().then((v) => { if (v) setStyleRef({ id: v.id, secret: v.secret }); });
-  }, [phase, card, styleRef, saveSession]);
-
-  const sendCard = async () => {
-    if (!card) return;
-    const name = [cleanName(card.firstName), cleanName(card.lastName)].filter(Boolean).join(' ');
-    const email = card.email.trim(), phone = card.phone.trim();
-    if (!name) { setCardErr(t.cardNeedContact); return; }
-    const mailOk = EMAIL_RE.test(email) && /@.+\./.test(email), phoneOk = phone.replace(/\D/g, '').length >= 7;
-    if (!mailOk && !phoneOk) { setCardErr(t.cardNeedEither); return; }
-    if (!mailOk) { setCardErr(email ? t.dlBadEmail : t.cardNeedEither); return; }
-    if (!phoneOk) { setCardErr(t.cardNeedEither); return; }
-    setCardBusy(true); setCardErr('');
-    try {
-      const v = voiceId.current ?? await saveSession();
-      const message = [card.service, card.notes].filter(Boolean).join('\n').slice(0, 1000);
-      const r = await fetch('/api/contact', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...(await guardFields()), name, email, phone, business: card.business.trim(), city: card.city.trim(), message, replyPreference: 'written', via: 'assistant', lang, page: window.location.pathname, ...(v ? { voiceSessionId: v.id, voiceSecret: v.secret } : {}) }),
-      });
-      if (!r.ok) throw new Error(String(r.status));
-      if (v) setStyleRef({ id: v.id, secret: v.secret }); setCardSent(true);
-    } catch { setCardErr(t.cardError); }
-    setCardBusy(false);
-  };
+    void loadWizardDraft().then((d) => {
+      if (!d || phaseRef.current !== 'consent' || turnsRef.current.length) return;
+      const c = d.draft.card;
+      voiceId.current = { id: d.id, secret: d.secret };
+      setCard({ service: c.service ?? '', business: c.business ?? '', city: c.city ?? '', firstName: c.firstName ?? '', lastName: c.lastName ?? '', phone: c.phone ?? '', email: c.email ?? '', notes: c.notes ?? '' });
+      setRestored(d.draft); goPhase('card'); setOpen(true);
+    });
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const onMic = () => {
     if (phase === 'listening') { manualStop.current = true; recRef.current?.stop(); }
@@ -765,35 +778,12 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
           </div>
         </div>
       ) : phase === 'card' ? (
-        <div style={{ margin: 'auto', width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 40 }}>
+        <div style={{ margin: 'auto', width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 40 }}>
           <h2 style={{ margin: 0, fontSize: 'clamp(22px, 3.5vw, 28px)', fontFamily: 'var(--font-display)', fontWeight: 600, textAlign: 'center' }}>{t.cardTitle}</h2>
-          {cardSent ? (
-            <>
-              <p role="status" style={{ textAlign: 'center', color: 'var(--lq-silver)', lineHeight: 1.6 }}>{t.cardSent}</p>
-              <button type="button" style={primary} onClick={() => { teardown(); setOpen(false); }}>{t.cardClose}</button>
-            </>
-          ) : !card ? (
+          {!card ? (
             <p role="status" aria-live="polite" style={{ textAlign: 'center', color: 'var(--lq-silver)' }}>{t.extracting}</p>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); void sendCard(); }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {styleRef && <StyleCta newTab lang={lang} body={{ kind: 'voice', sessionId: styleRef.id, secret: styleRef.secret }} />}
-              <p role="note" style={{ margin: 0, display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', fontSize: 14, lineHeight: 1.5, color: 'var(--lq-white)', border: '1px solid var(--lq-line-strong)', borderRadius: 'var(--lq-radius-card)' }}><span aria-hidden>✎</span><span>{t.cardReview}</span></p>
-              <p style={{ margin: 0, color: 'var(--lq-silver)', fontSize: 13.5, textAlign: 'center' }}>{t.cardHint}</p>
-              {([['service', t.cardService, 'text', 120], ['business', t.cardBusiness, 'text', 100], ['city', t.cardCity, 'text', 80], ['firstName', t.cardFirst, 'text', 40], ['lastName', t.cardLast, 'text', 40], ['phone', t.cardPhone, 'tel', 40], ['email', t.cardEmail, 'email', 254]] as const).map(([k, label, type, max]) => (
-                <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: 'var(--lq-silver)' }}>
-                  {label}{(k === 'phone' || k === 'email') ? ` * ${t.cardRequired}` : ''}
-                  <input type={type} aria-required={(k === 'phone' || k === 'email') ? 'true' : undefined} value={card[k]} maxLength={max} onChange={(e) => setCard({ ...card, [k]: e.target.value })}
-                    style={{ padding: '10px 14px', borderRadius: 'var(--lq-radius-sm)', border: '1px solid var(--lq-line-strong)', background: 'var(--lq-kelp)', color: 'var(--lq-white)', fontFamily: 'inherit', fontSize: 15 }} />
-                </label>
-              ))}
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: 'var(--lq-silver)' }}>
-                {t.cardNotes}
-                <textarea value={card.notes} maxLength={600} rows={3} onChange={(e) => setCard({ ...card, notes: e.target.value })}
-                  style={{ padding: '10px 14px', borderRadius: 'var(--lq-radius-sm)', border: '1px solid var(--lq-line-strong)', background: 'var(--lq-kelp)', color: 'var(--lq-white)', fontFamily: 'inherit', fontSize: 15, resize: 'vertical' }} />
-              </label>
-              {cardErr && <p role="alert" style={{ margin: 0, color: 'var(--lq-white)', fontSize: 13.5 }}>{cardErr}</p>}
-              <button type="submit" style={primary} disabled={cardBusy}>{cardBusy ? t.cardSending : t.cardSend}</button>
-            </form>
+            <RequestWizard lang={lang} initial={card} restored={restored} getSession={async () => voiceId.current ?? await saveSession()} onClose={() => { teardown(); setOpen(false); }} />
           )}
         </div>
       ) : (
@@ -838,7 +828,6 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
                 <div style={{ width: `${liveSpeak ? 0 : Math.round(level * 100)}%`, height: '100%', background: 'var(--lq-gradient)', transition: 'width 120ms linear' }} />
               </div>
               <span role="status" aria-live="polite" style={{ color: 'var(--lq-silver)', fontSize: 14 }}>{reconnecting ? t.reconnecting : liveSpeak ? t.liveSpeaking : t.liveListening}</span>
-              <span style={{ color: 'var(--lq-silver)', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{t.liveTimer}: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</span>
             </div>
           ) : typed ? (
             <form onSubmit={submitText} style={{ display: 'flex', gap: 8 }}>

@@ -19,14 +19,14 @@ import { registerAnalyze } from './analyze.js';
 import { registerOffers } from './offers.js';
 import { registerBilling } from './billing.js';
 import { registerProjects } from './projects.js';
-import { registerStyles } from './styles.js';
+import { registerStyles, saveChoice } from './styles.js';
 import { registerNewsletter } from './newsletter.js';
 import { registerAnalytics } from './analytics.js';
 import { registerAffiliates } from './affiliates.js';
 import { registerPreview } from './preview.js';
 import { languageOk, SAFE_FALLBACK } from './languageGuard.js';
 import { ids as abuseIds, recordAbuse, voiceBlocked, chatState, recordStrike, blockedMsg, adminList, adminUnlock, rateOk, globalOk, textMsgAllowed, TEXT_SESSION_MAX, insult, abuseExempt, MSG as ABUSE_MSG } from './abuse.js';
-import { validate as v, z, s, idP, LANG, email, emailOpt, bool, anyObj } from './validate.js';
+import { validate as v, z, s, idP, idp, LANG, email, emailOpt, bool, anyObj } from './validate.js';
 import { recordError } from './errors.js';
 import { shapeReply, tooLong, truncateReply } from './shapeGuard.js';
 import { pool, capReached, markQuota, quotaRecently, isQuotaError, livePressure, countSession, mintToken, buildLiveInstruction, liveConfigured, type LiveTurn } from './geminiLive.js';
@@ -343,7 +343,10 @@ const loginS = z.object({ password: s(500), remember: bool });
 const roiS = z.object({ ...WS, email, name: s(80), company: s(100), lang: LANG.nullish(), page: s(200), roiCalc: z.any().optional() });
 const consentS = z.object({ id: z.string().regex(/^[0-9a-f-]{36}$/i), v: z.number().int(), functional: bool, statistics: bool.optional() });
 const availS = z.object({ blocked: z.array(z.string().max(10)).max(1000) });
-const contactS = z.object({ ...WS, email: emailOpt, phone: s(40), name: s(80), message: s(1000), preferredStart: s(10), callTime: s(5), voiceSessionId: s(64), voiceSecret: s(200),
+const wizS = z.object({ site: s(200), contactWhen: z.enum(['', 'morning', 'afternoon', 'evening', 'any']).nullish(), startWhen: z.enum(['', 'asap', '1m', '3m', 'explore']).nullish(),
+  budget: z.enum(['', 'b1', 'b2', 'b3', 'b4', 'unsure']).nullish(), notes: s(600), exUrls: z.array(z.string().max(300)).max(3).nullish(), exNote: s(300), exNone: bool,
+  style: z.object({ likes: z.array(z.string().max(20)).max(8).nullish(), palette: z.any().optional(), font: s(40) }).nullish() }).nullish();
+const contactS = z.object({ wiz: wizS, ...WS, email: emailOpt, phone: s(40), name: s(80), message: s(1000), preferredStart: s(10), callTime: s(5), voiceSessionId: s(64), voiceSecret: s(200),
   roiCalc: z.any().optional(), topic: s(20), via: s(20), business: s(100), city: s(80), address: s(200), replyPreference: s(10), lang: LANG.nullish(), page: s(200) });
 const manualS = z.object({ name: s(80), email: emailOpt, phone: s(40), business: s(100), address: s(200), message: s(2000), lang: LANG.nullish() });
 const readS = z.object({ read: bool });
@@ -351,7 +354,8 @@ const statusS = z.object({ lang: LANG.nullish(), bid: s(200) });
 const unlockS = z.object({ k: s(24) });
 const ttsS = z.object({ text: s(600), sessionId: s(64), lang: LANG.nullish() });
 const turnS = z.object({ role: z.enum(['user', 'assistant']), text: z.string().max(20000), at: z.number().nullish() }).passthrough();
-const sessionS = z.object({ lang: LANG, turns: z.array(turnS).min(1).max(30), id: s(64), secret: s(200), consent: bool, kind: s(10), firstName: s(100), lastName: s(100), salutation: s(10), startedAt: z.any().optional(), endedAt: z.any().optional() }).passthrough();
+const sessionS = z.object({ lang: LANG, turns: z.array(turnS).min(1).max(30), id: s(64), secret: s(200), consent: bool, kind: s(10), firstName: s(100), lastName: s(100), salutation: s(10), startedAt: z.any().optional(), endedAt: z.any().optional(),
+  durationSec: z.number().min(0).max(7200).nullish(), endReason: s(40), timings: z.object({ lastAudioChunkAt: z.number().nullish(), lastTurnCompleteAt: z.number().nullish(), playbackDoneAt: z.number().nullish() }).nullish() }).passthrough();
 const cardS = z.object({ secret: s(200), name: s(80), email: emailOpt, phone: s(40), business: s(100), city: s(80), message: s(2000) }).passthrough();
 const vcontactS = z.object({ ...WS, email, name: s(80), phone: s(60), message: s(1000), secret: s(200) });
 const vreqS = z.object({ ...WS, email, firstName: s(40), lastName: s(40), secret: s(200), page: s(200) });
@@ -752,6 +756,12 @@ app.post('/api/contact', quoteLimiter, botGate, v(contactS), async (req, res) =>
     if (vs && safeEq(vs.secret, req.body?.voiceSecret)) voiceLink = vs;
   }
   if (req.body?.via === 'assistant' && voiceLink && voiceLink.kind !== 'text' && (!email || !/@.+\./.test(email) || /\s/.test(email) || phone.replace(/\D/g, '').length < 7)) return res.status(400).json({ ok: false, error: 'voice_contact_required' });
+  const w = voiceLink && req.body?.via === 'assistant' ? req.body?.wiz : null;
+  const urlOk = (u: string) => /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(u);
+  const exUrls = ((w?.exUrls ?? []) as string[]).map((u) => str(u, 200)).filter(urlOk);
+  if (w && (((w.exUrls ?? []) as string[]).some((u) => u.trim() && !urlOk(str(u, 200))) || (w.site && !urlOk(str(w.site, 200))))) return res.status(400).json({ ok: false, error: 'invalid_url' });
+  const wiz = w ? { site: str(w.site, 200), contactWhen: str(w.contactWhen, 10), startWhen: str(w.startWhen, 10), budget: str(w.budget, 10), notes: str(w.notes, 600),
+    examples: { urls: exUrls, note: str(w.exNote, 300), none: w.exNone === true } } : null;
   const roiCalc = sanitizeRoi(req.body?.roiCalc);
   const topicIn = String(req.body?.topic ?? '');
   // Where the request was sent from: the assistant's summary card (voice or text chat), the calculator, a resource card, or the plain form
@@ -773,6 +783,7 @@ app.post('/api/contact', quoteLimiter, botGate, v(contactS), async (req, res) =>
     lang: DEMO_LANGS.has(req.body?.lang) ? String(req.body.lang) : 'en',
     page: str(req.body?.page, 200),
     ...(voiceLink ? { voiceSessionId: voiceLink.id } : {}),
+    ...(wiz ? { wizard: true, existingSite: wiz.site, contactWhen: wiz.contactWhen, startWhen: wiz.startWhen, budget: wiz.budget, notes: wiz.notes, examples: wiz.examples } : {}),
     ...(roiCalc ? { roiCalc } : {}),
     ...(['res-qr', 'res-review', 'res-messages', 'res-legal', 'roi'].includes(String(req.body?.topic)) ? { topic: String(req.body.topic) } : {}),
     ...(/^\d{4}-\d{2}-\d{2}$/.test(String(req.body?.preferredStart)) ? { preferredStart: String(req.body.preferredStart) } : {}),
@@ -780,9 +791,10 @@ app.post('/api/contact', quoteLimiter, botGate, v(contactS), async (req, res) =>
   };
   try {
     await saveRequest(rec);
+    if (voiceLink && w?.style) await saveChoice(`voice:${voiceLink.id}`, rec.lang as 'tr' | 'en' | 'de' | 'el', { ...w.style, refs: exUrls.map((url) => ({ url, what: '' })), note: wiz?.examples.note });
     if (voiceLink) {
       const vs = await getVoice(voiceLink.id) as VoiceSession | null;
-      if (vs) { vs.contactSubmitted = true; vs.contactId = rec.id; vs.contact = { name: rec.name, email: rec.email, phone: rec.phone, message: rec.message }; await saveVoice(vs); }
+      if (vs) { vs.contactSubmitted = true; vs.contactId = rec.id; delete vs.draft; vs.contact = { name: rec.name, email: rec.email, phone: rec.phone, message: rec.message }; await saveVoice(vs); }
     }
     notifyOwnerOfRequest(rec, 'Contact');
     return res.json({ ok: true });
@@ -974,6 +986,11 @@ interface VoiceSession {
   firstName?: string;
   lastName?: string;
   salutation?: 'm' | 'f';
+  draft?: any;     // request wizard draft (post-call card)
+  draftAt?: number;
+  durationSec?: number;   // actual talk time
+  endReason?: string;     // finish_tool | time_limit | go_away | ws_close:<code> | error:<short> | user_hangup | abuse
+  timings?: { lastAudioChunkAt?: number; lastTurnCompleteAt?: number; playbackDoneAt?: number };   // ms offsets from call start
 }
 const listVoice = () => listRows('voice_sessions', VOICE_STORE) as Promise<VoiceSession[]>;
 const getVoice = (id: string) => getRow('voice_sessions', VOICE_STORE, id) as Promise<VoiceSession | null>;
@@ -985,6 +1002,16 @@ const sessionLimiter = rateLimit({ store: rlStore('sessionLimiter'),
   standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' },
 });
 // Visitor-provided name/salutation from the salutation form (sanitized, <=40 chars).
+function endFields(b: any): Pick<VoiceSession, 'durationSec' | 'endReason' | 'timings'> {
+  const o: Pick<VoiceSession, 'durationSec' | 'endReason' | 'timings'> = {};
+  if (Number.isFinite(b?.durationSec)) o.durationSec = Math.round(Number(b.durationSec));
+  if (typeof b?.endReason === 'string' && b.endReason) o.endReason = b.endReason.replace(/[^\w:.\-]/g, '').slice(0, 40);
+  if (b?.timings && typeof b.timings === 'object') {
+    const n = (x: unknown) => (Number.isFinite(x) ? Math.round(Number(x)) : 0);
+    o.timings = { lastAudioChunkAt: n(b.timings.lastAudioChunkAt), lastTurnCompleteAt: n(b.timings.lastTurnCompleteAt), playbackDoneAt: n(b.timings.playbackDoneAt) };
+  }
+  return o;
+}
 function visitorFields(b: any): Pick<VoiceSession, 'firstName' | 'lastName' | 'salutation'> {
   const nm = (v: unknown) => String(v ?? '').replace(/[<>"&\u0000-\u001f]/g, '').trim().slice(0, 40);
   const o: Pick<VoiceSession, 'firstName' | 'lastName' | 'salutation'> = {};
@@ -1016,7 +1043,7 @@ app.post('/api/voice/session', sessionLimiter, v(sessionS), async (req, res) => 
     if (typeof id === 'string' && id) {
       const ex = await getVoice(id);
       if (ex && !ex.deleted && ex.secret && safeEq(ex.secret, secret)) {
-        ex.turns = clean; ex.lang = lang; Object.assign(ex, visitorFields(req.body));
+        ex.turns = clean; ex.lang = lang; Object.assign(ex, visitorFields(req.body), endFields(req.body));
         ex.endedAt = Number.isFinite(endedAt) ? Number(endedAt) : Date.now();
         await saveVoice(ex);
         return res.json({ id: ex.id, secret: ex.secret });
@@ -1037,6 +1064,7 @@ app.post('/api/voice/session', sessionLimiter, v(sessionS), async (req, res) => 
       ipHash: crypto.createHash('sha256').update(`${req.ip ?? ''}|chioutworks-voice-v1`).digest('hex'),
       contactSubmitted: false,
       ...visitorFields(req.body),
+      ...endFields(req.body),
     };
     await saveVoice(session);
     return res.json({ id: session.id, secret: session.secret });
@@ -1044,6 +1072,22 @@ app.post('/api/voice/session', sessionLimiter, v(sessionS), async (req, res) => 
     void recordError('voice/save-failed', err); console.error('[voice] save failed', err);
     return res.status(500).json({ error: 'server' });
   }
+});
+
+// Request wizard draft (post-call card): capability = voice session id + secret; nothing reaches the admin until the final submit.
+const draftS = z.object({ sessionId: idp, secret: z.string().max(200),
+  draft: z.object({ step: z.number().int().min(1).max(3), card: z.record(z.string().max(30), z.string().max(2000)), style: z.object({ likes: z.array(z.string().max(20)).max(8), pal: z.string().max(20), pair: z.string().max(40), own: z.record(z.string().max(20), z.union([z.string().max(20), z.boolean()])) }).nullish(),
+    ex: z.object({ urls: z.array(z.string().max(300)).max(3), note: z.string().max(600), none: z.boolean() }).nullish() }).nullish() });
+const DRAFT_TTL = 24 * 60 * 60 * 1000;
+const draftSession = async (b: { sessionId: string; secret: string }) => { const s = await getVoice(b.sessionId); return s && !s.deleted && !s.contactSubmitted && safeEq(s.secret, b.secret) ? s : null; };
+app.post('/api/voice/draft', sessionLimiter, v(draftS), async (req, res) => {
+  const s = await draftSession(req.body); if (!s || !req.body.draft) return res.status(404).json({ error: 'not_found' });
+  s.draft = req.body.draft; s.draftAt = Date.now(); await saveVoice(s); return res.json({ ok: true });
+});
+app.post('/api/voice/draft/load', sessionLimiter, v(draftS), async (req, res) => {
+  const s = await draftSession(req.body);
+  if (!s || !s.draft || Date.now() - (s.draftAt ?? 0) > DRAFT_TTL) return res.status(404).json({ error: 'not_found' });
+  res.set('Cache-Control', 'no-store'); return res.json({ draft: s.draft, lang: s.lang });
 });
 
 // Request card of a text chat: the visitor reads/corrects ONLY the request linked to their own session (id + secret).

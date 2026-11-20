@@ -3,6 +3,7 @@ export interface Req {
   business?: string; message?: string; lang?: string; page?: string; demo?: string; modules?: string[];
   voiceSessionId?: string; replyPreference?: 'written' | 'phone'; preferredStart?: string; callTime?: string; topic?: string;
   roiCalc?: { sector: string; sectorLabel: string; tasks: { name: string; min: number; perWeek: number; auto: number }[]; staff: number; cost: number; currency: string; lang: string; results: { weekH: number; monthH: number; yearH: number; moneyMonth: number; moneyYear: number; days: number } };
+  city?: string; existingSite?: string; contactWhen?: string; startWhen?: string; budget?: string; notes?: string; examples?: { urls: string[]; note: string; none: boolean };
   read?: boolean; analysis?: Analysis;
 }
 export interface AnalysisData {
@@ -21,6 +22,7 @@ export interface VoiceSession {
   id: string; createdAt: string; lang: string; turns: Turn[]; contactSubmitted: boolean; kind?: 'voice' | 'text';
   contact?: { name?: string; email?: string; phone?: string; message?: string };
   contactId?: string; firstName?: string; lastName?: string; salutation?: 'm' | 'f'; analysis?: Analysis;
+  durationSec?: number; endReason?: string;
 }
 export interface Usage { chars: number; cap: number }
 

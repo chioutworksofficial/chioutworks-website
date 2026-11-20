@@ -64,6 +64,26 @@ export function styleSummary(s: StyleRec | null): string {
   return parts.join(' · ');
 }
 
+/** Applies a (sanitised) style choice to a record; false when nothing was liked (unless allowEmpty). */
+export function applyChoice(s: StyleRec, b: any, allowEmpty = false): boolean {
+  const ids = (v: unknown) => [...new Set((Array.isArray(v) ? v : []).map((x) => clean(x, 20)).filter((x) => TAGS[x]))].slice(0, 8);
+  const likes = ids(b.likes); if (!likes.length && !allowEmpty) return false;
+  s.likes = likes; s.dislikes = ids(b.dislikes).filter((x) => !likes.includes(x));
+  s.refs = (Array.isArray(b.refs) ? b.refs : []).slice(0, 3).map((r: any) => ({ url: clean(r?.url, 200), what: WHAT[r?.what] ? String(r.what) : '' }))
+    .filter((r: { url: string }) => /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(r.url));
+  const pb = b.palette ?? null;
+  s.palette = pb && typeof pb.id === 'string' && PALETTES.some((x) => x.id === pb.id) ? { id: pb.id }
+    : pb?.custom && HEX.test(String(pb.custom.accent)) ? { custom: { accent: String(pb.custom.accent).toLowerCase(), dark: pb.custom.dark === true,
+      ...Object.fromEntries((['bg', 'surface', 'text', 'muted'] as const).filter((k) => HEX.test(String(pb.custom[k]))).map((k) => [k, String(pb.custom[k]).toLowerCase()])) } } : null;
+  s.font = typeof b.font === 'string' && FONT_PAIRS.some((x) => x.id === b.font) ? b.font : null;
+  s.note = clean(b.note, 600); s.doneAt = new Date().toISOString();
+  return true;
+}
+/** Wizard submit: stores the choice for a verified reference (e.g. "voice:<id>") so the admin style view shows it. */
+export async function saveChoice(ref: string, lang: L, b: any): Promise<void> {
+  const s = await ensureStyle(ref, lang); if (applyChoice(s, b, true)) await saveStyle(s);
+}
+
 interface Deps {
   requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>; rateSkip?: () => boolean;
   /** Proves the visitor owns this request: intake token, or voice session id + secret. Returns the reference + language. */
@@ -88,18 +108,8 @@ export function registerStyles(app: Express, d: Deps) {
   });
   app.post('/api/style/:token', limiter, express.json({ limit: '8kb' }), v(styS, tokenP), async (req, res) => {
     const s = await getByToken(String(req.params.token)); if (!s) return res.status(404).json({ error: 'not_found' });
-    const b = req.body ?? {};
-    const ids = (v: unknown) => [...new Set((Array.isArray(v) ? v : []).map((x) => clean(x, 20)).filter((x) => TAGS[x]))].slice(0, 8);
-    const likes = ids(b.likes); if (!likes.length) return res.status(400).json({ error: 'min_one' });
-    s.likes = likes; s.dislikes = ids(b.dislikes).filter((x) => !likes.includes(x));
-    s.refs = (Array.isArray(b.refs) ? b.refs : []).slice(0, 2).map((r: any) => ({ url: clean(r?.url, 200), what: WHAT[r?.what] ? String(r.what) : '' }))
-      .filter((r: { url: string }) => /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(r.url));
-    const pb = b.palette ?? null;
-    s.palette = pb && typeof pb.id === 'string' && PALETTES.some((x) => x.id === pb.id) ? { id: pb.id }
-      : pb?.custom && HEX.test(String(pb.custom.accent)) ? { custom: { accent: String(pb.custom.accent).toLowerCase(), dark: pb.custom.dark === true,
-        ...Object.fromEntries((['bg', 'surface', 'text', 'muted'] as const).filter((k) => HEX.test(String(pb.custom[k]))).map((k) => [k, String(pb.custom[k]).toLowerCase()])) } } : null;
-    s.font = typeof b.font === 'string' && FONT_PAIRS.some((x) => x.id === b.font) ? b.font : null;
-    s.note = clean(b.note, 600); s.doneAt = new Date().toISOString(); await saveStyle(s);
+    if (!applyChoice(s, req.body ?? {})) return res.status(400).json({ error: 'min_one' });
+    await saveStyle(s);
     return res.json({ ok: true });
   });
   app.get('/api/admin/styles', async (req, res) => {

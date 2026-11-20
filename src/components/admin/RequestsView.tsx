@@ -170,7 +170,14 @@ export default function RequestsView({ reqs, setReqs, openId, setOpenId, go, set
           <Field label="E-posta" value={open.email} copy />
           <Field label="Telefon" value={open.phone} copy />
           <Field label="İşletme" value={open.business} />
+          <Field label="Şehir / bölge" value={open.city} />
           <Field label="Adres" value={open.address} />
+          <Field label="Mevcut web sitesi" value={open.existingSite} />
+          <Field label="İletişim zamanı" value={open.contactWhen && ({ morning: 'Sabah', afternoon: 'Öğleden sonra', evening: 'Akşam', any: 'Fark etmez' } as Record<string, string>)[open.contactWhen]} />
+          <Field label="Başlama isteği" value={open.startWhen && ({ asap: 'En kısa sürede', '1m': '1 ay içinde', '3m': '3 ay içinde', explore: 'Sadece bakıyor' } as Record<string, string>)[open.startWhen]} />
+          <Field label="Bütçe" value={open.budget && ({ b1: '1.000 € altı', b2: '1.000 – 3.000 €', b3: '3.000 – 10.000 €', b4: '10.000 € üzeri', unsure: 'Emin değil' } as Record<string, string>)[open.budget]} />
+          <Field label="Ek notlar" value={open.notes} />
+          <Field label="Örnek siteler" value={open.examples && (open.examples.none ? 'Örnek yok' : [...open.examples.urls, open.examples.note && `Neyini beğendi: ${open.examples.note}`].filter(Boolean).join('\n'))} />
           <Field label="Başlangıç tarihi" value={open.preferredStart && fmtDay(open.preferredStart)} />
           <Field label="Arama saati" value={open.callTime} />
           <Field label="Cevap tercihi" value={open.kind === 'contact' ? (open.replyPreference === 'phone' ? 'Gerekirse telefon' : 'Yazılı cevap') : undefined} />

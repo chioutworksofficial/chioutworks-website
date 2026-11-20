@@ -16,7 +16,7 @@ import { getBid } from '../lib/assistantConsent';
 import { hasConsent as hasCookieConsent } from '../lib/consent';
 import { hasConsent } from '../lib/assistantConsent';
 import { writeVoiceSession, clearVoiceSession, downloadTranscript } from '../lib/voiceSession';
-import { StyleCta } from '../site/pages/StylePage';
+import { ChatStyleFlow } from '../site/StyleInline';
 import { useDialogA11y } from './ui/useDialogA11y';
 
 // ── Chat memory (owner, 2026-11-19): always kept for this tab (sessionStorage = needed for the requested service);
@@ -72,7 +72,6 @@ function RequestCard({ lang, sess, ui }: { lang: string; sess: { id: string; sec
   return (
     <div lang={lang} style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid var(--lq-line-strong)', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <strong style={{ fontSize: 13.5, color: 'var(--lq-white)' }}>{ui.cardTitle}</strong>
-      {webRelated && <StyleCta newTab lang={lang as Lang} body={{ kind: 'voice', sessionId: sess.id, secret: sess.secret }} />}
       {rows.map(([k, label]) => (
         <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, color: 'var(--lq-mist)' }}>{label}
           <input value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value })} style={inp} maxLength={k === 'email' ? 254 : 100} />
@@ -83,6 +82,7 @@ function RequestCard({ lang, sess, ui }: { lang: string; sess: { id: string; sec
       </label>
       <button onClick={() => void save()} disabled={busy} style={{ padding: '9px 12px', borderRadius: 'var(--r-pill)', border: '1px solid var(--c-lilac)', background: 'color-mix(in srgb, var(--c-lilac) 14%, var(--c-abyss))', color: 'var(--lq-white)', fontSize: 12, cursor: 'pointer' }}>{ui.cardSave}</button>
       {msg && <span role="status" style={{ fontSize: 12, color: msg.ok ? 'var(--lq-white)' : 'var(--lq-mist)' }}>{msg.t}</span>}
+      {webRelated && <ChatStyleFlow lang={lang as Lang} sess={sess} />}
     </div>
   );
 }

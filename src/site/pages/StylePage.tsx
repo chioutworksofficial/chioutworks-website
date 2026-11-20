@@ -11,14 +11,14 @@ import '../../styles/fonts-style.css';
 // then fine-tune colours (palette or own main colour) and a font pair on a live preview, optionally name example sites,
 // send. The owner sees the exact colour codes and font names. Each card is a drawn sample site, not a screenshot.
 type What = 'colors' | 'layout' | 'photos' | 'all';
-const FONT: Record<StylePreset['font'], string> = {
+export const FONT: Record<StylePreset['font'], string> = {
   sans: '"Inter", system-ui, sans-serif', serif: '"Playfair Display", Georgia, serif', rounded: '"Nunito", system-ui, sans-serif', mono: '"Space Grotesk", system-ui, sans-serif',
 };
-const BODY: Record<StylePreset['font'], string> = { sans: '"Inter", system-ui, sans-serif', serif: '"Lato", system-ui, sans-serif', rounded: '"Nunito", system-ui, sans-serif', mono: '"DM Sans", system-ui, sans-serif' };
-type Look = { p: StylePreset; pal: Pal; head: string; body: string };
+export const BODY: Record<StylePreset['font'], string> = { sans: '"Inter", system-ui, sans-serif', serif: '"Lato", system-ui, sans-serif', rounded: '"Nunito", system-ui, sans-serif', mono: '"DM Sans", system-ui, sans-serif' };
+export type Look = { p: StylePreset; pal: Pal; head: string; body: string };
 
 /** Keeps a fixed-width drawing (W px) scaled to its container width. */
-function Scaled({ w: W = 640, children }: { w?: number; children: React.ReactNode }) {
+export function Scaled({ w: W = 640, children }: { w?: number; children: React.ReactNode }) {
   const box = useRef<HTMLDivElement>(null); const inner = useRef<HTMLDivElement>(null);
   const [k, setK] = useState(0.4); const [h, setH] = useState(0);
   useLayoutEffect(() => {
@@ -33,7 +33,7 @@ function Scaled({ w: W = 640, children }: { w?: number; children: React.ReactNod
 }
 
 /** A realistic sample website in the look's colours and fonts: nav, hero (by layout type), service cards, footer. */
-function SitePreview({ look, lang }: { look: Look; lang: Lang }) {
+export function SitePreview({ look, lang }: { look: Look; lang: Lang }) {
   const { p, pal: c, head, body } = look; const t = STYLE_TUNE[lang];
   const r = p.font === 'rounded' ? 14 : p.font === 'mono' ? 4 : 8;
   const photo = p.photo ?? `linear-gradient(135deg, ${c.accent}, ${c.surface})`;
@@ -70,7 +70,7 @@ function SitePreview({ look, lang }: { look: Look; lang: Lang }) {
     </div>
   );
 }
-const presetLook = (p: StylePreset): Look => ({ p, pal: p.pal, head: FONT[p.font], body: BODY[p.font] });
+export const presetLook = (p: StylePreset): Look => ({ p, pal: p.pal, head: FONT[p.font], body: BODY[p.font] });
 
 export default function StylePage() {
   const { lang: urlLang, slug: token = '' } = useParams();

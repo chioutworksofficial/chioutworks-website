@@ -11,6 +11,12 @@ const duration = (turns: { at: number }[]) => {
   return sec < 60 ? `${sec} sn` : `${Math.floor(sec / 60)} dk ${sec % 60} sn`;
 };
 
+/** Measured talk time (m:ss) and why the call ended, saved by the live call. */
+const mmss = (n: number) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
+const END: Record<string, string> = { finish_tool: 'asistan bitirdi', time_limit: 'süre sınırı', go_away: 'sunucu kapatma uyarısı', user_hangup: 'ziyaretçi kapattı', abuse: 'kötüye kullanım' };
+const endLabel = (r?: string) => (r ? END[r] ?? r : '');
+const measured = (s: VoiceSession) => (s.durationSec != null ? ` · süre ${mmss(s.durationSec)}${s.endReason ? ` · bitiş: ${endLabel(s.endReason)}` : ''}` : '');
+
 const LANG: Record<string, string> = { tr: 'Türkçe', en: 'İngilizce', de: 'Almanca', el: 'Yunanca' };
 const TITLE: Record<string, Record<string, string>> = { m: { tr: 'Bay', de: 'Herr', en: 'Mr', el: 'κύριος' }, f: { tr: 'Bayan', de: 'Frau', en: 'Ms', el: 'κυρία' } };
 const who = (s: VoiceSession) => {
@@ -57,7 +63,7 @@ export default function VoiceView({ sessions, setSessions, openId, setOpenId, go
               <button className="adm-rowmain" onClick={() => { setOpenId(s.id); setConfirm(false); setMsg(null); }}>
               <span style={{ minWidth: 0, flex: '1 1 150px' }}>
                 <span className="adm-name">{who(s)}</span><br />
-                <span className="adm-meta">{fmtDate(s.createdAt)} · {LANG[s.lang] ?? s.lang} · {s.turns.length} mesaj{duration(s.turns) ? ` · ${s.kind === 'text' ? 'süre' : 'konuşma'} ${duration(s.turns)}` : ''}</span>
+                <span className="adm-meta">{fmtDate(s.createdAt)} · {LANG[s.lang] ?? s.lang} · {s.turns.length} mesaj{measured(s)}{!measured(s) && duration(s.turns) ? ` · ${s.kind === 'text' ? 'süre' : 'konuşma'} ${duration(s.turns)}` : ''}</span>
                 {' '}<span className="adm-chip" data-src={s.kind === 'text' ? 'chat' : 'voice'}>{s.kind === 'text' ? 'Yazılı sohbet' : 'Sesli görüşme'}{duration(s.turns) ? ` · ${duration(s.turns)}` : ''}</span>
               </span>
               {s.contactSubmitted && <span className="adm-chip tag">Talebe dönüştü</span>}
@@ -79,6 +85,7 @@ export default function VoiceView({ sessions, setSessions, openId, setOpenId, go
               <p className="adm-name" style={{ marginBottom: 6 }}>{who(open)}</p>
               {open.contactSubmitted && open.contactId && go && <button className="lq-btn-ghost adm-btn sm" style={{ marginBottom: 12 }} onClick={() => go('requests', open.contactId)}>Talebe dönüştü: talebi aç</button>}
               {open.contact && <p className="adm-meta" style={{ marginBottom: 12 }}>{[open.contact.name, open.contact.email, open.contact.phone].filter(Boolean).join(' · ')}</p>}
+              {open.durationSec != null && <p className="adm-meta" style={{ margin: '0 0 12px' }}><span className="adm-chip" data-src="voice">Süre: {mmss(open.durationSec)}{open.endReason ? ` · Bitiş: ${endLabel(open.endReason)}` : ''}</span></p>}
               {duration(open.turns) && <p className="adm-meta" style={{ margin: '0 0 12px' }}><span className="adm-chip" data-src={open.kind === 'text' ? 'chat' : 'voice'}>{open.kind === 'text' ? 'Sohbet süresi' : 'Konuşma süresi'}: {duration(open.turns)}</span></p>}
               {open.turns.length > 0 && <div style={{ marginBottom: 16 }}><AnalysisPanel key={open.id} type="session" id={open.id} title={who(open)} analysis={open.analysis}
                 onDone={(a) => setSessions((sessions ?? []).map((x) => x.id === open.id ? { ...x, analysis: a } : x))} /></div>}
