@@ -10,17 +10,22 @@ const SITE_URL = /export const SITE_URL = '([^']+)'/.exec(readFileSync(join(ROOT
 const OG_LOCALE = { en: 'en_GB', de: 'de_DE', tr: 'tr_TR', el: 'el_GR' };
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2', '.woff': 'font/woff', '.mp4': 'video/mp4', '.wasm': 'application/wasm', '.txt': 'text/plain', '.xml': 'application/xml' };
 
+const T0 = Date.now();
+const log = (m) => console.log(`[prerender] +${((Date.now() - T0) / 1000).toFixed(1)}s ${m}`);
+
 async function launch() {
   const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
   const { default: puppeteer } = await import('puppeteer-core');
   if (process.platform === 'linux') {
-    try {
-      const { default: chromium } = await import('@sparticuz/chromium');
-      return await puppeteer.launch({ args: [...chromium.args, ...args], executablePath: await chromium.executablePath(), headless: 'shell' });
-    } catch (e) { console.warn('[prerender] @sparticuz/chromium unavailable:', e.message); }
+    const { default: chromium } = await import('@sparticuz/chromium');
+    const executablePath = await chromium.executablePath();
+    log(`chromium source=@sparticuz/chromium path=${executablePath} exists=${existsSync(executablePath)}`);
+    return await puppeteer.launch({ args: [...new Set([...chromium.args, ...args])], executablePath, headless: 'shell' });
   }
   const { executablePath } = await import('puppeteer');
-  return await puppeteer.launch({ args, executablePath: await executablePath(), headless: true });
+  const path = await executablePath();
+  log(`chromium source=puppeteer path=${path} exists=${existsSync(path)}`);
+  return await puppeteer.launch({ args, executablePath: path, headless: true });
 }
 
 async function main() {
@@ -40,21 +45,26 @@ async function main() {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const origin = `http://127.0.0.1:${server.address().port}`;
 
-  const browser = await launch();
+  const tl = Date.now();
+  let browser;
+  try { browser = await launch(); } catch (e) { console.warn('[prerender] chromium launch failed:', e.message); process.exit(0); }
+  log(`launched in ${((Date.now() - tl) / 1000).toFixed(1)}s`);
   let done = 0;
+  let finished = 0;
   const queue = [...paths];
   const retried = new Set();
   const worker = async () => {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
     await page.setRequestInterception(true);
-    page.on('request', (r) => (/\/api\//.test(r.url()) ? r.abort() : r.continue()));
+    const BLOCK = new Set(['image', 'font', 'media', 'websocket']);
+    page.on('request', (r) => (BLOCK.has(r.resourceType()) || /\/api\//.test(r.url()) ? r.abort() : r.continue()));
     await page.evaluateOnNewDocument(() => { try { sessionStorage.setItem('cw-pre', '1'); } catch { /* ignore */ } });
     for (let path; (path = queue.shift()); ) {
       try {
-        await page.goto(origin + path, { waitUntil: 'load', timeout: 30000 });
-        await page.waitForFunction(() => (document.querySelector('h1') || document.querySelector('h2')) && document.querySelector('script#ld-page'), { timeout: 20000 });
-        await new Promise((r) => setTimeout(r, 600));
+        await page.goto(origin + path, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await page.waitForFunction(() => (document.querySelector('h1') || document.querySelector('h2')) && document.querySelector('script#ld-page'), { timeout: 15000 });
+        await new Promise((r) => setTimeout(r, 300));
         const html = await page.evaluate((site, locale, path2) => {
           const set = (sel, attr, v) => document.head.querySelector(sel)?.setAttribute(attr, v);
           const title = document.title;
@@ -73,7 +83,8 @@ async function main() {
         mkdirSync(dir, { recursive: true });
         writeFileSync(join(dir, 'index.html'), out);
         done++;
-      } catch (e) { if (!retried.has(path)) { retried.add(path); queue.push(path); continue; } console.warn(`[prerender] skip ${path}: ${e.message}`, process.env.PRERENDER_DEBUG ? await page.evaluate(() => [!!document.querySelector('h1'), !!document.querySelector('script#ld-page'), document.body.innerText.slice(0, 120)]).catch(() => '') : ''); }
+        if (++finished % 20 === 0) log(`${finished}/${paths.length} pages`);
+      } catch (e) { if (!retried.has(path)) { retried.add(path); queue.push(path); continue; } console.warn(`[prerender] skip ${path}: ${e.message}`); finished++; }
     }
     await page.close();
   };
@@ -83,5 +94,5 @@ async function main() {
   console.log(`[prerender] ${done}/${paths.length} pages written`);
 }
 
-const timer = setTimeout(() => { console.warn('[prerender] timeout, shipping SPA'); process.exit(0); }, 4 * 60 * 1000);
+const timer = setTimeout(() => { console.warn('[prerender] 3.5 min cap reached, shipping pages written so far'); process.exit(0); }, 3.5 * 60 * 1000);
 main().catch((e) => console.warn('[prerender] skipped:', e.message)).finally(() => { clearTimeout(timer); process.exit(0); });
