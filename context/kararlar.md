@@ -76,3 +76,4 @@
 - 2026-11-20 · Supabase ücretsiz planda kalınacak (sahibin kararı); otomatik geri yüklenebilir yedek yok, yerel yedek betiği önerildi (cevap bekleniyor).
 
 - 2026-11-20 · Admin paneli giriş şifresi (ADMIN_TOKEN) alan adı bağlandıktan sonra yenilenecek: `sh scripts/new-admin-token.sh` (sahip: "daha değil"). Kurucu adı arama motoru bilgisinden (index.html JSON-LD) kaldırılıyor (sahip onayı); ad yalnızca Impressum'da.
+- 2026-11-20 · Mobil hız ve his işi sahibin isteğiyle pazartesi 2026-11-23'e ertelendi. Kurucu adı index.html'den (meta açıklama, author, JSON-LD Person, LinkedIn kişisel bağlantı, yedek metin) kaldırıldı; ad yalnızca Impressum'da.

@@ -1,0 +1,260 @@
+diff --git a/index.html b/index.html
+index 2d49c10..1bc9f9b 100644
+--- a/index.html
++++ b/index.html
+@@ -2,11 +2,12 @@
+ <html lang="en">
+   <head>
+     <meta charset="UTF-8" />
+-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
++    <meta name="color-scheme" content="dark light" />
++    <style>html{background:#0b0c0e;color-scheme:dark}html[data-mode=light]{background:#f4f7fc;color-scheme:light}</style>
+     <script src="/theme-init.js"></script>
+     <title>Chioutworks — Automation, Web Development & AI Integration</title>
+-    <meta name="description" content="Chioutworks by Chousein Chiout: business automation, custom web apps, AI integration and digital strategy for companies in Germany, Türkiye and Greece. Ready-made app demos for salons, clinics, cleaning companies and more." />
+-    <meta name="author" content="Chousein Chiout" />
++    <meta name="description" content="Chioutworks: business automation, custom web apps, AI integration and digital strategy for companies in Germany, Türkiye and Greece. Ready-made app demos for salons, clinics, cleaning companies and more." />
+     <meta name="theme-color" content="#0e111b" />
+     <!-- TODO(domain): replace https://chioutworks.com when the final domain is live -->
+     <link rel="canonical" href="https://chioutworks.com/" />
+@@ -50,12 +51,10 @@
+             "image": "https://chioutworks.com/og-share.jpg",
+             "description": "Business automation, custom web development, AI integration and digital strategy for small and medium businesses.",
+             "foundingDate": "2023",
+-            "founder": { "@id": "https://chioutworks.com/#founder" },
+             "address": { "@type": "PostalAddress", "addressLocality": "Kelsterbach", "addressRegion": "Hessen", "addressCountry": "DE" },
+             "areaServed": ["DE", "TR", "GR", "AT", "CH", "CY"],
+             "availableLanguage": ["en", "de", "tr", "el"],
+             "knowsAbout": ["Business process automation", "Web development", "AI integration", "AI voice assistants", "Digital strategy", "CRM systems", "Online booking systems"],
+-            "sameAs": ["https://www.linkedin.com/in/chousein-chiout-29345323a/"],
+             "hasOfferCatalog": {
+               "@type": "OfferCatalog",
+               "name": "Services",
+@@ -69,15 +68,6 @@
+               ]
+             }
+           },
+-          {
+-            "@type": "Person",
+-            "@id": "https://chioutworks.com/#founder",
+-            "name": "Chousein Chiout",
+-            "jobTitle": "Founder, Tech Entrepreneur",
+-            "worksFor": { "@id": "https://chioutworks.com/#business" },
+-            "knowsLanguage": ["tr", "en", "de", "el"],
+-            "sameAs": ["https://www.linkedin.com/in/chousein-chiout-29345323a/"]
+-          },
+           {
+             "@type": "WebSite",
+             "@id": "https://chioutworks.com/#website",
+@@ -107,7 +97,7 @@
+   <body>
+     <noscript>
+       <h1>Chioutworks — Automation, Web Development &amp; AI Integration</h1>
+-      <p>Chousein Chiout helps businesses in Germany, Türkiye and Greece automate processes, build web apps and integrate AI. LinkedIn: https://www.linkedin.com/in/chousein-chiout-29345323a/</p>
++      <p>Chioutworks helps businesses in Germany, Türkiye and Greece automate processes, build web apps and integrate AI.</p>
+     </noscript>
+     <div id="cw-pre" aria-hidden="true"><span class="m"><i></i><i></i></span><span class="b"><i></i></span></div>
+     <script>
+diff --git a/public/theme-init.js b/public/theme-init.js
+index 2c98138..2bbeb53 100644
+--- a/public/theme-init.js
++++ b/public/theme-init.js
+@@ -1,4 +1,10 @@
+ /* Applies the visitor's saved colour mode before the page is painted (no light/dark flash). Dark is the default. */
+ (function () {
+-  try { if (localStorage.getItem('cw-mode') === 'light') document.documentElement.setAttribute('data-mode', 'light'); } catch (e) { /* storage blocked */ }
++  try {
++    if (localStorage.getItem('cw-mode') === 'light') {
++      document.documentElement.setAttribute('data-mode', 'light');
++      var m = document.querySelector('meta[name="theme-color"]');
++      if (m) m.setAttribute('content', '#f4f7fc');
++    }
++  } catch (e) { /* storage blocked */ }
+ })();
+diff --git a/src/App.tsx b/src/App.tsx
+index eb87971..b9c596d 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,10 +1,9 @@
+-import { lazy, Suspense, useEffect, type ReactNode } from 'react';
++import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+ import { useLang } from './hooks/useLang';
+ import SiteNav from './site/SiteNav';
+ import Preloader from './site/Preloader';
+ import SiteHero, { openAssistant } from './site/SiteHero';
+ import { ChatLauncher } from './site/VoiceOrb';
+-const VoiceIntake = lazy(() => import('./site/VoiceIntake'));
+ import { SITE_UI } from './site/i18n';
+ import StatementReveal from './site/StatementReveal';
+ import FeaturesScroll from './site/FeaturesScroll';
+@@ -33,6 +32,30 @@ import { TOOL_TEXT } from './site/i18n/tools';
+ import PopularPackages from './site/PopularPackages';
+ import SectionDots from './site/SectionDots';
+ const AIAssistant = lazy(() => import('./components/AIAssistant'));
++const VoiceIntake = lazy(() => import('./site/VoiceIntake'));
++
++/** Assistant + voice bundles load after first idle (or at once when the visitor opens them; the event is replayed). */
++function DeferredAssistants({ lang }: { lang: Lang }) {
++  const [on, setOn] = useState(false);
++  useEffect(() => {
++    let pending: Event | null = null;
++    const wake = (e: Event) => { pending = e; go(); };
++    const go = () => {
++      window.removeEventListener('cw:open-assistant', wake);
++      window.removeEventListener('cw:open-voice', wake);
++      void Promise.all([import('./components/AIAssistant'), import('./site/VoiceIntake')]).then(() => {
++        setOn(true);
++        if (pending) { const e = pending; window.setTimeout(() => window.dispatchEvent(new CustomEvent(e.type, { detail: (e as CustomEvent).detail })), 80); }
++      });
++    };
++    window.addEventListener('cw:open-assistant', wake);
++    window.addEventListener('cw:open-voice', wake);
++    const ric = (window as unknown as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
++    const id = ric ? ric(() => { if (!pending) go(); }, { timeout: 6000 }) : window.setTimeout(go, 4000);
++    return () => { window.removeEventListener('cw:open-assistant', wake); window.removeEventListener('cw:open-voice', wake); (window as unknown as { cancelIdleCallback?: (n: number) => void }).cancelIdleCallback?.(id); };
++  }, []);
++  return on ? <Suspense fallback={null}><AIAssistant lang={lang} hideLauncher /><VoiceIntake lang={lang} /></Suspense> : null;
++}
+ import { toolPath, packagePath, blogPath, type PageKey } from './lib/routes';
+ import { initSmoothScroll, getLenis } from './lib/smoothScroll';
+ import { articleLd, serviceLd } from './lib/structuredData';
+@@ -104,10 +127,7 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
+       <main id="main" tabIndex={-1} key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter"><Suspense fallback={<div style={{ minHeight: '60vh' }} aria-busy="true" />}>{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} post={post} /> : PAGES[page](lang)}</Suspense></main>
+       <SiteFinale key={mode} lang={lang} />
+       <SectionDots lang={lang} page={page} />
+-      <Suspense fallback={null}>
+-        <AIAssistant lang={lang} hideLauncher />
+-        <VoiceIntake lang={lang} />
+-      </Suspense>
++      <DeferredAssistants lang={lang} />
+       <ChatLauncher label={SITE_UI[lang].openChat} onOpen={() => openAssistant(false)} />
+     </div>
+   );
+diff --git a/src/site/ChatOrb.tsx b/src/site/ChatOrb.tsx
+index 3966686..0b7cd83 100644
+--- a/src/site/ChatOrb.tsx
++++ b/src/site/ChatOrb.tsx
+@@ -26,7 +26,7 @@ export default function ChatOrb({ size = 200, active = false, points = 360 }: {
+     const ctx = cv?.getContext('2d');
+     if (!cv || !ctx) return;
+     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+-    const dpr = Math.min(2, window.devicePixelRatio || 1);
++    const dpr = Math.min(window.matchMedia('(pointer: coarse)').matches ? 1.5 : 2, window.devicePixelRatio || 1);
+     cv.width = size * dpr; cv.height = size * dpr;
+     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+     const A = tok(cv, '--c-lilac', '#85a6e9'), B = tok(cv, '--c-signal', '#2862d7'), W = tok(cv, '--c-quartz', '#ffffff');
+@@ -70,11 +70,11 @@ export default function ChatOrb({ size = 200, active = false, points = 360 }: {
+     const loop = (now: number) => {
+       const dt = Math.min(0.05, (now - last) / 1000); last = now;
+       t += dt; rot += dt * (activeRef.current ? 1.1 : 0.32);
+-      if (visible) frame();
+-      raf = requestAnimationFrame(loop);
++      frame();
++      raf = visible ? requestAnimationFrame(loop) : 0;
+     };
+     if (reduce) frame(); else raf = requestAnimationFrame(loop);
+-    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; });
++    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible && !raf && !reduce) { last = performance.now(); raf = requestAnimationFrame(loop); } });
+     io.observe(cv);
+     return () => { cancelAnimationFrame(raf); io.disconnect(); };
+   }, [size, points]);
+diff --git a/src/site/ModeToggle.tsx b/src/site/ModeToggle.tsx
+index ee7d60a..8b6b6a6 100644
+--- a/src/site/ModeToggle.tsx
++++ b/src/site/ModeToggle.tsx
+@@ -35,6 +35,7 @@ export default function ModeToggle({ lang }: { lang: Lang }) {
+     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+     if (!reduced) html.classList.add('cw-mode-anim');
+     if (next) html.setAttribute('data-mode', 'light'); else html.removeAttribute('data-mode');
++    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', next ? '#f4f7fc' : '#0e111b');
+     try { localStorage.setItem('cw-mode', next ? 'light' : 'dark'); } catch { /* storage blocked: works for this visit only */ }
+     setLight(next);
+     window.dispatchEvent(new Event('cw-mode'));
+diff --git a/src/site/SiteFinale.tsx b/src/site/SiteFinale.tsx
+index 9270e09..4be64a0 100644
+--- a/src/site/SiteFinale.tsx
++++ b/src/site/SiteFinale.tsx
+@@ -26,7 +26,7 @@ export default function SiteFinale({ lang }: { lang: Lang }) {
+     const v = (n: string) => cs.getPropertyValue(n).trim();
+     const col = { white: v('--lq-white'), kelp: v('--lq-kelp'), abyss: v('--lq-abyss'), g2: v('--lq-g2') };
+     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
++    const dpr = Math.min(window.devicePixelRatio || 1, matchMedia('(max-width: 1023px), (pointer: coarse)').matches ? 1.5 : 2);
+ 
+     let W = 0, SH = 0, PH = 0, GAP = 0;
+     type Star = { x: number; y: number; r: number; a: number; s: number; p: number };
+diff --git a/src/site/SiteNav.tsx b/src/site/SiteNav.tsx
+index 102794c..2016cec 100644
+--- a/src/site/SiteNav.tsx
++++ b/src/site/SiteNav.tsx
+@@ -63,7 +63,7 @@ export default function SiteNav({ lang }: { lang: Lang }) {
+   return (
+     <>
+       <header className="fixed top-0 inset-x-0 z-[60] transition-colors duration-300"
+-        style={{ background: 'transparent' /* lialive: header never forms a bar; content scrolls under it */ }}>
++        style={{ paddingTop: 'env(safe-area-inset-top, 0px)', background: 'transparent' /* lialive: header never forms a bar; content scrolls under it */ }}>
+         <div className="site-nav-row mx-auto flex items-center justify-between gap-4 px-5 md:px-9 h-[76px]">
+           <Link to={pagePath(lang, 'home')} aria-label="Chioutworks" className="site-nav-logo shrink-0">
+             <span className="nav-logo-desk"><Logo size={30} /></span>
+diff --git a/src/site/VoiceOrb.tsx b/src/site/VoiceOrb.tsx
+index ead1a84..48107ef 100644
+--- a/src/site/VoiceOrb.tsx
++++ b/src/site/VoiceOrb.tsx
+@@ -38,11 +38,12 @@ export default function VoiceOrb({ label, onTalk, bare }: { label: string; onTal
+     if (!box || !cv || !ctx) return;
+     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+     const pal = readPalette(box);
++    const small = window.matchMedia('(max-width: 1023px), (pointer: coarse)').matches;   // phones: lighter canvas (DPR <= 1.5, 30 fps)
+     let f = 0, dpr = 1, t = reduce ? 3 : 0, last = performance.now(), raf = 0, visible = true;
+ 
+     const resize = () => {
+       f = Math.max(1, Math.floor(box.offsetWidth));
+-      dpr = window.devicePixelRatio || 1;
++      dpr = Math.min(window.devicePixelRatio || 1, small ? 1.5 : 8);
+       cv.width = f * dpr; cv.height = f * dpr;
+       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+       if (reduce) frame();
+@@ -119,6 +120,7 @@ export default function VoiceOrb({ label, onTalk, bare }: { label: string; onTal
+     };
+ 
+     const loop = (now: number) => {
++      if (small && now - last < 32) { raf = requestAnimationFrame(loop); return; }
+       t += ((now - last) / 1000) * 60 * (0.016 + 0.009 * 0.1);
+       last = now;
+       frame();
+@@ -163,7 +165,7 @@ export default function VoiceOrb({ label, onTalk, bare }: { label: string; onTal
+ /** Fixed bottom-centre chat button with faint rings (lialive-style), shown on every site page. */
+ export function ChatLauncher({ label, onOpen }: { label: string; onOpen: () => void }) {
+   return (
+-    <div className="fixed left-1/2 bottom-5 -translate-x-1/2 z-[50] pointer-events-none">
++    <div className="fixed left-1/2 -translate-x-1/2 z-[50] pointer-events-none" style={{ bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))' }}>
+       <span aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ width: 120, height: 120, border: '1px solid var(--lq-line)' }} />
+       <span aria-hidden="true" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ width: 88, height: 88, border: '1px solid var(--lq-line)' }} />
+       <button type="button" onClick={onOpen} aria-label={label}
+diff --git a/src/styles/theme.css b/src/styles/theme.css
+index d3d2254..fd8610d 100644
+--- a/src/styles/theme.css
++++ b/src/styles/theme.css
+@@ -944,6 +944,12 @@ html:has([data-site-theme='liquid']) body::-webkit-scrollbar { display: none; wi
+ /* Touch screens only (phones/tablets, desktop untouched): hover looks must not stay "stuck" after a tap.
+    Instead a short press feedback (:active) while the finger is down; no grey tap box. */
+ html { -webkit-tap-highlight-color: transparent; }
++a, button, summary, [role='button'], input, select, textarea, label { touch-action: manipulation; }   /* no 300 ms tap delay */
++#root { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }   /* notch in landscape (viewport-fit=cover) */
++@media (hover: none) {
++  button:not(:disabled), a.lq-btn, [role='button'], .lq-card { transition: transform .1s ease-out, filter .1s ease-out; }
++  button:not(:disabled):active, a.lq-btn:active, [role='button']:active { transform: scale(.98); filter: brightness(1.08); }
++}
+ @media (hover: none) {
+   [data-site-theme='liquid'] .lq-btn-ghost:hover {
+     border-color: color-mix(in srgb, var(--c-quartz) 14%, transparent);
+@@ -964,7 +970,7 @@ html { -webkit-tap-highlight-color: transparent; }
+ /* Page transition (all screens): new page fades in from a light blur */
+ .cw-page-enter { animation: cwPageEnter .65s cubic-bezier(.22,1,.36,1) backwards; }   /* 'backwards': after the animation NO filter may remain on <main> (a filter breaks the scroll-pinned sections) */
+ @keyframes cwPageEnter { from { opacity: 0; filter: blur(8px); } to { opacity: 1; filter: none; } }   /* no transform: it would shift scroll-pinned sections */
+-@media (prefers-reduced-motion: reduce) { .cw-page-enter { animation: none; } }
++@media (prefers-reduced-motion: reduce), (max-width: 1023px) { .cw-page-enter { animation: none; } }   /* phones: no full-page blur (costly, delays LCP) */
+ 
+ /* Phones: ring labels in the statement section stand out (brighter pill), the next section starts closer */
+ @media (max-width: 767px) {

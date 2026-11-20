@@ -68,6 +68,7 @@
 | Form soruları DE/EL | Almanca ve Yunanca metinleri bir kişinin okuması | Sen |
 
 ## C. Yapılmadı
+| **Mobil hız ve his (pazartesi 2026-11-23 ilk iş)** | Hayır, ama önemli | Ayrıntı `SON-DURUM.md` en üstte |
 | Parça | Yayından önce şart mı? | Not |
 |---|---|---|
 | Hız ve erişilebilirlik (büyük paketleri bölme vb.) | Hayır, ama önemli | |

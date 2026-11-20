@@ -1,3 +1,5 @@
+> **PAZARTESİ 2026-11-23 İLK İŞ (sahibin isteği): Mobil hız ve his işi.** Hedefler: Lighthouse mobil hız ≥ 80 (şu an 48–49; ana sayfa LCP 6,5 sn, TBT 580 ms); her ekran genişliği (280/320/360/375/390/412/430, katlanabilir, yatay) yana taşma yok, çentik (safe-area), dvh; kasma/ısınma yok (ekran dışında ve sekme gizliyken tüm animasyon/3D/parçacık durur, mobilde DPR ≤ 1,5, boşta işlemci ~0); dokunuş hissi (basınca anında hafif çökme, dokunma gecikmesi yok, Android'de ana butonlarda kısa titreşim); göz rahatlığı (açılışta beyaz parlama yok, tarayıcı çubuğu site renginde, koyu modda büyük beyaz yüzey yok, yumuşak geçişler). Tasarım birebir aynı kalacak. 20 Kasım'da başlayıp durdurulan yarım iş: `_yedek/mobil-pazartesi/mobil-yarim-kalan.patch` (uygulanmadı, referans).
+
 # Son Durum — Devir Teslim (2026-11-14)
 
 > "resume p" yazıldığında önce bu dosya okunur. Ardından **`context/HARITA.md`** (ana harita), `CLAUDE.md` ve `context/kararlar.md`.
