@@ -5,6 +5,7 @@ import {
   type DemoAccess, type DemoErrorCode,
 } from '../lib/demoAccess';
 import BtnArrow from '../site/BtnArrow';
+import { useDialogA11y } from './ui/useDialogA11y';
 
 interface Props {
   open: boolean;
@@ -21,6 +22,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export default function DemoAccessModal({ open, lang, demo, onClose, onUnlocked }: Props) {
+  const trapRef = useDialogA11y();
   const m = T[lang].demos.modal;
   const [step, setStep] = useState<'form' | 'code'>('form');
   const [email, setEmail] = useState('');
@@ -83,6 +85,7 @@ export default function DemoAccessModal({ open, lang, demo, onClose, onUnlocked 
 
   return (
     <div
+      ref={trapRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="demo-access-title"

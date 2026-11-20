@@ -4,6 +4,7 @@ import { useLang } from '../hooks/useLang';
 import { pagePath } from '../lib/routes';
 import { onConsentOpen, readConsent, saveConsent } from '../lib/consent';
 import { CONSENT_UI } from '../site/i18n/consent';
+import { useDialogA11y } from './ui/useDialogA11y';
 
 /**
  * Cookie / storage consent: a small, non-blocking card (bottom-left) on the first visit, plus a settings dialog
@@ -11,6 +12,7 @@ import { CONSENT_UI } from '../site/i18n/consent';
  * Necessary storage stays on and cannot be switched off.
  */
 export default function CookieConsent() {
+  const trapRef = useDialogA11y();
   const [lang] = useLang();
   const u = CONSENT_UI[lang];
   const { pathname } = useLocation();
@@ -64,7 +66,7 @@ export default function CookieConsent() {
             background: 'color-mix(in srgb, var(--c-abyss) 92%, transparent)', border: '1px solid var(--c-hairline)', backdropFilter: 'blur(12px)',
             boxShadow: '0 18px 50px -20px color-mix(in srgb, var(--c-signal) 45%, transparent)', color: 'var(--c-mist)' }}>
           <h2 style={{ margin: '0 0 6px', fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, color: 'var(--c-quartz)' }}>{u.title}</h2>
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55 }}>{u.body} <Link to={pagePath(lang, 'privacy')} style={{ color: 'var(--c-lilac)' }}>{u.privacy}</Link></p>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55 }}>{u.body} <Link to={pagePath(lang, 'privacy')} style={{ color: 'var(--c-lilac)', textDecoration: 'underline' }}>{u.privacy}</Link></p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
             <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: true, statistics: true })}>{u.acceptAll}</button>
             <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional: false, statistics: false })}>{u.necessaryOnly}</button>
@@ -76,7 +78,7 @@ export default function CookieConsent() {
       {dialog && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'color-mix(in srgb, var(--c-void) 70%, transparent)' }}
           onClick={(e) => { if (e.target === e.currentTarget) setDialog(false); }}>
-          <div ref={dlgRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="cw-consent-title"
+          <div ref={(el) => { dlgRef.current = el; trapRef(el); }} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="cw-consent-title"
             style={{ width: 'min(520px, 100%)', maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto', padding: 24, borderRadius: 'var(--r-card)', background: 'var(--c-abyss)', border: '1px solid var(--c-hairline)', color: 'var(--c-mist)', outline: 'none' }}>
             <h2 id="cw-consent-title" style={{ margin: '0 0 8px', fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, color: 'var(--c-quartz)' }}>{u.title}</h2>
             <p style={{ margin: '0 0 8px', fontSize: 14, lineHeight: 1.55 }}>{u.body}</p>
@@ -84,7 +86,7 @@ export default function CookieConsent() {
             <Row name={u.functional.name} desc={u.functional.desc} on={functional} set={setFunctional} />
             <Row name={u.statistics.name} desc={u.statistics.desc} on={statistics} set={setStatistics} />
             <p style={{ margin: '4px 0 16px', paddingTop: 12, borderTop: '1px solid var(--c-edge)', fontSize: 13, color: 'var(--c-ash)' }}>
-              {u.noMarketing} <Link to={pagePath(lang, 'privacy')} onClick={() => setDialog(false)} style={{ color: 'var(--c-lilac)' }}>{u.privacy}</Link>
+              {u.noMarketing} <Link to={pagePath(lang, 'privacy')} onClick={() => setDialog(false)} style={{ color: 'var(--c-lilac)', textDecoration: 'underline' }}>{u.privacy}</Link>
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <button type="button" className="lq-btn-ghost" style={btn} onClick={() => decide({ functional, statistics })}>{u.save}</button>

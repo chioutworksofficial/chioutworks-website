@@ -95,12 +95,13 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
 
   return (
     <div data-site-theme="liquid" style={{ background: 'var(--background)', minHeight: '100vh' }}>
+      <a href="#main" className="cw-skip" onClick={(e) => { e.preventDefault(); const m = document.getElementById('main'); m?.focus({ preventScroll: true }); m?.scrollIntoView(); }}>{SITE_UI[lang].skipToContent}</a>
       <Preloader lang={lang} />
       <SiteNav lang={lang} />
       {/* Fixed navbar: keep inner pages' first section clear of it (PageHero pages clear it themselves) */}
       {page !== 'home' && page !== 'blog' && page !== 'faq' && page !== 'resources' && <div aria-hidden="true" style={{ height: 76 }} />}
       {/* Page change: the new page sharpens out of a short blur and rises slightly (lialive-style) */}
-      <main key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter"><Suspense fallback={<div style={{ minHeight: '60vh' }} aria-busy="true" />}>{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} post={post} /> : PAGES[page](lang)}</Suspense></main>
+      <main id="main" tabIndex={-1} key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter"><Suspense fallback={<div style={{ minHeight: '60vh' }} aria-busy="true" />}>{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} post={post} /> : PAGES[page](lang)}</Suspense></main>
       <SiteFinale key={mode} lang={lang} />
       <SectionDots lang={lang} page={page} />
       <Suspense fallback={null}>

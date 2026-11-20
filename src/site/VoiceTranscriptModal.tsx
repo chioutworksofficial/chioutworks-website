@@ -3,9 +3,11 @@ import type { Lang } from '../translations';
 import { VOICE_UI } from './i18n/voice';
 import { CONTACT_PAGE_UI } from './i18n/contactPage';
 import { clearVoiceSession, type VoiceTurn } from '../lib/voiceSession';
+import { useDialogA11y } from '../components/ui/useDialogA11y';
 
 /** Read-only transcript of a saved voice session (id+secret is the capability). */
 export default function VoiceTranscriptModal({ lang, id, secret, onClose, onDeleted }: { lang: Lang; id: string; secret: string; onClose: () => void; onDeleted?: () => void }) {
+  const trapRef = useDialogA11y();
   const t = VOICE_UI[lang];
   const u = CONTACT_PAGE_UI[lang];
   const [turns, setTurns] = useState<VoiceTurn[] | null>(null);
@@ -35,7 +37,7 @@ export default function VoiceTranscriptModal({ lang, id, secret, onClose, onDele
   }, [onClose]);
 
   return (
-    <div role="dialog" aria-modal="true" data-lenis-prevent aria-label={u.voiceTitle} onClick={onClose}
+    <div ref={trapRef} role="dialog" aria-modal="true" data-lenis-prevent aria-label={u.voiceTitle} onClick={onClose}
       style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'color-mix(in srgb, var(--lq-abyss) 85%, transparent)', display: 'grid', placeItems: 'center', padding: 20 }}>
       <div onClick={(e) => e.stopPropagation()} className="lq-card"
         style={{ width: '100%', maxWidth: 560, maxHeight: '80vh', overflow: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--lq-abyss)', color: 'var(--lq-white)' }}>

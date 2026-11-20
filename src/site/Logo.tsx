@@ -32,7 +32,7 @@ export function LogoMark({ size = 30 }: { size?: number }) {
 
 export default function Logo({ size = 30, stacked = false }: { size?: number; stacked?: boolean }) {
   return (
-    <span className={stacked ? 'inline-flex flex-col items-center gap-3' : 'inline-flex items-center gap-3'} aria-label="Chioutworks">
+    <span className={stacked ? 'inline-flex flex-col items-center gap-3' : 'inline-flex items-center gap-3'} role="img" aria-label="Chioutworks">
       <LogoMark size={size} />
       <span aria-hidden="true" lang="en" style={{ fontSize: Math.round(size * (stacked ? 0.4 : 0.47)), letterSpacing: '0.16em', lineHeight: 1, fontFamily: 'var(--font-display)', whiteSpace: 'nowrap' }}>
         <span style={{ fontWeight: 500, color: 'var(--c-quartz)' }}>CHIOUT</span>

@@ -7,12 +7,14 @@ import { Label } from './ui';
 import BtnArrow from '../../site/BtnArrow';
 import { guardFields, prefetchFormToken } from '../../lib/formGuard';
 import Honeypot from '../Honeypot';
+import { useDialogA11y } from '../ui/useDialogA11y';
 
 const inputCls = 'w-full rounded-[6px] px-3 py-2.5 text-sm outline-none focus:border-[color:var(--lq-g2)]! placeholder:text-[color:var(--lq-silver)]';
 const field: React.CSSProperties = { background: 'var(--lq-deep)', border: '1px solid var(--lq-line)', color: 'var(--lq-white)' };
 
 /** "Request a demo" for apps that are not publicly openable — goes to /api/demo/quote as kind=demo-request. */
 export default function DemoRequestModal({ lang, slug, email: initialEmail, onClose }: { lang: Lang; slug: string; email: string; onClose: () => void }) {
+  const trapRef = useDialogA11y();
   const s = SHOWCASE_UI[lang];
   const b = T[lang].demos.builder;
   const errors = T[lang].demos.modal.errors;
@@ -56,7 +58,7 @@ export default function DemoRequestModal({ lang, slug, email: initialEmail, onCl
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="demo-request-title"
+    <div ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="demo-request-title"
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-6"
       style={{ background: 'var(--color-overlay)', backdropFilter: 'blur(6px)' }}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

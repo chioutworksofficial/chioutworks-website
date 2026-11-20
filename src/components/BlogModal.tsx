@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import type { BlogPost } from '../data/sections';
 import { T, type Lang } from '../translations';
 import { pagePath } from '../lib/routes';
+import { useDialogA11y } from './ui/useDialogA11y';
 
 interface Props {
   post: BlogPost;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function BlogModal({ post, onClose, lang = 'en' }: Props) {
+  const trapRef = useDialogA11y();
   const u = T[lang].ui;
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -37,6 +39,7 @@ export default function BlogModal({ post, onClose, lang = 'en' }: Props) {
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
+        ref={trapRef} role="dialog" aria-modal="true" aria-label={post.title}
         style={{
           width: '100%', maxWidth: 760,
           maxHeight: '90dvh',

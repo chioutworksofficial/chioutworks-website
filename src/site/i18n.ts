@@ -20,6 +20,7 @@ export const SITE_UI = {
     tapToTalk: 'Tap the mic to talk',
     openChat: 'Open chat',
     sectionsNav: 'Sections',
+    skipToContent: 'Skip to content',
     sections: { hero: 'Home', features: 'Features', demos: 'Demos', faq: 'FAQ', roi: 'Savings', projects: 'Projects', start: 'Get started' },
   },
   de: {
@@ -39,6 +40,7 @@ export const SITE_UI = {
     tapToTalk: 'Mikrofon antippen und sprechen',
     openChat: 'Chat öffnen',
     sectionsNav: 'Abschnitte',
+    skipToContent: 'Zum Inhalt springen',
     sections: { hero: 'Start', features: 'Leistungen', demos: 'Demos', faq: 'Fragen', roi: 'Ersparnis', projects: 'Projekte', start: 'Loslegen' },
   },
   tr: {
@@ -58,6 +60,7 @@ export const SITE_UI = {
     tapToTalk: 'Konuşmak için mikrofona dokunun',
     openChat: 'Sohbeti aç',
     sectionsNav: 'Bölümler',
+    skipToContent: 'İçeriğe geç',
     sections: { hero: 'Başlangıç', features: 'Özellikler', demos: 'Demolar', faq: 'Sorular', roi: 'Tasarruf', projects: 'Projeler', start: 'Başlayın' },
   },
   el: {
@@ -77,6 +80,7 @@ export const SITE_UI = {
     tapToTalk: 'Πατήστε το μικρόφωνο για να μιλήσετε',
     openChat: 'Άνοιγμα συνομιλίας',
     sectionsNav: 'Ενότητες',
+    skipToContent: 'Μετάβαση στο περιεχόμενο',
     sections: { hero: 'Αρχή', features: 'Υπηρεσίες', demos: 'Επιδείξεις', faq: 'Ερωτήσεις', roi: 'Εξοικονόμηση', projects: 'Έργα', start: 'Ξεκινήστε' },
   },
 } satisfies Record<Lang, unknown>;

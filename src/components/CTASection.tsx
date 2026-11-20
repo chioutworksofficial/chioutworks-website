@@ -226,7 +226,7 @@ export default function CTASection({ lang }: Props) {
               <div key={f.label} className="flex items-baseline justify-between gap-4" style={{ padding: '12px 0', borderBottom: '1px solid var(--lq-line)' }}>
                 <span style={mono}>{f.label}</span>
                 {f.href ? (
-                  <a href={f.href} target="_blank" rel="noreferrer" style={{ fontSize: 14, color: 'var(--lq-white)', textDecoration: 'none', textAlign: 'right' }}>{f.value}</a>
+                  <a href={f.href} target="_blank" rel="noreferrer" style={{ display: 'inline-block', minHeight: 24, fontSize: 14, color: 'var(--lq-white)', textDecoration: 'none', textAlign: 'right' }}>{f.value}</a>
                 ) : (
                   <span style={{ fontSize: 14, color: 'var(--lq-white)', textAlign: 'right' }}>{f.value}</span>
                 )}

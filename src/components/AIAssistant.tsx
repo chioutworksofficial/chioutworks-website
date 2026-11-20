@@ -17,6 +17,7 @@ import { hasConsent as hasCookieConsent } from '../lib/consent';
 import { hasConsent } from '../lib/assistantConsent';
 import { writeVoiceSession, clearVoiceSession, downloadTranscript } from '../lib/voiceSession';
 import { StyleCta } from '../site/pages/StylePage';
+import { useDialogA11y } from './ui/useDialogA11y';
 
 // ── Chat memory (owner, 2026-11-19): always kept for this tab (sessionStorage = needed for the requested service);
 // kept 7 days in localStorage only with the "functional/comfort" cookie consent. Cleared with "Clear chat"/"Delete".
@@ -337,6 +338,7 @@ interface Props {
 }
 
 export default function AIAssistant({ lang, hideLauncher = false }: Props) {
+  const trapRef = useDialogA11y();
   const ui = UI[lang];
   const vt = VOICE_UI[lang];
   const navigate = useNavigate();
@@ -792,6 +794,7 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
               overflow: 'hidden',
               fontFamily: 'var(--lq-font)',
             }}
+            ref={trapRef}
             role="dialog"
             aria-label={ui.title}
             aria-modal="true"
@@ -857,7 +860,7 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
               </div>
             ) : (<>
             {/* ── Messages ─────────────────────────────────────────────── */}
-            <div data-lenis-prevent style={{
+            <div data-lenis-prevent role="log" aria-live="polite" aria-relevant="additions" tabIndex={0} aria-label={ui.title} style={{
               flex: 1,
               overflowY: 'auto',
               padding: '14px 14px 8px',
@@ -1103,6 +1106,7 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
               <input
                 ref={inputRef}
                 type="text"
+                aria-label={ui.placeholder}
                 className="cw-ai-input"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

@@ -7,11 +7,13 @@ import { pagePath } from '../lib/routes';
 import { BLOG_PAGE_UI } from './i18n/blogPage';
 import BlogCover from './BlogCover';
 import { readMinutes } from './blogMeta';
+import { useDialogA11y } from '../components/ui/useDialogA11y';
 
 const label: React.CSSProperties = { fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase' };
 const Arrow = ({ flip }: { flip?: boolean }) => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={flip ? { transform: 'scaleX(-1)' } : undefined}><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
 export default function BlogReader({ post, posts, lang, onClose, onOpen }: { post: BlogPost; posts: BlogPost[]; lang: Lang; onClose: () => void; onOpen: (p: BlogPost) => void }) {
+  const trapRef = useDialogA11y();
   const ui = BLOG_PAGE_UI[lang];
   const u = T[lang].ui;
   const box = useRef<HTMLDivElement>(null);
@@ -35,7 +37,7 @@ export default function BlogReader({ post, posts, lang, onClose, onOpen }: { pos
 
   // portal to <body> so no transformed/pinned ancestor can trap the overlay under the fixed header
   return createPortal(
-    <div ref={box} role="dialog" aria-modal="true" data-lenis-prevent aria-label={post.title} className="fixed inset-0 overflow-y-auto" style={{ zIndex: 2000, background: 'var(--lq-abyss)', color: 'var(--lq-mist)' }}>
+    <div ref={(el) => { box.current = el; trapRef(el); }} role="dialog" aria-modal="true" data-lenis-prevent aria-label={post.title} className="fixed inset-0 overflow-y-auto" style={{ zIndex: 2000, background: 'var(--lq-abyss)', color: 'var(--lq-mist)' }}>
       <div className="relative w-full overflow-hidden" style={{ minHeight: 460 }}>
         <div className="absolute inset-0"><BlogCover id={post.id} /></div>
         <div aria-hidden className="absolute inset-0" style={{ background: 'linear-gradient(to top, color-mix(in srgb, var(--c-abyss) 92%, transparent) 8%, color-mix(in srgb, var(--c-abyss) 35%, transparent) 70%, transparent)' }} />

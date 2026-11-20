@@ -595,7 +595,7 @@ export function PreviewFrame({ d, lang }: { d: PreviewData; lang: Lang }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--c-abyss)', borderBottom: '1px solid var(--c-hairline)' }}>
         {[0, 1, 2].map((i) => <span key={i} aria-hidden="true" style={{ width: 9, height: 9, borderRadius: 9, background: 'var(--c-hairline)' }} />)}
         <span style={{ marginLeft: 8, flex: 1, minWidth: 0, fontSize: 12, padding: '3px 10px', borderRadius: 999, background: 'var(--c-void)', color: 'var(--c-ash)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{view === 'website' ? d.domain : `app.${d.domain}`}</span>
-        <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 999, border: '1px solid var(--c-signal)', color: 'var(--c-signal)', whiteSpace: 'nowrap' }}>{t.strip}</span>
+        <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 999, border: '1px solid var(--c-signal)', color: 'var(--c-lilac)', whiteSpace: 'nowrap' }}>{t.strip}</span>
       </div>
       {views.length > 1 && (
         <div role="tablist" style={{ display: 'flex', gap: 4, padding: 6, background: 'var(--c-deep-sea)', borderBottom: '1px solid var(--c-hairline)', overflowX: 'auto' }}>

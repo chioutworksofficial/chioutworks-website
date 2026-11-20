@@ -135,7 +135,7 @@ function PayBox({ token, lang, pay, currency, onPaid }: { token: string; lang: L
   return (
     <div style={{ marginTop: 18, padding: 18, borderRadius: 'var(--r-input)', background: 'var(--c-deep-sea)', border: '1px solid var(--c-hairline)' }}>
       {pay.firstPaid ? <>
-        <p style={{ margin: 0, fontWeight: 600, color: 'var(--c-signal)' }}>✓ {u.payDone}</p>
+        <p style={{ margin: 0, fontWeight: 600, color: 'var(--c-lilac)' }}>✓ {u.payDone}</p>
         {(pay.invoices ?? []).map((inv) => <a key={inv.url} href={inv.url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginTop: 8, color: 'var(--c-lilac)' }}>🧾 {inv.test ? u.invoiceTest : u.invoice} {inv.number}</a>)}
       </> : <>
         <p style={{ margin: '0 0 4px' }}>{u.payNow(money(pay.now))}</p>

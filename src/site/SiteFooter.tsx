@@ -34,7 +34,7 @@ export default function SiteFooter({ lang, variant = 'default' }: { lang: Lang; 
             <Link to={pagePath(lang, 'home')} aria-label="Chioutworks"><Logo size={32} /></Link>
             <p className="mt-4 max-w-sm" style={{ fontSize: 15, lineHeight: 1.5, color: 'var(--c-mist)', textShadow: halo }}>{o.tagline}</p>
             <ul className="mt-4 flex flex-col gap-2">
-              <li><a href="https://www.linkedin.com/in/chousein-chiout-29345323a/" target="_blank" rel="noopener noreferrer" style={{ ...link, color: 'var(--lq-mist)', display: 'inline-flex', alignItems: 'center', gap: 8 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg>LinkedIn</a></li>
+              <li><a href="https://www.linkedin.com/in/chousein-chiout-29345323a/" target="_blank" rel="noopener noreferrer" style={{ ...link, color: 'var(--lq-mist)', display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 24 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.34V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></svg>LinkedIn</a></li>
             </ul>
           </div>
           <nav aria-label={o.pages} className="md:col-span-4">
@@ -48,7 +48,7 @@ export default function SiteFooter({ lang, variant = 'default' }: { lang: Lang; 
             <ul className="flex flex-col gap-2">
               {legal.map(([k, l]) => <li key={k}><Link to={pagePath(lang, k)} style={link}>{l}</Link></li>)}
               <li><Link to={`${pagePath(lang, 'docs')}#imprint`} style={link}>{t.footer.legal[3]}</Link></li>
-              <li><button type="button" onClick={openConsentSettings} style={{ ...link, cursor: 'pointer', textAlign: 'left' }}>{CONSENT_UI[lang].footerLink}</button></li>
+              <li><button type="button" onClick={openConsentSettings} style={{ ...link, cursor: 'pointer', textAlign: 'left', minHeight: 24, padding: '2px 0' }}>{CONSENT_UI[lang].footerLink}</button></li>
             </ul>
           </nav>
         </div>

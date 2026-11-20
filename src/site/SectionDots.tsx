@@ -33,7 +33,7 @@ function detect(lang: Lang, page: string): Item[] {
     if (!el.id) el.id = `${page}-s${i + 1}`;
     // heading first, then any sub-heading / eyebrow / first text line — never a bare number
     const h = el.querySelector('h1, h2') || el.querySelector('h3, h4, legend, label, strong, p');
-    const text = (h?.textContent || '').replace(/\s+/g, ' ').trim();
+    const text = ((h as HTMLElement | null)?.innerText || h?.textContent || '').replace(/\s+/g, ' ').trim();
     out.push({ id: el.id, label: named[el.id] || (text.length > 40 ? text.slice(0, 38) + '…' : text) || document.title.split(/\s[|—–-]\s/)[0] });
   });
   const finale = document.getElementById('start');
@@ -80,7 +80,7 @@ export default function SectionDots({ lang, page }: { lang: Lang; page: string }
         return (
           // compact dashes: 2px tall, ~15px apart, active one longer and coloured with a soft glow
           <button key={id} type="button" onClick={() => go(id)} aria-label={label} aria-current={on ? 'true' : undefined}
-            className="group relative flex items-center justify-end h-[15px] w-8">
+            className="group relative flex items-center justify-end h-6 w-8">
             <span className="pointer-events-none absolute right-9 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full px-3 py-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
               style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--c-quartz)', background: 'var(--c-deep-sea)', border: '1px solid var(--c-edge)' }}>{label}</span>
             <span className="block rounded-full transition-all duration-300"

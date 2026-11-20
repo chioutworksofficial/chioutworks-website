@@ -1554,3 +1554,12 @@ svg.is-in .bc-draw, svg.is-in .bc-grow, svg.is-in .bc-write, svg.is-in .bc-pen {
 @keyframes psc-wheel { 0% { opacity: 1; transform: translateY(0); } 70% { opacity: 0; transform: translateY(8px); } 100% { opacity: 0; } }
 @media (max-width: 639px) { [data-site-theme='liquid'] .psc-hint { font-size: 12px; top: 0; } }
 @media (prefers-reduced-motion: reduce) { [data-site-theme='liquid'] .psc-hint b, [data-site-theme='liquid'] .psc-mouse i { animation: none; } }
+
+/* Accessibility (WCAG 2.2 AA): skip link, keyboard focus ring, no auto-motion for reduced-motion users */
+.cw-skip { position: fixed; left: 12px; top: -80px; z-index: 10000; padding: 12px 18px; border-radius: var(--r-pill); background: var(--c-quartz); color: var(--c-void); font-weight: 600; text-decoration: none; transition: top .15s; }
+.cw-skip:focus, .cw-skip:focus-visible { top: 12px; }
+main:focus { outline: none; }
+[data-site-theme='liquid'] :is(a, button, input, textarea, select, summary, [tabindex]):focus-visible:not(.cw-ai-input) { outline: 2px solid var(--c-lilac) !important; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

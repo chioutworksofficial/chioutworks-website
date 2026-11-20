@@ -406,7 +406,7 @@ export default function IntakePage() {
       </div>
 
       <p style={{ marginTop: 40, fontSize: 12, color: 'var(--c-ash)', lineHeight: 1.6 }}>
-        {u.privacy} <Link to={pagePath(lang, 'privacy')} style={{ color: 'var(--c-lilac)' }}>{u.privacyLink}</Link>
+        {u.privacy} <Link to={pagePath(lang, 'privacy')} style={{ color: 'var(--c-lilac)', textDecoration: 'underline' }}>{u.privacyLink}</Link>
       </p>
     </>,
   );

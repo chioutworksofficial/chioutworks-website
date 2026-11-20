@@ -173,7 +173,7 @@ export default function PackagePage({ lang, id }: { lang: Lang; id: PackageId })
           <span className="absolute left-1/2 top-1/2 rounded-full" style={{ width: 860, height: 860, transform: 'translate(-50%, -50%)', background: 'radial-gradient(circle, color-mix(in srgb, var(--lq-g1) 22%, transparent), transparent 65%)' }} />
         </div>
         <div className="relative mx-auto px-5 md:px-9 pt-24 md:pt-36 pb-10" style={{ maxWidth: 1100 }}>
-          <Link to={`${pagePath(lang, 'home')}#popular`} className="inline-flex items-center gap-2 mb-8" style={{ fontSize: 13, color: 'var(--lq-silver)' }}><span aria-hidden="true">←</span>{t.back}</Link>
+          <Link to={`${pagePath(lang, 'home')}#popular`} className="inline-flex items-center gap-2 mb-8" style={{ minHeight: 24, fontSize: 13, color: 'var(--lq-silver)' }}><span aria-hidden="true">←</span>{t.back}</Link>
           <h1 style={{ fontSize: 'clamp(36px, 5vw, 72px)', fontWeight: 500, lineHeight: 1.04, letterSpacing: '-0.02em', fontFamily: 'var(--font-display)', color: 'var(--lq-white)', margin: 0, maxWidth: 900 }}>{pop.title}</h1>
           <p className="mt-6" style={{ fontSize: 17, lineHeight: 1.6, color: 'var(--lq-silver)', maxWidth: 680 }}>{x.intro}</p>
           <div className="mt-8 flex flex-wrap items-center gap-3">

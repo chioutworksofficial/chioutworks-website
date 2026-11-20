@@ -248,7 +248,7 @@ function Inner({ lang }: { lang: Lang }) {
         </div>
       </div>
       {createPortal(
-        <div className="roi-print-root" lang={lang}>
+        <div className="roi-print-root" lang={lang} aria-hidden="true">
           <h1>{ui.rTitle}</h1>
           <p className="roi-muted">{ui.rDate}: {fmtDate(lang)}{(repName || repCompany) && ` · ${ui.rFor}: ${[repName, repCompany].filter(Boolean).join(', ')}`}</p>
           <h2>{ui.rInputs}</h2>

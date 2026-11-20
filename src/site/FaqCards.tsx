@@ -117,7 +117,7 @@ export default function FaqCards({ items, id }: { items: readonly Item[]; id: st
                 style={{ minHeight: 380, padding: 32 }}
               >
                 <span style={{ fontFamily: 'var(--lq-mono)', fontSize: 11, color: 'var(--c-lilac)' }}>{String(i + 1).padStart(2, '0')}.</span>
-                <h3 className="mt-5" style={{ fontSize: 22, fontWeight: 400, lineHeight: 1.4, color: 'var(--lq-mist)', maxWidth: 420 }}>{it.q}</h3>
+                <h2 className="mt-5" style={{ fontSize: 22, fontWeight: 400, lineHeight: 1.4, color: 'var(--lq-mist)', maxWidth: 420 }}>{it.q}</h2>
                 <div id={`${id}-a-${i}`} role="region" aria-labelledby={`${id}-q-${i}`} style={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', opacity: isOpen ? 1 : 0, transform: isOpen ? 'none' : 'translateY(8px)', transition: 'grid-template-rows .4s ease, opacity .4s ease, transform .4s ease' }}>
                   <div style={{ overflow: 'hidden' }}>
                     <p className="pt-5 pb-14" style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--lq-silver)' }}>{it.a}</p>
