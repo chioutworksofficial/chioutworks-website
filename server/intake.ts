@@ -242,6 +242,13 @@ const expired = (i: Intake) => new Date(i.expiresAt).getTime() < Date.now();
 const KEY_RE = /^[a-z0-9_]{1,60}$/;
 const REQUIRED = ['meta_company', 'meta_contact', 'meta_email', 'biz_type'];
 
+import { validate as v, z, s, bool, anyObj, idP, tokenP, LANG } from './validate.js';
+const answersS = z.object({ answers: z.record(z.string(), z.any()) });
+const createS = z.object({ lang: s(8), secondLang: s(8), market: s(20), sector: s(40), requestId: s(60), prefill: anyObj }).passthrough();
+const actionS = z.object({ action: z.enum(['cancel', 'renew']).nullish() });
+const mailS = z.object({ to: s(120), origin: s(200) });
+
+import { recordError } from './errors.js';
 export function registerIntake(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 60 * 1000, max: 90, skip: d.rateSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
   const live = async (token: string): Promise<Intake | null> => {
@@ -300,7 +307,7 @@ export function registerIntake(app: Express, d: Deps) {
         }
         await writeTrans(cache);
       } catch (e) {
-        console.error('[intake] translate failed', (e as Error).message);
+        void recordError('intake/translate-failed', e); console.error('[intake] translate failed', (e as Error).message);
         return res.status(502).json({ error: 'ai_failed' });
       }
     }
@@ -308,7 +315,7 @@ export function registerIntake(app: Express, d: Deps) {
     return res.json({ to, map: Object.fromEntries([...src].filter((x) => have[x]).map((x) => [x, have[x]])) });
   });
 
-  app.patch('/api/intake/:token', limiter, async (req, res) => {
+  app.patch('/api/intake/:token', limiter, v(answersS, tokenP), async (req, res) => {
     const i = await getIntakeByToken(String(req.params.token));
     if (!i || i.cancelledAt || expired(i)) return res.status(404).json({ error: 'not_found' });
     const inc = req.body?.answers;
@@ -335,7 +342,7 @@ export function registerIntake(app: Express, d: Deps) {
     return res.json(changed ? { ok: true, definition: defOf(i) } : { ok: true });
   });
 
-  app.post('/api/intake/:token/submit', limiter, async (req, res) => {
+  app.post('/api/intake/:token/submit', limiter, v(undefined, tokenP), async (req, res) => {
     const i = await getIntakeByToken(String(req.params.token));
     if (!i || i.cancelledAt || expired(i)) return res.status(404).json({ error: 'not_found' });
     const missing = REQUIRED.filter((k) => !str0(i.answers[k]));
@@ -358,7 +365,7 @@ export function registerIntake(app: Express, d: Deps) {
     analysisStale: !!(i.analysis && i.updatedAt && i.updatedAt > ((i.analysis as { at?: string }).at ?? '')), path: pathOf(i), expired: expired(i),
   });
 
-  app.post('/api/admin/intakes', async (req, res) => {
+  app.post('/api/admin/intakes', v(createS), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const b = req.body ?? {};
     const lang: L = isL(b.lang) ? b.lang : 'tr';
@@ -391,7 +398,7 @@ export function registerIntake(app: Express, d: Deps) {
     return res.json({ intake: brief(i), formatted: formatAnswers(i, 'tr'), markdown: answersMarkdown(i, 'tr'), analysis: i.analysis ?? null, preview: (i as { preview?: { data: unknown } }).preview?.data ?? null });
   });
 
-  app.patch('/api/admin/intakes/:id', async (req, res) => {
+  app.patch('/api/admin/intakes/:id', v(actionS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const i = await getIntake(String(req.params.id));
     if (!i) return res.status(404).json({ error: 'not_found' });
@@ -402,14 +409,14 @@ export function registerIntake(app: Express, d: Deps) {
     return res.json({ intake: brief(i) });
   });
 
-  app.delete('/api/admin/intakes/:id', async (req, res) => {
+  app.delete('/api/admin/intakes/:id', v(undefined, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     if (!(await deleteIntake(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
     return res.json({ ok: true });
   });
 
   // Never throws, never 5xx for "no verified domain": the admin UI shows a clear message instead.
-  app.post('/api/admin/intakes/:id/email', async (req, res) => {
+  app.post('/api/admin/intakes/:id/email', v(mailS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const i = await getIntake(String(req.params.id));
     if (!i) return res.status(404).json({ error: 'not_found' });
@@ -428,7 +435,7 @@ export function registerIntake(app: Express, d: Deps) {
       i.emailedAt = new Date().toISOString(); await saveIntake(i);
       return res.json({ ok: true });
     } catch (e) {
-      console.error('[intake] Resend request failed', (e as Error).message);
+      void recordError('intake/Resend-request-failed', e); console.error('[intake] Resend request failed', (e as Error).message);
       return res.json({ ok: false, reason: 'send_failed' });
     }
   });

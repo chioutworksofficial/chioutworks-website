@@ -66,12 +66,15 @@ const html = (lang: L, title: string, body: string) => `<!doctype html><html lan
 
 interface Deps { rateSkip?: () => boolean; sendConfirm?: (to: string, lang: L, confirmUrl: string, unsubUrl: string) => Promise<boolean> }
 
+import { validate as v, z, s as str, bool, email } from './validate.js';
+const nlSubS = z.object({ website: str(2000), ft: str(500), email, consent: bool, lang: str(8), source: str(40) });
+const nlUnsubS = z.object({ token: str(200) });
 export function registerNewsletter(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
   const langOf = (v: unknown): L => ((LANGS as readonly string[]).includes(String(v)) ? (String(v) as L) : 'en');
 
   // Opt-in (only from an explicit, unticked checkbox). Always answers the same, so addresses cannot be probed.
-  app.post('/api/newsletter/subscribe', limiter, async (req: Request, res: Response) => {
+  app.post('/api/newsletter/subscribe', limiter, v(nlSubS), async (req: Request, res: Response) => {
     const email = String(req.body?.email ?? '').trim().toLowerCase().slice(0, 254);
     if (!EMAIL_RE.test(email) || req.body?.consent !== true) return res.status(400).json({ error: 'bad_request' });
     let s = await find('email', email);
@@ -101,5 +104,5 @@ export function registerNewsletter(app: Express, d: Deps) {
     return res.type('html').send(html(s.lang, PAGE[s.lang].out, PAGE[s.lang].outBody));
   };
   app.get('/api/newsletter/unsubscribe', unsubscribe);
-  app.post('/api/newsletter/unsubscribe', unsubscribe);
+  app.post('/api/newsletter/unsubscribe', v(nlUnsubS), unsubscribe);
 }

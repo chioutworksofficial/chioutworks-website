@@ -72,11 +72,13 @@ async function readDays(n: number): Promise<Ev[]> {
 
 interface Deps { requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>; rateSkip?: () => boolean }
 
+import { validate as v, z, s as str } from './validate.js';
+const beaconS = z.union([z.string().max(4000), z.object({ k: str(10), wd: z.any().optional(), eng: z.any().optional() }).passthrough()]);
 export function registerAnalytics(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
   const perVisitor = new Map<string, number>();   // events per visitor hash per day (in memory)
 
-  app.post('/api/a', limiter, async (req: Request, res: Response) => {
+  app.post('/api/a', limiter, v(beaconS), async (req: Request, res: Response) => {
     res.status(204).end();   // answer at once; never leak anything back
     try {
       const b = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});

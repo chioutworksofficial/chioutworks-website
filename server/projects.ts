@@ -131,6 +131,15 @@ const safeName = (n: string) => clean(n, 120).replace(/[/\\?%*:|"<>]/g, '_') || 
 
 interface Deps { requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>; rateSkip?: () => boolean; getGroq?: () => Groq | null }
 
+import { validate as v, z, s, bool, anyObj, idP, tokenP } from './validate.js';
+const prjUiS = z.object({ lang: s(8), texts: anyObj });
+const prjLangS = z.object({ lang: s(8) });
+const prjTextS = z.object({ text: s(4000) });
+const prjPatchS = z.object({ previewUrl: s(400), stage: anyObj, requestDone: anyObj, preview: anyObj }).passthrough();
+const prjTransS = z.object({ texts: z.array(z.any()).max(100).nullish() });
+const prjDelP = z.object({ id: idP.shape.id, kind: z.enum(['messages', 'files', 'requests']), itemId: idP.shape.id });
+
+import { recordError } from './errors.js';
 export function registerProjects(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
   const uploadLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
@@ -165,7 +174,7 @@ export function registerProjects(app: Express, d: Deps) {
         const p = await getProject(projectId);
         if (p) { p.tr = p.tr ?? {}; p.tr[lang] = { ...(p.tr[lang] ?? {}), ...fresh }; await saveProject(p); }
         Object.assign(cache, fresh);
-      } catch (e) { console.error('[projects] localize failed', (e as Error).message); }
+      } catch (e) { void recordError('projects/localize-failed', e); console.error('[projects] localize failed', (e as Error).message); }
     }
     return texts.map((t) => (t ? cache[hash(t)] ?? t : t));
   };
@@ -196,7 +205,7 @@ export function registerProjects(app: Express, d: Deps) {
     const t = sniff(buf); if (!t) return 'type_not_allowed';
     const f: PFile = { id: newId(), name: safeName(name), size: buf.length, type: t.type, from, at: new Date().toISOString(), preview: false };
     if (dbOn()) {
-      try { await storagePut(`${p.id}/${f.id}.${t.ext}`, buf, t.type); } catch (e) { console.error('[projects] upload failed', (e as Error).message); return 'storage_failed'; }
+      try { await storagePut(`${p.id}/${f.id}.${t.ext}`, buf, t.type); } catch (e) { void recordError('projects/upload-failed', e); console.error('[projects] upload failed', (e as Error).message); return 'storage_failed'; }
     } else {
       const dir = path.join(FILES, p.id); fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, `${f.id}.${t.ext}`), buf);
@@ -230,7 +239,7 @@ export function registerProjects(app: Express, d: Deps) {
     if (dirty) await saveProject(p);
     res.set('Cache-Control', 'no-store'); return res.json(await pubLocal(p));
   });
-  app.post('/api/project/:token/ui', limiter, express.json({ limit: '24kb' }), async (req, res) => {
+  app.post('/api/project/:token/ui', limiter, express.json({ limit: '24kb' }), v(prjUiS, tokenP), async (req, res) => {
     const p = await getProjectByToken(String(req.params.token)); if (!p) return res.status(404).json({ error: 'not_found' });
     const lang = String(req.body?.lang ?? ''); if (!VIEW_LANGS[lang]) return res.status(400).json({ error: 'bad_lang' });
     const src = req.body?.texts && typeof req.body.texts === 'object' ? req.body.texts as Record<string, unknown> : {};
@@ -250,12 +259,12 @@ export function registerProjects(app: Express, d: Deps) {
         need.forEach((t, i) => { const v = clean(out.texts?.[i], 400); if (v) cache[hash(t)] = v; });
         store = await uiRead();
         store[lang] = { ...(store[lang] ?? {}), ...cache }; await uiWrite(store);
-      } catch (e) { console.error('[projects] ui translate failed', (e as Error).message); }
+      } catch (e) { void recordError('projects/ui-translate-failed', e); console.error('[projects] ui translate failed', (e as Error).message); }
     }
     return res.json({ texts: Object.fromEntries(keys.map((k, i) => [k, cache[hash(texts[i])] ?? texts[i]])) });
   });
   // The client picks the language of their project page; it stays until the project ends (e-mails follow it too)
-  app.post('/api/project/:token/lang', limiter, express.json({ limit: '1kb' }), async (req, res) => {
+  app.post('/api/project/:token/lang', limiter, express.json({ limit: '1kb' }), v(prjLangS, tokenP), async (req, res) => {
     const p = await getProjectByToken(String(req.params.token));
     if (!p) return res.status(404).json({ error: 'not_found' });
     const l = String(req.body?.lang ?? ''); if (!VIEW_LANGS[l]) return res.status(400).json({ error: 'bad_lang' });
@@ -263,21 +272,21 @@ export function registerProjects(app: Express, d: Deps) {
     if (['tr', 'en', 'de', 'el'].includes(l)) p.lang = l as L;   // site language (link, e-mails) follows when it is one of the 4 site languages
     await saveProject(p); return res.json({ ok: true, path: projectPath(p.lang, p.token) });
   });
-  app.post('/api/project/:token/messages', limiter, express.json({ limit: '16kb' }), async (req, res) => {
+  app.post('/api/project/:token/messages', limiter, express.json({ limit: '16kb' }), v(prjTextS, tokenP), async (req, res) => {
     const p = await getProjectByToken(String(req.params.token));
     if (!p) return res.status(404).json({ error: 'not_found' });
     const text = clean(req.body?.text, 4000); if (!text) return res.status(400).json({ error: 'empty' });
     p.messages.push({ id: newId(), from: 'client', text, at: new Date().toISOString() }); p.unreadOwner += 1; await saveProject(p);
     return res.json({ ok: true });
   });
-  app.post('/api/project/:token/requests', limiter, express.json({ limit: '16kb' }), async (req, res) => {
+  app.post('/api/project/:token/requests', limiter, express.json({ limit: '16kb' }), v(prjTextS, tokenP), async (req, res) => {
     const p = await getProjectByToken(String(req.params.token));
     if (!p) return res.status(404).json({ error: 'not_found' });
     const text = clean(req.body?.text, 2000); if (!text) return res.status(400).json({ error: 'empty' });
     p.requests.push({ id: newId(), text, at: new Date().toISOString(), done: false, doneAt: null }); p.unreadOwner += 1; await saveProject(p);
     return res.json({ ok: true });
   });
-  app.post('/api/project/:token/files', uploadLimiter, raw, async (req, res) => {
+  app.post('/api/project/:token/files', uploadLimiter, raw, v(undefined, tokenP), async (req, res) => {
     const p = await getProjectByToken(String(req.params.token));
     if (!p) return res.status(404).json({ error: 'not_found' });
     const buf = req.body as Buffer;
@@ -300,7 +309,7 @@ export function registerProjects(app: Express, d: Deps) {
   app.get('/api/admin/projects', async (req, res) => { if (!(await d.requireAdmin(req, res))) return; return res.json({ projects: (await listProjects()).map(brief).reverse() }); });
   app.get('/api/admin/projects/:id', async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
-    const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
+    const p = await getProject(String(req.params.id)); if (!p) return res.status(404).json({ error: 'not_found' });
     if (p.unreadOwner) { p.unreadOwner = 0; await saveProject(p); }
     // The owner reads what the client wrote in Turkish as well
     const out = pub(p);
@@ -310,9 +319,9 @@ export function registerProjects(app: Express, d: Deps) {
       messages: out.messages.map((m) => (m.from === 'client' && m.text ? { ...m, textTr: tr[k++] } : m)),
       requests: out.requests.map((r) => ({ ...r, textTr: tr[k++] })) } });
   });
-  app.patch('/api/admin/projects/:id', express.json({ limit: '32kb' }), async (req, res) => {
+  app.patch('/api/admin/projects/:id', express.json({ limit: '32kb' }), v(prjPatchS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
-    const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
+    const p = await getProject(String(req.params.id)); if (!p) return res.status(404).json({ error: 'not_found' });
     const b = req.body ?? {}; const now = new Date().toISOString();
     if (typeof b.previewUrl === 'string') { const u = clean(b.previewUrl, 400); p.previewUrl = /^https?:\/\//.test(u) || !u ? u : ''; }
     if (b.stage && STAGES.includes(b.stage.key)) {
@@ -331,10 +340,10 @@ export function registerProjects(app: Express, d: Deps) {
     return res.json({ ok: true });
   });
   // Owner writes in Turkish → the client's language (texts of one step: note + items). Not saved here; the admin saves.
-  app.post('/api/admin/projects/:id/translate', express.json({ limit: '32kb' }), async (req, res) => {
+  app.post('/api/admin/projects/:id/translate', express.json({ limit: '32kb' }), v(prjTransS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const groq = d.getGroq?.(); if (!groq) return res.status(503).json({ error: 'ai_unavailable' });
-    const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
+    const p = await getProject(String(req.params.id)); if (!p) return res.status(404).json({ error: 'not_found' });
     const texts: string[] = (Array.isArray(req.body?.texts) ? req.body.texts : []).slice(0, 41).map((t: unknown) => clean(t, 600));
     const target = LANG_NAME[viewOf(p)] ?? 'English';
     try {
@@ -345,18 +354,18 @@ export function registerProjects(app: Express, d: Deps) {
       } as any) as any;
       const out = JSON.parse(c.choices[0]?.message?.content ?? '{}');
       return res.json({ texts: texts.map((t, i) => clean(out.texts?.[i], 600) || t) });
-    } catch (e) { console.error('[projects] translate failed', (e as Error).message); return res.status(502).json({ error: 'ai_failed' }); }
+    } catch (e) { void recordError('projects/translate-failed', e); console.error('[projects] translate failed', (e as Error).message); return res.status(502).json({ error: 'ai_failed' }); }
   });
-  app.post('/api/admin/projects/:id/messages', express.json({ limit: '16kb' }), async (req, res) => {
+  app.post('/api/admin/projects/:id/messages', express.json({ limit: '16kb' }), v(prjTextS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
-    const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
+    const p = await getProject(String(req.params.id)); if (!p) return res.status(404).json({ error: 'not_found' });
     const text = clean(req.body?.text, 4000); if (!text) return res.status(400).json({ error: 'empty' });
     p.messages.push({ id: newId(), from: 'owner', text, at: new Date().toISOString() }); p.unreadClient += 1; await saveProject(p);
     return res.json({ ok: true });
   });
-  app.post('/api/admin/projects/:id/files', raw, async (req, res) => {
+  app.post('/api/admin/projects/:id/files', raw, v(undefined, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
-    const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
+    const p = await getProject(String(req.params.id)); if (!p) return res.status(404).json({ error: 'not_found' });
     const r = await saveFile(p, req.body as Buffer, String(req.query.name ?? ''), 'owner');
     if (typeof r === 'string') return res.status(400).json({ error: r });
     if (r.type.startsWith('image/') && req.query.preview === '1') r.preview = true;
@@ -364,14 +373,14 @@ export function registerProjects(app: Express, d: Deps) {
     return res.json({ ok: true, file: r });
   });
   // Owner only: remove a message, a file (with its chat bubble) or a change request. Files are deleted from disk too.
-  app.delete('/api/admin/projects/:id/:kind/:itemId', async (req, res) => {
+  app.delete('/api/admin/projects/:id/:kind/:itemId', v(undefined, prjDelP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
-    const p = await getProject(req.params.id); if (!p) return res.status(404).json({ error: 'not_found' });
+    const p = await getProject(String(req.params.id)); if (!p) return res.status(404).json({ error: 'not_found' });
     const id = String(req.params.itemId);
     const dropFile = async (fid: string) => {
       const gone = p.files.find((f) => f.id === fid);
       p.files = p.files.filter((f) => f.id !== fid); p.messages = p.messages.filter((m) => m.fileId !== fid);
-      if (dbOn()) { if (gone) try { await storageDel(`${p.id}/${fid}.${EXT[gone.type] ?? ''}`); } catch (e) { console.error('[projects] file delete failed', (e as Error).message); } return; }
+      if (dbOn()) { if (gone) try { await storageDel(`${p.id}/${fid}.${EXT[gone.type] ?? ''}`); } catch (e) { void recordError('projects/file-delete-failed', e); console.error('[projects] file delete failed', (e as Error).message); } return; }
       const dir = path.join(FILES, p.id);
       try { for (const n of fs.readdirSync(dir)) if (n.startsWith(fid + '.')) fs.unlinkSync(path.join(dir, n)); } catch { /* no folder */ }
     };
@@ -383,7 +392,7 @@ export function registerProjects(app: Express, d: Deps) {
   });
   app.get('/api/admin/projects/:id/files/:fileId', async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
-    const p = await getProject(req.params.id); if (!p) return res.status(404).end();
+    const p = await getProject(String(req.params.id)); if (!p) return res.status(404).end();
     return sendFile(res, p, String(req.params.fileId));
   });
 }

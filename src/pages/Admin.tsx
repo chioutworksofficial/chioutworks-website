@@ -10,13 +10,14 @@ import AppointmentsView from '../components/admin/AppointmentsView';
 import IntakesView from '../components/admin/IntakesView';
 import OffersView from '../components/admin/OffersView';
 import ProjectsView from '../components/admin/ProjectsView';
+import ErrorsView from '../components/admin/ErrorsView';
 
 type Auth = 'checking' | 'out' | 'in' | 'unset';
-export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects';
+export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Genel bakış' }, { key: 'requests', label: 'Talepler' }, { key: 'intakes', label: 'Analiz formları' }, { key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' },
   { key: 'voice', label: 'Sesli görüşmeler' }, { key: 'calendar', label: 'Takvim' },
-  { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'appointments', label: 'Randevular' },
+  { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'appointments', label: 'Randevular' }, { key: 'errors', label: 'Hatalar / Errors' },
 ];
 
 function Login({ unset, onDone }: { unset: boolean; onDone: () => void }) {
@@ -144,6 +145,7 @@ export default function Admin() {
         {tab === 'calendar' && <AvailabilityPanel onSaved={setBlocked} />}
         {tab === 'analytics' && <AnalyticsView />}
         {tab === 'appointments' && <AppointmentsView />}
+        {tab === 'errors' && <ErrorsView />}
       </main>
     </div>
   );

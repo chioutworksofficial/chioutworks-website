@@ -25,6 +25,8 @@ import { registerAffiliates } from './affiliates.js';
 import { registerPreview } from './preview.js';
 import { languageOk, SAFE_FALLBACK } from './languageGuard.js';
 import { ids as abuseIds, recordAbuse, voiceBlocked, chatState, recordStrike, blockedMsg, adminList, adminUnlock, rateOk, globalOk, textMsgAllowed, TEXT_SESSION_MAX, insult, abuseExempt, MSG as ABUSE_MSG } from './abuse.js';
+import { validate as v, z, s, idP, LANG, email, emailOpt, bool, anyObj } from './validate.js';
+import { recordError } from './errors.js';
 import { shapeReply, tooLong, truncateReply } from './shapeGuard.js';
 import { pool, capReached, markQuota, quotaRecently, isQuotaError, livePressure, countSession, mintToken, buildLiveInstruction, liveConfigured, type LiveTurn } from './geminiLive.js';
 
@@ -193,6 +195,12 @@ app.use('/api/admin', (req, res, next) => {
   return res.status(403).json({ error: 'forbidden_origin' });
 });
 
+// Auth before validation: an unauthenticated caller gets 401 (never 400) on admin mutations (requireAdmin is hoisted).
+app.use('/api/admin', async (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS' || req.path === '/login' || req.path === '/logout') return next();
+  if (await requireAdmin(req, res)) return next();
+});
+
 // Voice sessions carry whole transcripts (up to 30 turns x 2000 chars)
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '512kb' })); // Stripe signature needs the raw body
 app.use('/api/voice', express.json({ limit: '128kb' }));
@@ -288,7 +296,7 @@ async function sendDemoEmail(to: string, code: string, lang: string): Promise<bo
     if (!r.ok) console.error('[demo] Resend error', r.status, await r.text());
     return r.ok;
   } catch (e) {
-    console.error('[demo] Resend request failed', e);
+    void recordError('demo/Resend-request-failed', e); console.error('[demo] Resend request failed', e);
     return false;
   }
 }
@@ -325,7 +333,34 @@ const demoVerifyLimiter = rateLimit({ store: rlStore('demoVerifyLimiter'),
 });
 
 // ── POST /api/demo/request-code ────────────────────────────────────────────
-app.post('/api/demo/request-code', demoRequestLimiter, async (req, res) => {
+// ── Request schemas (zod; defence in depth, handlers still sanitise). Failure → 400 {ok:false,error:'invalid'} ──
+const WS = { website: s(2000), ft: s(500) };   // honeypot + signed form token (read by botGate)
+const demoReqS = z.object({ email, name: s(80), phone: s(60), demo: s(40), lang: LANG.nullish() });
+const demoVerS = z.object({ code: s(16) });
+const quoteS = z.object({ ...WS, email, name: s(80), business: s(100), message: s(1000), demo: s(40), lang: LANG.nullish(), kind: s(20), modules: z.array(z.string().max(30)).max(20).nullish() });
+const loginS = z.object({ password: s(500), remember: bool });
+const roiS = z.object({ ...WS, email, name: s(80), company: s(100), lang: LANG.nullish(), page: s(200), roiCalc: z.any().optional() });
+const consentS = z.object({ id: z.string().regex(/^[0-9a-f-]{36}$/i), v: z.number().int(), functional: bool, statistics: bool });
+const availS = z.object({ blocked: z.array(z.string().max(10)).max(1000) });
+const contactS = z.object({ ...WS, email: emailOpt, phone: s(40), name: s(80), message: s(1000), preferredStart: s(10), callTime: s(5), voiceSessionId: s(64), voiceSecret: s(200),
+  roiCalc: z.any().optional(), topic: s(20), via: s(20), business: s(100), city: s(80), address: s(200), replyPreference: s(10), lang: LANG.nullish(), page: s(200) });
+const manualS = z.object({ name: s(80), email: emailOpt, phone: s(40), business: s(100), address: s(200), message: s(2000), lang: LANG.nullish() });
+const readS = z.object({ read: bool });
+const statusS = z.object({ lang: LANG.nullish(), bid: s(200) });
+const unlockS = z.object({ k: s(24) });
+const ttsS = z.object({ text: s(600), sessionId: s(64), lang: LANG.nullish() });
+const turnS = z.object({ role: z.enum(['user', 'assistant']), text: z.string().max(20000), at: z.number().nullish() }).passthrough();
+const sessionS = z.object({ lang: LANG, turns: z.array(turnS).min(1).max(30), id: s(64), secret: s(200), consent: bool, kind: s(10), firstName: s(100), lastName: s(100), salutation: s(10), startedAt: z.any().optional(), endedAt: z.any().optional() }).passthrough();
+const cardS = z.object({ secret: s(200), name: s(80), email: emailOpt, phone: s(40), business: s(100), city: s(80), message: s(2000) }).passthrough();
+const vcontactS = z.object({ ...WS, email, name: s(80), phone: s(60), message: s(1000), secret: s(200) });
+const vreqS = z.object({ ...WS, email, firstName: s(40), lastName: s(40), secret: s(200), page: s(200) });
+const bulkS = z.object({ ids: z.array(z.string().max(100)).min(1).max(500), action: z.enum(['read', 'unread', 'delete']) });
+const liveTokS = z.object({ consent: bool, consentVersion: s(40), lang: LANG.nullish(), bid: s(200), prevSessionId: s(64), ticket: s(64), visitor: anyObj, transcript: z.array(z.any()).max(200).nullish() }).passthrough();
+const liveBeatS = z.object({ sessionId: s(64), abuse: bool, bid: s(200) });
+const extractS = z.object({ consent: bool, consentVersion: s(40), transcript: z.array(z.any()).max(200).nullish(), groqOk: bool });
+const chatS = z.object({ messages: z.array(z.object({ role: s(20), content: z.any().optional() }).passthrough()).max(60), language: s(8), bid: s(200), visitor: anyObj, voice: bool, sess: anyObj, hour: z.any().optional() }).passthrough();
+
+app.post('/api/demo/request-code', demoRequestLimiter, v(demoReqS), async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase();
   const name = String(req.body?.name ?? '').trim().slice(0, 80) || undefined;
   const phone = String(req.body?.phone ?? '').replace(/[^\d+\s()-]/g, '').trim().slice(0, 30) || undefined;
@@ -372,13 +407,13 @@ app.post('/api/demo/request-code', demoRequestLimiter, async (req, res) => {
       ...(live ? {} : { devCode: lead.code }),
     });
   } catch (err) {
-    console.error('[demo] request-code failed', err);
+    void recordError('demo/request-code-failed', err); console.error('[demo] request-code failed', err);
     return res.status(500).json({ ok: false, error: 'server' });
   }
 });
 
 // ── POST /api/demo/verify ──────────────────────────────────────────────────
-app.post('/api/demo/verify', demoVerifyLimiter, async (req, res) => {
+app.post('/api/demo/verify', demoVerifyLimiter, v(demoVerS), async (req, res) => {
   const code = String(req.body?.code ?? '').replace(/\D/g, '');
   if (code.length !== 6) return res.status(400).json({ ok: false, error: 'invalid_code' });
 
@@ -395,7 +430,7 @@ app.post('/api/demo/verify', demoVerifyLimiter, async (req, res) => {
     if (db) await dbUpsert('demo_access', demoRow(lead), 'code'); else saveDemoLeads(leads);
     return res.json({ ok: true, expiresAt: lead.expiresAt, email: lead.email });
   } catch (err) {
-    console.error('[demo] verify failed', err);
+    void recordError('demo/verify-failed', err); console.error('[demo] verify failed', err);
     return res.status(500).json({ ok: false, error: 'server' });
   }
 });
@@ -448,7 +483,7 @@ const quoteLimiter = rateLimit({ store: rlStore('quoteLimiter'),
   message: { ok: false, error: 'rate_limited' },
 });
 
-app.post('/api/demo/quote', quoteLimiter, botGate, async (req, res) => {
+app.post('/api/demo/quote', quoteLimiter, botGate, v(quoteS), async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase();
   if (!EMAIL_RE.test(email) || email.length > 254) return res.status(400).json({ ok: false, error: 'invalid_email' });
 
@@ -487,13 +522,13 @@ app.post('/api/demo/quote', quoteLimiter, botGate, async (req, res) => {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ from: process.env.DEMO_EMAIL_FROM, to: [notify], reply_to: quote.email, subject: `${quote.kind === 'demo-request' ? 'Demo request' : 'Quote request'}: ${quote.business || quote.email} (${quote.demo})`, text: body }),
-      }).catch((e) => console.error('[quote] notify failed', e));
+      }).catch((e) => { void recordError('quote/notify-failed', e); console.error('[quote] notify failed', e); });
     } else {
       console.log(`[quote] new request (${quote.demo}): ${quote.modules.join(', ')}`);   // no personal data in logs
     }
     return res.json({ ok: true });
   } catch (err) {
-    console.error('[quote] failed', err);
+    void recordError('quote/failed', err); console.error('[quote] failed', err);
     return res.status(500).json({ ok: false, error: 'server' });
   }
 });
@@ -545,7 +580,7 @@ const loginLimiter = rateLimit({ store: rlStore('loginLimiter'),
   windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false,
   message: { error: 'rate_limited', message: 'Çok fazla deneme yapıldı. Lütfen 15 dakika sonra tekrar deneyin.' },
 });
-app.post('/api/admin/login', loginLimiter, async (req, res) => {
+app.post('/api/admin/login', loginLimiter, v(loginS), async (req, res) => {
   if (!process.env.ADMIN_TOKEN) return res.status(503).json({ error: 'admin_token_not_configured' });
   if (!tokenOk(String(req.body?.password ?? '').slice(0, 500))) return res.status(401).json({ error: 'wrong_password' });
   const ttl = req.body?.remember === true ? 30 * 24 * 3600e3 : 12 * 3600e3;
@@ -598,7 +633,7 @@ app.get('/api/rates', async (_req, res) => {
 
 // Savings calculator: optional e-mail left when downloading the PDF report → request in admin (source "calculator").
 // Stored only to reply in writing; no newsletter (marketing needs a separate double opt-in, see server/newsletter.ts).
-app.post('/api/roi-report', quoteLimiter, botGate, async (req, res) => {
+app.post('/api/roi-report', quoteLimiter, botGate, v(roiS), async (req, res) => {
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const email = str(req.body?.email, 254).toLowerCase();
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
@@ -614,7 +649,7 @@ app.post('/api/roi-report', quoteLimiter, botGate, async (req, res) => {
     await saveRequest(rec);
     return res.json({ ok: true });
   } catch (err) {
-    console.error('[roi-report] save failed', err);
+    void recordError('roi-report/save-failed', err); console.error('[roi-report] save failed', err);
     return res.status(500).json({ error: 'server' });
   }
 });
@@ -622,7 +657,7 @@ app.post('/api/roi-report', quoteLimiter, botGate, async (req, res) => {
 // Proof of cookie consent (GDPR Art. 7(1)): random id, version, choices, time. No IP, no user agent.
 const CONSENT_STORE = path.join(__dirname, '../data/consents.json');
 const consentLimiter = rateLimit({ store: rlStore('consentLimiter'), windowMs: 10 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, skip: demoLimitSkip });
-app.post('/api/consent', consentLimiter, async (req, res) => {
+app.post('/api/consent', consentLimiter, v(consentS), async (req, res) => {
   const b = req.body ?? {};
   const id = String(b.id ?? '');
   if (!/^[0-9a-f-]{36}$/i.test(id) || !Number.isInteger(b.v)) return res.status(400).json({ error: 'bad_request' });
@@ -638,7 +673,7 @@ app.post('/api/consent', consentLimiter, async (req, res) => {
     atomicWrite(CONSENT_STORE, all.slice(-20000));
     return res.json({ ok: true });
   } catch (err) {
-    console.error('[consent] save failed', err);
+    void recordError('consent/save-failed', err); console.error('[consent] save failed', err);
     return res.status(500).json({ error: 'server' });
   }
 });
@@ -655,7 +690,7 @@ app.get('/api/availability', async (_req, res) => {
   return res.json({ blocked: (await readBlocked()).filter((d) => d >= today) });
 });
 
-app.put('/api/admin/availability', async (req, res) => {
+app.put('/api/admin/availability', v(availS), async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   const b = req.body?.blocked;
   if (!Array.isArray(b) || b.some((x) => typeof x !== 'string' || !isRealDate(x))) return res.status(400).json({ error: 'invalid' });
@@ -699,7 +734,7 @@ function legacySource(r: LegacyReq, sessions: Map<string, VoiceSession['kind']>)
   return 'form';
 }
 
-app.post('/api/contact', quoteLimiter, botGate, async (req, res) => {
+app.post('/api/contact', quoteLimiter, botGate, v(contactS), async (req, res) => {
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   if (str(req.body?.website, 200)) return res.json({ ok: true }); // honeypot
   const email = str(req.body?.email, 254).toLowerCase();
@@ -751,7 +786,7 @@ app.post('/api/contact', quoteLimiter, botGate, async (req, res) => {
     notifyOwnerOfRequest(rec, 'Contact');
     return res.json({ ok: true });
   } catch (err) {
-    console.error('[contact] failed', err);
+    void recordError('contact/failed', err); console.error('[contact] failed', err);
     return res.status(500).json({ ok: false, error: 'server' });
   }
 });
@@ -766,14 +801,14 @@ function notifyOwnerOfRequest(rec: any, label: string) {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: process.env.DEMO_EMAIL_FROM, to: [notify], ...(rec.email ? { reply_to: rec.email } : {}), subject: `${label}: ${rec.name}`, text: body }),
-    }).catch((e) => console.error('[contact] notify failed', e));
+    }).catch((e) => { void recordError('contact/notify-failed', e); console.error('[contact] notify failed', e); });
   } else {
     console.log('[contact] new message received');   // no personal data in logs
   }
 }
 
 // Owner adds a person by hand (details given by phone, in person, etc.); then creates an intake link from it as usual
-app.post('/api/admin/quote-requests', async (req, res) => {
+app.post('/api/admin/quote-requests', v(manualS), async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const name = str(req.body?.name, 80); const email = str(req.body?.email, 254).toLowerCase(); const phone = str(req.body?.phone, 40);
@@ -788,7 +823,7 @@ app.post('/api/admin/quote-requests', async (req, res) => {
     await saveRequest(rec);
     return res.json({ request: rec });
   } catch (err) {
-    console.error('[admin] manual add failed', err);
+    void recordError('admin/manual-add-failed', err); console.error('[admin] manual add failed', err);
     return res.status(500).json({ error: 'server' });
   }
 });
@@ -800,7 +835,7 @@ app.get('/api/admin/quote-requests', async (req, res) => {
   const withSource = (all as LegacyReq[]).map((r) => (r.source ? r : { ...r, source: legacySource(r, sessions) }));
   return res.json({ requests: withSource.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
 });
-app.patch('/api/admin/quote-requests/:id', async (req, res) => {
+app.patch('/api/admin/quote-requests/:id', v(readS, idP), async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   const r = await getRequest(String(req.params.id));
   if (!r) return res.status(404).json({ error: 'not_found' });
@@ -808,7 +843,7 @@ app.patch('/api/admin/quote-requests/:id', async (req, res) => {
   await saveRequest(r);
   return res.json({ ok: true });
 });
-app.delete('/api/admin/quote-requests/:id', async (req, res) => {
+app.delete('/api/admin/quote-requests/:id', v(undefined, idP), async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   if (!(await getRequest(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
   await deleteRequests([String(req.params.id)]);
@@ -865,14 +900,14 @@ async function reserveTts(len: number, sessionId: string): Promise<boolean> {
   return true;
 }
 // Chat abuse: visitor status (client checks before a new chat, no model call) and admin unlock (owner 2026-11-19)
-app.post('/api/assistant/status', async (req, res) => {
+app.post('/api/assistant/status', v(statusS), async (req, res) => {
   const lang = ['tr', 'en', 'de', 'el'].includes(req.body?.lang) ? req.body.lang : 'en';
   if (abuseExempt(req.ip ?? 'anon')) return res.json({ blocked: false });
   const cs = await chatState(abuseIds(req.ip ?? 'anon', req.body?.bid));
   res.json(cs.blocked ? { blocked: true, permanent: cs.permanent, until: cs.until, message: blockedMsg(lang, cs) } : { blocked: false });
 });
 app.get('/api/admin/abuse', async (req, res) => { if (!(await requireAdmin(req, res))) return; res.json(await adminList()); });
-app.post('/api/admin/abuse/unlock', async (req, res) => {
+app.post('/api/admin/abuse/unlock', v(unlockS), async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   const k = typeof req.body?.k === 'string' && /^[0-9a-f]{24}$/.test(req.body.k) ? req.body.k : '';
   if (!k) return res.status(400).json({ error: 'bad_key' });
@@ -884,7 +919,7 @@ app.get('/api/admin/tts-usage', async (req, res) => {
   return res.json({ ...(await readTtsUsage()), cap: TTS_MONTHLY_CAP });
 });
 
-app.post('/api/assistant/tts', ttsLimiter, async (req, res) => {
+app.post('/api/assistant/tts', ttsLimiter, v(ttsS), async (req, res) => {
   const key = process.env.AZURE_SPEECH_KEY;
   const region = process.env.AZURE_SPEECH_REGION;
   if (!key || !region || !/^[a-z0-9-]+$/i.test(region)) return res.status(501).json({ error: 'tts_unavailable' });
@@ -893,7 +928,7 @@ app.post('/api/assistant/tts', ttsLimiter, async (req, res) => {
   const sessionId = String(req.body?.sessionId ?? '').slice(0, 64) || (req.ip ?? 'anon');
   try {
     if (!(await reserveTts(text.length, sessionId))) return res.status(429).json({ fallback: true });
-  } catch (err) { console.error('[tts] usage store failed', err); return res.status(429).json({ fallback: true }); }
+  } catch (err) { void recordError('tts/usage-store-failed', err); console.error('[tts] usage store failed', err); return res.status(429).json({ fallback: true }); }
   const v = AZURE_VOICES[req.body?.lang] ?? AZURE_VOICES.en;
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${v.locale}"><voice name="${v.voice}">${xmlEscape(text)}</voice></speak>`;
   try {
@@ -911,7 +946,7 @@ app.post('/api/assistant/tts', ttsLimiter, async (req, res) => {
     res.setHeader('Content-Type', 'audio/mpeg');
     return res.send(Buffer.from(await r.arrayBuffer()));
   } catch (err) {
-    console.error('[tts] failed', err);
+    void recordError('tts/failed', err); console.error('[tts] failed', err);
     return res.status(502).json({ error: 'tts_failed' });
   }
 });
@@ -964,7 +999,7 @@ const safeEq = (a: unknown, b: unknown) => {
 };
 
 // Create, or update when {id, secret} of an existing session are supplied (id+secret is the capability).
-app.post('/api/voice/session', sessionLimiter, async (req, res) => {
+app.post('/api/voice/session', sessionLimiter, v(sessionS), async (req, res) => {
   const { lang, turns, startedAt, endedAt, id, secret } = req.body ?? {};
   if (!DEMO_LANGS.has(lang) || !Array.isArray(turns) || turns.length === 0 || turns.length > 30) {
     return res.status(400).json({ error: 'invalid_session' });
@@ -1005,7 +1040,7 @@ app.post('/api/voice/session', sessionLimiter, async (req, res) => {
     await saveVoice(session);
     return res.json({ id: session.id, secret: session.secret });
   } catch (err) {
-    console.error('[voice] save failed', err);
+    void recordError('voice/save-failed', err); console.error('[voice] save failed', err);
     return res.status(500).json({ error: 'server' });
   }
 });
@@ -1022,7 +1057,7 @@ app.get('/api/voice/session/:id/request', sessionLimiter, async (req, res) => {
   const c = await cardRequest(req);
   return c ? res.json(cardOut(c.r)) : res.status(404).json({ error: 'not_found' });
 });
-app.patch('/api/voice/session/:id/request', sessionLimiter, async (req, res) => {
+app.patch('/api/voice/session/:id/request', sessionLimiter, v(cardS, idP), async (req, res) => {
   const c = await cardRequest(req);
   if (!c) return res.status(404).json({ error: 'not_found' });
   const str = (v: unknown, n: number) => String(v ?? '').replace(/[<>\u0000-\u001f]/g, ' ').trim().slice(0, n);
@@ -1033,7 +1068,7 @@ app.patch('/api/voice/session/:id/request', sessionLimiter, async (req, res) => 
     await saveRequest(c.r);
     c.s.contact = { name, email, phone, message: c.r.message }; await saveVoice(c.s);
     return res.json(cardOut(c.r));
-  } catch (err) { console.error('[voice] card update failed'); return res.status(500).json({ error: 'server' }); }
+  } catch (err) { void recordError('voice/card-update-failed', err); console.error('[voice] card update failed'); return res.status(500).json({ error: 'server' }); }
 });
 
 // Read-only transcript for the visitor: only with the matching secret (404 unknown id, 403 wrong secret).
@@ -1053,7 +1088,7 @@ async function pruneVoice() {
       : await listVoice();
     const old = all.filter((x) => !x.contactSubmitted && !(new Date(x.createdAt).getTime() > cutoff));
     if (old.length) { await deleteVoice(old.map((x) => x.id)); console.log(`[voice] pruned ${old.length} old sessions`); }
-  } catch (err) { console.error('[voice] prune failed', err); }
+  } catch (err) { void recordError('voice/prune-failed', err); console.error('[voice] prune failed', err); }
 }
 if (!process.env.VERCEL) {
   void pruneVoice();
@@ -1061,6 +1096,18 @@ if (!process.env.VERCEL) {
 }
 
 // Daily job for Vercel Cron (the in-process timer above only runs on a long-lived server): keep-alive + cleanups.
+// Own error log (server/errors.ts): latest 200 rows, and clear. The /api/admin Origin check above covers the DELETE.
+app.get('/api/admin/errors', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  res.set('Cache-Control', 'no-store');
+  return res.json({ errors: dbOn() ? (await dbSelect('app_errors', 'select=id,t,route,kind,message,count&order=t.desc&limit=200').catch(() => [])).slice(0, 200) : [] });
+});
+app.delete('/api/admin/errors', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  if (dbOn()) await dbDelete('app_errors', `t=lte.${new Date(Date.now() + 86400e3).toISOString()}`);
+  return res.json({ ok: true });
+});
+
 app.get('/api/cron/daily', async (req, res) => {
   const secret = process.env.CRON_SECRET;
   if (!secret) return res.status(503).json({ error: 'cron_not_configured' });
@@ -1068,10 +1115,11 @@ app.get('/api/cron/daily', async (req, res) => {
   if (!crypto.timingSafeEqual(given, crypto.createHash('sha256').update(`Bearer ${secret}`).digest())) return res.status(401).json({ error: 'unauthorized' });
   if (dbOn()) await kvSet('keepalive', { at: new Date().toISOString() });
   await pruneVoice();
+  if (dbOn()) await dbDelete('app_errors', `t=lt.${new Date(Date.now() - 30 * 86400e3).toISOString()}`).catch((e) => console.error('[cron] errors prune failed', (e as Error).message));   // 30-day retention
   return res.json({ ok: true });
 });
 
-app.post('/api/voice/session/:id/contact', voiceLimiter, botGate, async (req, res) => {
+app.post('/api/voice/session/:id/contact', voiceLimiter, botGate, v(vcontactS, idP), async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase();
   if (!EMAIL_RE.test(email) || email.length > 254) return res.status(400).json({ error: 'invalid_email' });
   const contact = {
@@ -1089,13 +1137,13 @@ app.post('/api/voice/session/:id/contact', voiceLimiter, botGate, async (req, re
     await saveVoice(s);
     return res.json({ ok: true });
   } catch (err) {
-    console.error('[voice] contact failed', err);
+    void recordError('voice/contact-failed', err); console.error('[voice] contact failed', err);
     return res.status(500).json({ error: 'server' });
   }
 });
 
 // Visitor deletes their conversation (right to erasure). Unlinked: record removed. Linked to a submitted request: transcript wiped, record kept as deleted.
-app.delete('/api/voice/session/:id', sessionLimiter, async (req, res) => {
+app.delete('/api/voice/session/:id', sessionLimiter, v(undefined, idP), async (req, res) => {
   try {
     const s = await getVoice(String(req.params.id));
     if (!s || s.deleted) return res.status(404).json({ error: 'not_found' });
@@ -1104,13 +1152,13 @@ app.delete('/api/voice/session/:id', sessionLimiter, async (req, res) => {
     else await deleteVoice([s.id]);
     return res.json({ ok: true });
   } catch (err) {
-    console.error('[voice] delete failed', err);
+    void recordError('voice/delete-failed', err); console.error('[voice] delete failed', err);
     return res.status(500).json({ error: 'server' });
   }
 });
 
 // Optional: visitor sends the conversation as a written-evaluation request (kind 'voice-download'). No marketing use.
-app.post('/api/voice/session/:id/request', voiceLimiter, botGate, async (req, res) => {
+app.post('/api/voice/session/:id/request', voiceLimiter, botGate, v(vreqS, idP), async (req, res) => {
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const email = str(req.body?.email, 254).toLowerCase();
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
@@ -1130,7 +1178,7 @@ app.post('/api/voice/session/:id/request', voiceLimiter, botGate, async (req, re
     console.log('[voice] written-evaluation request received');
     return res.json({ ok: true });
   } catch (err) {
-    console.error('[voice] request failed', err);
+    void recordError('voice/request-failed', err); console.error('[voice] request failed', err);
     return res.status(500).json({ error: 'server' });
   }
 });
@@ -1144,7 +1192,7 @@ app.get('/api/admin/voice-sessions', async (req, res) => {
   return res.json({ sessions });
 });
 
-app.delete('/api/admin/voice-sessions/:id', async (req, res) => {
+app.delete('/api/admin/voice-sessions/:id', v(undefined, idP), async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   if (!(await getVoice(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
   await deleteVoice([String(req.params.id)]);
@@ -1162,7 +1210,7 @@ function bulkIds(b: any): string[] | null {
   if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500 || ids.some((x: unknown) => typeof x !== 'string' || !x || x.length > 100)) return null;
   return [...new Set(ids as string[])];
 }
-app.post('/api/admin/quote-requests/bulk', async (req, res) => {
+app.post('/api/admin/quote-requests/bulk', v(bulkS), async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   const ids = bulkIds(req.body);
   const action = req.body?.action;
@@ -1183,11 +1231,11 @@ app.post('/api/admin/quote-requests/bulk', async (req, res) => {
     }
     return res.json({ ok: true, affected: hit.length, missing: ids.length - hit.length });
   } catch (err) {
-    console.error('[admin bulk] quotes failed', err);
+    void recordError('admin bulk/quotes-failed', err); console.error('[admin bulk] quotes failed', err);
     return res.status(500).json({ error: 'server' });
   }
 });
-app.post('/api/admin/voice-sessions/bulk', async (req, res) => {
+app.post('/api/admin/voice-sessions/bulk', v(bulkS), async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   const ids = bulkIds(req.body);
   if (!ids || req.body?.action !== 'delete') return res.status(400).json({ error: 'invalid' });
@@ -1201,7 +1249,7 @@ app.post('/api/admin/voice-sessions/bulk', async (req, res) => {
     await saveRequest(changed);
     return res.json({ ok: true, affected: hit.length, missing: ids.length - hit.length });
   } catch (err) {
-    console.error('[admin bulk] voice failed', err);
+    void recordError('admin bulk/voice-failed', err); console.error('[admin bulk] voice failed', err);
     return res.status(500).json({ error: 'server' });
   }
 });
@@ -1228,7 +1276,7 @@ const cleanTurns = (v: unknown): LiveTurn[] => (Array.isArray(v) ? v : []).slice
   .map((t: any) => ({ role: t.role as 'user' | 'assistant', text: String(t.text).slice(0, 600) }));
 const personName = (v: unknown) => String(v ?? '').replace(/[^\p{L}\s.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 40);
 
-app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
+app.post('/api/voice/live-token', liveLimiter, v(liveTokS), async (req, res) => {
   const b = req.body ?? {};
   if (b.consent !== true || b.consentVersion !== VOICE_CONSENT_VERSION) return res.status(400).json({ error: 'consent_required' });
   if (!liveConfigured()) return res.status(501).json({ error: 'unavailable' });
@@ -1254,7 +1302,7 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
   } catch (err) {
     pool.release(slot.id);
     if (isQuotaError(err)) { markQuota(); return res.status(503).json({ error: 'cap', scope: 'daily' }); }
-    console.error('[live] token failed:', (err as Error)?.message?.replace(/key=[^&\s]+/g, 'key=***').slice(0, 200));
+    void recordError('live/token-failed', err); console.error('[live] token failed:', (err as Error)?.message?.replace(/key=[^&\s]+/g, 'key=***').slice(0, 200));
     return res.status(502).json({ error: 'token_failed' });
   }
 });
@@ -1262,8 +1310,8 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
 app.get('/api/voice/live-status', liveLimiter, async (_req, res) => res.json(await livePressure()));
 const SLOT_ID = /^[a-f0-9]{32}$/;   // slot ids/tickets are 128-bit random hex; anything else is ignored
 const slotId = (v: unknown) => (typeof v === 'string' && SLOT_ID.test(v) ? v : '');
-app.post('/api/voice/live-heartbeat', liveLimiter, async (req, res) => { const id = slotId(req.body?.sessionId); res.json({ ok: id ? pool.beat(id) : false }); });
-app.post('/api/voice/live-end', liveLimiter, async (req, res) => {
+app.post('/api/voice/live-heartbeat', liveLimiter, v(liveBeatS), async (req, res) => { const id = slotId(req.body?.sessionId); res.json({ ok: id ? pool.beat(id) : false }); });
+app.post('/api/voice/live-end', liveLimiter, v(liveBeatS), async (req, res) => {
   const sid = slotId(req.body?.sessionId); if (sid) pool.release(sid);
   if (req.body?.abuse === true) await recordAbuse(abuseIds(req.ip ?? 'anon', req.body?.bid));   // call ended by finish_conversation(reason=abuse)
   return res.json({ ok: true });
@@ -1283,7 +1331,7 @@ function validateExtract(o: any) {
   };
 }
 const extractLimiter = rateLimit({ store: rlStore('extractLimiter'), windowMs: 60 * 60 * 1000, max: 40, skip: demoLimitSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
-app.post('/api/voice/extract', extractLimiter, async (req, res) => {
+app.post('/api/voice/extract', extractLimiter, v(extractS), async (req, res) => {
   if (req.body?.consent !== true || req.body?.consentVersion !== VOICE_CONSENT_VERSION) return res.status(400).json({ error: 'consent_required' });
   const turns = cleanTurns(req.body?.transcript);
   if (!turns.some((t) => t.role === 'user')) return res.status(400).json({ error: 'empty' });
@@ -1400,7 +1448,7 @@ const CHAT_BYE: Record<string, [string, string, string]> = {
 const farewell = (lang: string, hour: unknown) => { const h = Number.isInteger(hour) ? Number(hour) : 12; const b = CHAT_BYE[lang] ?? CHAT_BYE.en; return h >= 5 && h <= 16 ? b[0] : h >= 17 && h <= 21 ? b[1] : b[2]; };
 const NO_MORE_RE = /^\s*(hayır|hayir|yok|yok teşekkürler|teşekkürler|teşekkür ederim|sağ ol|tamam|bu kadar|no|nope|nothing|no thanks|thanks|thank you|that'?s all|nein|nichts|danke|nein danke|das war's|όχι|οχι|τίποτα|ευχαριστώ|ευχαριστω|αυτά|αυτα)[\s.!]*$/i;
 
-app.post('/api/assistant/chat', async (req, res) => {
+app.post('/api/assistant/chat', v(chatS), async (req, res) => {
   // Validate body
   const { messages, language } = req.body as {
     messages?: { role: string; content: string }[];
@@ -1610,7 +1658,7 @@ app.post('/api/assistant/chat', async (req, res) => {
     // (create_appointment tool calling was removed: the business no longer offers calls/meetings.)
     res.json({ message, action: null });
   } catch (err) {
-    console.error('[assistant/chat] Error:', err);
+    void recordError('assistant/chat/Error', err); console.error('[assistant/chat] Error:', err);
     // Primary provider busy/down: offer the second provider, which is used only after the visitor agrees in the chat
     res.status(503).json({ error: 'AI unavailable', fallback: true });
   }
@@ -1659,6 +1707,7 @@ registerPreview(app, { getGroq, rateSkip: demoLimitSkip });
 // Last-resort error handler (owner, 2026-11-19): async route errors (e.g. database briefly unavailable) answer with a
 // short JSON error; no stack traces or internals to the visitor, and only a short note in the server log.
 app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  void recordError(req.path, err);
   console.error(`[error] ${req.method} ${req.path}: ${String((err as Error)?.message ?? err).slice(0, 200)}`);
   if (res.headersSent) return;
   res.status(500).json({ error: 'server_error' });

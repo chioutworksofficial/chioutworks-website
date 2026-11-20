@@ -71,8 +71,11 @@ function normalize(o: any) {
 
 const turnsText = (turns: any[]) => (turns ?? []).slice(-60).map((t) => `${t.role === 'user' ? 'Visitor' : 'Assistant'}: ${String(t.text ?? '').slice(0, 800)}`).join('\n');
 
+import { validate as v, z, s as str } from './validate.js';
+const analyzeS = z.object({ type: str(20), id: str(100) });
+import { recordError } from './errors.js';
 export function registerAnalyze(app: Express, d: Deps) {
-  app.post('/api/admin/analyze', async (req, res) => {
+  app.post('/api/admin/analyze', v(analyzeS), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const type = String(req.body?.type ?? ''); const id = String(req.body?.id ?? '');
     if (!['intake', 'request', 'session'].includes(type) || !id) return res.status(400).json({ error: 'bad_request' });
@@ -116,7 +119,7 @@ export function registerAnalyze(app: Express, d: Deps) {
         return res.json({ analysis });
       } catch (e: any) {
         if (m < models.length - 1) { console.warn(`[analyze] ${models[m]} failed (${e?.status ?? e?.message}), trying fallback`); continue; }
-        console.error('[analyze] failed', e?.status ?? e?.message);
+        void recordError('analyze/failed', e); console.error('[analyze] failed', e?.status ?? e?.message);
         return res.status(502).json({ error: 'ai_failed', message: 'Yapay zekâ analizi şu an üretilemedi, tekrar deneyin.' });
       }
     }

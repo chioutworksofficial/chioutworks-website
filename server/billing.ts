@@ -61,11 +61,13 @@ function verify(raw: Buffer, header: string | undefined, secret: string): boolea
 
 interface Deps { requireAdmin: (req: Request, res: Response) => boolean | Promise<boolean>; rateSkip?: () => boolean }
 
+import { validate as v, tokenP, idP } from './validate.js';
+import { recordError } from './errors.js';
 export function registerBilling(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
 
   // 1) Client: first payment (setup fee or deposit) + monthly subscription starting two months later
-  app.post('/api/offer/:token/checkout', limiter, async (req, res) => {
+  app.post('/api/offer/:token/checkout', limiter, v(undefined, tokenP), async (req, res) => {
     if (!stripeOn()) return res.status(503).json({ error: 'not_configured' });
     const o = await live(String(req.params.token));
     if (!o || !o.contract) return res.status(404).json({ error: 'not_found' });
@@ -93,12 +95,12 @@ export function registerBilling(app: Express, d: Deps) {
           line_items: [{ quantity: 1, price_data: { currency: cur, unit_amount: cents(now), product_data: { name: setupName } } }],
         }, `first-${o.id}-${cents(now)}`);
       return res.json({ url: session.url });
-    } catch (e) { console.error('[billing] checkout failed', (e as Error).message); return res.status(502).json({ error: 'stripe_failed' }); }
+    } catch (e) { void recordError('billing/checkout-failed', e); console.error('[billing] checkout failed', (e as Error).message); return res.status(502).json({ error: 'stripe_failed' }); }
   });
 
   // 1b) TEST payment (owner's wish, 2026-11-17): only while Stripe is NOT configured and NEVER in production.
   //     Lets the owner see the whole flow (pay → live project page). No money moves; the offer is marked as test-paid.
-  app.post('/api/offer/:token/test-pay', limiter, async (req, res) => {
+  app.post('/api/offer/:token/test-pay', limiter, v(undefined, tokenP), async (req, res) => {
     if (!testPayOn()) return res.status(404).json({ error: 'not_available' });
     const o = await live(String(req.params.token));
     if (!o || !o.contract || !o.billing?.payRequestedAt) return res.status(404).json({ error: 'not_found' });
@@ -135,18 +137,18 @@ export function registerBilling(app: Express, d: Deps) {
   });
 
   // 2) Client: Stripe customer portal (payment method, invoices). Cancellation rules (6-month minimum) come with the cancellation flow.
-  app.post('/api/offer/:token/portal', limiter, async (req, res) => {
+  app.post('/api/offer/:token/portal', limiter, v(undefined, tokenP), async (req, res) => {
     if (!stripeOn()) return res.status(503).json({ error: 'not_configured' });
     const o = await live(String(req.params.token));
     if (!o?.billing?.customerId) return res.status(404).json({ error: 'not_found' });
     try {
       const s = await stripe('/billing_portal/sessions', { customer: o.billing.customerId, return_url: offerUrl(o), locale: LOCALE[contractLangFor(o.market, o.lang)] ?? 'auto' });
       return res.json({ url: s.url });
-    } catch (e) { console.error('[billing] portal failed', (e as Error).message); return res.status(502).json({ error: 'stripe_failed' }); }
+    } catch (e) { void recordError('billing/portal-failed', e); console.error('[billing] portal failed', (e as Error).message); return res.status(502).json({ error: 'stripe_failed' }); }
   });
 
   // 3) Admin: payment link for the remaining setup balance (after a deposit)
-  app.post('/api/admin/offers/:id/rest-link', async (req, res) => {
+  app.post('/api/admin/offers/:id/rest-link', v(undefined, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     if (!stripeOn()) return res.status(503).json({ error: 'not_configured' });
     const o = await getOffer(String(req.params.id));
@@ -162,7 +164,7 @@ export function registerBilling(app: Express, d: Deps) {
       });
       o.billing.restUrl = s.url; o.billing.restAmount = rest; await saveOffer(o);
       return res.json({ ok: true, url: s.url });
-    } catch (e) { console.error('[billing] rest link failed', (e as Error).message); return res.status(502).json({ error: 'stripe_failed' }); }
+    } catch (e) { void recordError('billing/rest-link-failed', e); console.error('[billing] rest link failed', (e as Error).message); return res.status(502).json({ error: 'stripe_failed' }); }
   });
 
   // 4) Webhook (raw body). Each event is processed once (event ids kept per offer).

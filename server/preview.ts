@@ -105,6 +105,8 @@ function featuresOf(i: Intake): PreviewFeatures {
 
 interface Deps { getGroq: () => Groq | null; rateSkip?: () => boolean }
 
+import { validate as v, z, bool, tokenP } from './validate.js';
+const prevS = z.object({ again: z.any().optional() });
 export function registerPreview(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 8, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
   const find = async (token: string) => {
@@ -120,7 +122,7 @@ export function registerPreview(app: Express, d: Deps) {
     return res.json({ preview: pub((i as any).preview) });
   });
 
-  app.post('/api/intake/:token/preview', limiter, async (req: Request, res: Response) => {
+  app.post('/api/intake/:token/preview', limiter, v(prevS, tokenP), async (req: Request, res: Response) => {
     const { i } = await find(String(req.params.token));
     if (!i) return res.status(404).json({ error: 'not_found' });
     if (i.status !== 'submitted') return res.status(409).json({ error: 'not_submitted' });

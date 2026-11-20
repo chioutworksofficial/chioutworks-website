@@ -210,6 +210,17 @@ interface Deps {
 /** Style the client picked on the "choose my style" page, for the AI planner (owner, 2026-11-17). */
 const styleLine = async (o: Offer) => { const st = o.intakeId ? styleSummary(await styleFor([`intake:${o.intakeId}`])) : ''; return st ? `\n\nCLIENT'S STYLE CHOICE (use it for design-related items and wording): ${st}` : ''; };
 
+import { validate as v, z, s, bool, anyObj, idP, tokenP } from './validate.js';
+const offCreateS = z.object({ intakeId: s(64), requestId: s(64) });
+const offPatchS = z.object({ ownerNotes: s(4000), title: s(160), message: s(4000), items: z.array(z.any()).max(60).nullish(), monthlyIncludes: s(600), validUntil: s(10), currency: s(5), lang: s(5) }).passthrough();
+const offPlanS = z.object({ ownerNotes: s(4000) });
+const offTransS = z.object({ target: s(5), fields: anyObj });
+const offTextS = z.object({ text: s(4000) });
+const offAcceptS = z.object({ name: s(120), confirm: bool });
+const offShowS = z.object({ allow: bool });
+const offSignS = z.object({ company: s(120), address: s(200), signer: s(120), role: s(80), business: bool, agree: bool });
+
+import { recordError } from './errors.js';
 export function registerOffers(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
   const msgLimiter = rateLimit({ windowMs: 10 * 60_000, max: 20, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
@@ -265,7 +276,7 @@ export function registerOffers(app: Express, d: Deps) {
     market: o.market ?? null, marketLang: marketLang(o.market), portal: o.portal ?? null, portalAuto: setupTotal(o) > 1000, showcase: o.showcase ?? null,
     billing: { on: stripeOn(), test: testPayOn(), payRequestedAt: o.billing?.payRequestedAt ?? null, testPaid: !!o.billing?.test, due: dueNow(o), rest: Math.max(0, Math.round((setupTotal(o) - dueNow(o)) * 100) / 100), ...(o.billing ? { customer: !!o.billing.customerId, subStatus: o.billing.subStatus ?? null, firstPaidAt: o.billing.firstPaidAt ?? null, restUrl: o.billing.restUrl ?? null, restPaidAt: o.billing.restPaidAt ?? null, paymentFailedAt: o.billing.paymentFailedAt ?? null, lastInvoiceAt: o.billing.lastInvoiceAt ?? null } : {}) } });
 
-  app.post('/api/admin/offers', async (req, res) => {
+  app.post('/api/admin/offers', v(offCreateS), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const intakeId = clean(req.body?.intakeId, 64) || null; const requestId = clean(req.body?.requestId, 64) || null;
     let lang: L = 'tr'; let company = ''; let contact = ''; let currency: Offer['currency'] = 'EUR'; let market = '';
@@ -306,7 +317,7 @@ export function registerOffers(app: Express, d: Deps) {
   });
 
   // Save draft fields, or run an action: send | cancel | paid | unpaid | reopen
-  app.patch('/api/admin/offers/:id', async (req, res) => {
+  app.patch('/api/admin/offers/:id', v(offPatchS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const o = await getOffer(String(req.params.id));
     if (!o) return res.status(404).json({ error: 'not_found' });
@@ -345,13 +356,13 @@ export function registerOffers(app: Express, d: Deps) {
     return res.json({ offer: full(o) });
   });
 
-  app.delete('/api/admin/offers/:id', async (req, res) => {
+  app.delete('/api/admin/offers/:id', v(undefined, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     if (!(await deleteOffer(String(req.params.id)))) return res.status(404).json({ error: 'not_found' });
     return res.json({ ok: true });
   });
 
-  app.post('/api/admin/offers/:id/plan', async (req, res) => {
+  app.post('/api/admin/offers/:id/plan', v(offPlanS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const groq = d.getGroq();
     if (!groq) return res.status(503).json({ error: 'ai_unavailable', message: 'GROQ_API_KEY tanımlı değil.' });
@@ -368,13 +379,13 @@ export function registerOffers(app: Express, d: Deps) {
       await saveOffer(x);
       return res.json({ offer: full(x) });
     } catch (e) {
-      console.error('[offers] plan failed', (e as any)?.message);
+      void recordError('offers/plan-failed', e); console.error('[offers] plan failed', (e as any)?.message);
       return res.status(502).json({ error: 'ai_failed', message: 'Plan önerisi şu an üretilemedi, tekrar deneyin.' });
     }
   });
 
   // Owner writes in Turkish → client's language; or shows the client-language texts / client messages in Turkish (not saved).
-  app.post('/api/admin/offers/:id/translate', async (req, res) => {
+  app.post('/api/admin/offers/:id/translate', v(offTransS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const groq = d.getGroq();
     if (!groq) return res.status(503).json({ error: 'ai_unavailable', message: 'GROQ_API_KEY tanımlı değil.' });
@@ -403,13 +414,13 @@ Return ONE JSON object with exactly the same keys and array lengths as the input
       };
       return res.json({ target: toClient ? o.lang : 'tr', ...out });
     } catch (e) {
-      console.error('[offers] translate failed', (e as any)?.message);
+      void recordError('offers/translate-failed', e); console.error('[offers] translate failed', (e as any)?.message);
       return res.status(502).json({ error: 'ai_failed', message: 'Çeviri şu an yapılamadı, tekrar deneyin.' });
     }
   });
 
   // Owner asks a follow-up question about the plan ("ayda 30 € ile yapılabilir mi?")
-  app.post('/api/admin/offers/:id/plan-chat', async (req, res) => {
+  app.post('/api/admin/offers/:id/plan-chat', v(offTextS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const groq = d.getGroq();
     if (!groq) return res.status(503).json({ error: 'ai_unavailable', message: 'GROQ_API_KEY tanımlı değil.' });
@@ -431,12 +442,12 @@ Return ONE JSON object with exactly the same keys and array lengths as the input
       await saveOffer(x);
       return res.json({ offer: full(x) });
     } catch (e) {
-      console.error('[offers] plan chat failed', (e as any)?.message);
+      void recordError('offers/plan-chat-failed', e); console.error('[offers] plan chat failed', (e as any)?.message);
       return res.status(502).json({ error: 'ai_failed', message: 'Cevap şu an üretilemedi, tekrar deneyin.' });
     }
   });
 
-  app.post('/api/admin/offers/:id/messages', async (req, res) => {
+  app.post('/api/admin/offers/:id/messages', v(offTextS, idP), async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;
     const text = clean(req.body?.text, 4000);
     if (!text) return res.status(400).json({ error: 'bad_request' });
@@ -473,7 +484,7 @@ Return ONE JSON object with exactly the same keys and array lengths as the input
     return res.json(pub(o));
   });
 
-  app.post('/api/offer/:token/accept', limiter, async (req, res) => {
+  app.post('/api/offer/:token/accept', limiter, v(offAcceptS, tokenP), async (req, res) => {
     const { o } = await live(String(req.params.token));
     if (!o) return res.status(404).json({ error: 'not_found' });
     if (o.status === 'accepted') return res.json(pub(o));
@@ -501,7 +512,7 @@ Return ONE JSON object with exactly the same keys and array lengths as the input
     const doc = buildContract(contractInput(o, { company: o.company, address: '', signer: o.acceptedName || o.contact, role: '' }, new Date().toISOString()));
     return res.json({ signed: false, doc, showcase: o.showcase, prefill: { company: o.company, signer: o.acceptedName || o.contact } });
   });
-  app.post('/api/offer/:token/showcase', limiter, async (req, res) => {
+  app.post('/api/offer/:token/showcase', limiter, v(offShowS, tokenP), async (req, res) => {
     const { o } = await live(String(req.params.token));
     if (!o || o.status !== 'accepted') return res.status(404).json({ error: 'not_found' });
     if (o.contract) return res.status(409).json({ error: 'already_signed' });   // after signing only by writing (see clause)
@@ -509,7 +520,7 @@ Return ONE JSON object with exactly the same keys and array lengths as the input
     o.showcase = { allow: req.body.allow, at: new Date().toISOString() }; await saveOffer(o);
     return res.json({ ok: true, showcase: o.showcase });
   });
-  app.post('/api/offer/:token/sign', limiter, async (req, res) => {
+  app.post('/api/offer/:token/sign', limiter, v(offSignS, tokenP), async (req, res) => {
     const { o } = await live(String(req.params.token));
     if (!o || o.status !== 'accepted') return res.status(404).json({ error: 'not_found' });
     if (o.contract) return res.json({ ok: true, signedAt: o.contract.signedAt, hash: o.contract.hash });
@@ -579,7 +590,7 @@ ${d.sections.map((s) => `<h2>${esc(s.title)}</h2>${s.body.map((x) => `<p>${esc(x
     return res.type('html').send(contractHtml(o));
   });
 
-  app.post('/api/offer/:token/messages', msgLimiter, async (req, res) => {
+  app.post('/api/offer/:token/messages', msgLimiter, v(offTextS, tokenP), async (req, res) => {
     const { o } = await live(String(req.params.token));
     if (!o) return res.status(404).json({ error: 'not_found' });
     const text = clean(req.body?.text, 2000);

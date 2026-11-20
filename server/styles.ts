@@ -71,9 +71,13 @@ interface Deps {
   requestOf?: (ref: string) => string | null | Promise<string | null>;
   verify: (b: { kind?: string; token?: string; sessionId?: string; secret?: string; lang?: string }) => Promise<{ ref: string; lang: L } | null>;
 }
+import { validate as v, z, s, bool, anyObj, tokenP } from './validate.js';
+const styStartS = z.object({ kind: s(20), token: s(200), sessionId: s(64), secret: s(200), lang: s(8) });
+const styS = z.object({ likes: z.array(z.any()).max(40).nullish(), dislikes: z.array(z.any()).max(40).nullish(), refs: z.array(z.any()).max(10).nullish(), palette: z.any().optional(), note: s(2000) }).passthrough();
+
 export function registerStyles(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 40, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
-  app.post('/api/style/start', limiter, express.json({ limit: '2kb' }), async (req, res) => {
+  app.post('/api/style/start', limiter, express.json({ limit: '2kb' }), v(styStartS), async (req, res) => {
     const v = await d.verify(req.body ?? {}); if (!v) return res.status(404).json({ error: 'not_found' });
     const s = await ensureStyle(v.ref, v.lang); return res.json({ token: s.token, path: stylePath(s.lang, s.token), done: !!s.doneAt });
   });
@@ -82,7 +86,7 @@ export function registerStyles(app: Express, d: Deps) {
     res.set('Cache-Control', 'no-store');
     return res.json({ lang: s.lang, done: !!s.doneAt, likes: s.likes, dislikes: s.dislikes, refs: s.refs, note: s.note, palette: s.palette ?? null, font: s.font ?? null });
   });
-  app.post('/api/style/:token', limiter, express.json({ limit: '8kb' }), async (req, res) => {
+  app.post('/api/style/:token', limiter, express.json({ limit: '8kb' }), v(styS, tokenP), async (req, res) => {
     const s = await getByToken(String(req.params.token)); if (!s) return res.status(404).json({ error: 'not_found' });
     const b = req.body ?? {};
     const ids = (v: unknown) => [...new Set((Array.isArray(v) ? v : []).map((x) => clean(x, 20)).filter((x) => TAGS[x]))].slice(0, 8);
