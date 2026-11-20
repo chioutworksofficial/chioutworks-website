@@ -1,23 +1,25 @@
-import { useEffect, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import type { Lang } from '../translations';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import App from '../App';
-import PrivacyPolicy from '../pages/PrivacyPolicy';
-import TermsOfService from '../pages/TermsOfService';
-import Docs from '../pages/Docs';
-import DemoApp from '../pages/DemoApp';
-import SolutionDeck from '../site/pages/SolutionDeck';
-import IntakePage from '../site/pages/IntakePage';
-import OfferPage from '../site/pages/OfferPage';
-import ProjectPage from '../site/pages/ProjectPage';
+const PrivacyPolicy = lazy(() => import('../pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('../pages/TermsOfService'));
+const Docs = lazy(() => import('../pages/Docs'));
+const DemoApp = lazy(() => import('../pages/DemoApp'));
+const SolutionDeck = lazy(() => import('../site/pages/SolutionDeck'));
+const IntakePage = lazy(() => import('../site/pages/IntakePage'));
+const OfferPage = lazy(() => import('../site/pages/OfferPage'));
+const ProjectPage = lazy(() => import('../site/pages/ProjectPage'));
 import NotFound from '../site/pages/NotFound';
 import { INTAKE_SLUG, OFFER_SLUG, PROJECT_SLUG, demoPath, isLang, pageFromSlug, pagePath, preferredLang, type PageKey } from '../lib/routes';
-import StylePage from '../site/pages/StylePage';
+const StylePage = lazy(() => import('../site/pages/StylePage'));
 import { toolById } from '../data/affiliates';
 import { PACKAGE_IDS } from '../site/i18n/packages';
 import { BLOG_POSTS } from '../data/sections';
 import { STYLE_SLUG } from '../site/i18n/style';
+
+const Lazy = ({ children }: { children: ReactNode }) => <Suspense fallback={<div style={{ minHeight: '100vh', background: 'var(--background, transparent)' }} aria-busy="true" />}>{children}</Suspense>;
 
 /** "/" and unknown URLs → home page in the visitor's language */
 export function RootRedirect() {
@@ -42,10 +44,10 @@ export function PageRoute() {
   const page = pageFromSlug(lang, pageSlug);
   if (!page) return <NotFound lang={lang} />;
   if (!pageSlug) return <Navigate to={pagePath(lang, 'home')} replace />;
-  if (page === 'privacy') return <WithMeta lang={lang} page="privacy"><PrivacyPolicy /></WithMeta>;
-  if (page === 'terms') return <WithMeta lang={lang} page="terms"><TermsOfService /></WithMeta>;
+  if (page === 'privacy') return <WithMeta lang={lang} page="privacy"><Lazy><PrivacyPolicy /></Lazy></WithMeta>;
+  if (page === 'terms') return <WithMeta lang={lang} page="terms"><Lazy><TermsOfService /></Lazy></WithMeta>;
   if (page === 'solutions') return <Navigate to={pagePath(lang, 'demos')} replace />;
-  if (page === 'docs') return <WithMeta lang={lang} page="docs"><Docs /></WithMeta>;
+  if (page === 'docs') return <WithMeta lang={lang} page="docs"><Lazy><Docs /></Lazy></WithMeta>;
   return <App page={page} />;
 }
 
@@ -53,11 +55,11 @@ export function PageRoute() {
 export function DemoRoute() {
   const { lang, page: pageSlug, slug } = useParams();
   if (!isLang(lang)) return <RootRedirect />;
-  if (pageSlug === INTAKE_SLUG[lang]) return <NoReferrer><IntakePage /></NoReferrer>;
-  if (pageSlug === OFFER_SLUG[lang]) return <NoReferrer><OfferPage /></NoReferrer>;
-  if (pageSlug === PROJECT_SLUG[lang]) return <NoReferrer><ProjectPage /></NoReferrer>;
-  if (pageSlug === STYLE_SLUG[lang]) return <NoReferrer><StylePage /></NoReferrer>;
-  if (pageFromSlug(lang, pageSlug) === 'solutions') return <SolutionDeck />;
+  if (pageSlug === INTAKE_SLUG[lang]) return <NoReferrer><Lazy><IntakePage /></Lazy></NoReferrer>;
+  if (pageSlug === OFFER_SLUG[lang]) return <NoReferrer><Lazy><OfferPage /></Lazy></NoReferrer>;
+  if (pageSlug === PROJECT_SLUG[lang]) return <NoReferrer><Lazy><ProjectPage /></Lazy></NoReferrer>;
+  if (pageSlug === STYLE_SLUG[lang]) return <NoReferrer><Lazy><StylePage /></Lazy></NoReferrer>;
+  if (pageFromSlug(lang, pageSlug) === 'solutions') return <Lazy><SolutionDeck /></Lazy>;
   if (pageFromSlug(lang, pageSlug) === 'blog') {
     return BLOG_POSTS.en.some((p) => p.id === slug) ? <App page="blog" sub={slug} /> : <Navigate to={pagePath(lang, 'blog')} replace />;
   }
@@ -69,7 +71,7 @@ export function DemoRoute() {
     return tool && (tool.active || import.meta.env.DEV) ? <App page="tools" sub={tool.id} /> : <Navigate to={pagePath(lang, 'tools')} replace />;
   }
   if (pageFromSlug(lang, pageSlug) !== 'demos') return <Navigate to={pagePath(lang, 'home')} replace />;
-  return <WithMeta lang={lang} page="demos" demo><DemoApp /></WithMeta>;
+  return <WithMeta lang={lang} page="demos" demo><Lazy><DemoApp /></Lazy></WithMeta>;
 }
 
 /** Private link pages (code in the URL): never send the URL to other sites as Referer (security standard §2). */

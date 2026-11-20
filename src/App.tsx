@@ -1,10 +1,10 @@
-import { useEffect, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { useLang } from './hooks/useLang';
 import SiteNav from './site/SiteNav';
 import Preloader from './site/Preloader';
 import SiteHero, { openAssistant } from './site/SiteHero';
 import { ChatLauncher } from './site/VoiceOrb';
-import VoiceIntake from './site/VoiceIntake';
+const VoiceIntake = lazy(() => import('./site/VoiceIntake'));
 import { SITE_UI } from './site/i18n';
 import StatementReveal from './site/StatementReveal';
 import FeaturesScroll from './site/FeaturesScroll';
@@ -13,17 +13,18 @@ import IndustriesWheel from './site/IndustriesWheel';
 import RoiCalculator from './site/RoiCalculator';
 import PartnerStrip from './site/PartnerStrip';
 import SiteFinale from './site/SiteFinale';
-import ServicesPage from './site/pages/ServicesPage';
-import AboutPage from './site/pages/AboutPage';
-import PortfolioPage from './site/pages/PortfolioPage';
-import BlogPage from './site/pages/BlogPage';
-import ContactPage from './site/pages/ContactPage';
-import DemosPage from './site/pages/DemosPage';
-import FaqPage from './site/pages/FaqPage';
-import ResourcesPage from './site/pages/ResourcesPage';
-import ToolsPage, { ToolPage } from './site/pages/ToolsPage';
-import PackagePage from './site/pages/PackagePage';
-import BlogArticle from './site/pages/BlogArticle';
+const ServicesPage = lazy(() => import('./site/pages/ServicesPage'));
+const AboutPage = lazy(() => import('./site/pages/AboutPage'));
+const PortfolioPage = lazy(() => import('./site/pages/PortfolioPage'));
+const BlogPage = lazy(() => import('./site/pages/BlogPage'));
+const ContactPage = lazy(() => import('./site/pages/ContactPage'));
+const DemosPage = lazy(() => import('./site/pages/DemosPage'));
+const FaqPage = lazy(() => import('./site/pages/FaqPage'));
+const ResourcesPage = lazy(() => import('./site/pages/ResourcesPage'));
+const ToolsPage = lazy(() => import('./site/pages/ToolsPage'));
+const ToolPage = lazy(() => import('./site/pages/ToolsPage').then((m) => ({ default: m.ToolPage })));
+const PackagePage = lazy(() => import('./site/pages/PackagePage'));
+const BlogArticle = lazy(() => import('./site/pages/BlogArticle'));
 import { BLOG_POSTS } from './data/sections';
 import { PACKAGE_IDS, PACKAGE_TEXT, type PackageId } from './site/i18n/packages';
 import { POPULAR_UI } from './site/i18n/popular';
@@ -31,9 +32,10 @@ import { toolById } from './data/affiliates';
 import { TOOL_TEXT } from './site/i18n/tools';
 import PopularPackages from './site/PopularPackages';
 import SectionDots from './site/SectionDots';
-import AIAssistant from './components/AIAssistant';
+const AIAssistant = lazy(() => import('./components/AIAssistant'));
 import { toolPath, packagePath, blogPath, type PageKey } from './lib/routes';
 import { initSmoothScroll, getLenis } from './lib/smoothScroll';
+import { articleLd, serviceLd } from './lib/structuredData';
 import { usePageMeta } from './hooks/usePageMeta';
 import type { Lang } from './translations';
 import { useMode } from './site/ModeToggle';
@@ -78,9 +80,9 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
   // Blog article (/:lang/blog/:id)
   const post = page === 'blog' && sub ? BLOG_POSTS[lang].find((p) => p.id === sub) : undefined;
 
-  usePageMeta(lang, page, tool && toolText ? { title: `${toolText.tagline} — Chioutworks`, description: toolText.short, path: toolPath(lang, tool.id), alt: (l) => toolPath(l, tool.id) }
-    : pkg ? { title: `${pkgTitle} — Chioutworks`, description: PACKAGE_TEXT[pkg][lang].intro.slice(0, 155), path: packagePath(lang, pkg), alt: (l) => packagePath(l, pkg) }
-    : post ? { title: `${post.title} — Chioutworks`, description: post.excerpt.slice(0, 155), path: blogPath(lang, post.id), alt: (l) => blogPath(l, post.id) } : {});
+  usePageMeta(lang, page, tool && toolText ? { title: `${toolText.tagline} — Chioutworks`, description: toolText.short, path: toolPath(lang, tool.id), alt: (l) => toolPath(l, tool.id), crumbs: [{ name: toolText.tagline, path: toolPath(lang, tool.id) }] }
+    : pkg ? { title: `${pkgTitle} — Chioutworks`, description: PACKAGE_TEXT[pkg][lang].intro.slice(0, 155), path: packagePath(lang, pkg), alt: (l) => packagePath(l, pkg), crumbs: [{ name: pkgTitle, path: packagePath(lang, pkg) }], ld: [serviceLd(lang, pkgTitle, PACKAGE_TEXT[pkg][lang].intro, packagePath(lang, pkg))] }
+    : post ? { title: `${post.title} — Chioutworks`, description: post.excerpt.slice(0, 155), path: blogPath(lang, post.id), alt: (l) => blogPath(l, post.id), crumbs: [{ name: post.title, path: blogPath(lang, post.id) }], ld: [articleLd(lang, post, BLOG_POSTS.en.find((p) => p.id === post.id)?.date, blogPath(lang, post.id))] } : {});
 
   useEffect(() => initSmoothScroll(), []);
 
@@ -98,11 +100,13 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
       {/* Fixed navbar: keep inner pages' first section clear of it (PageHero pages clear it themselves) */}
       {page !== 'home' && page !== 'blog' && page !== 'faq' && page !== 'resources' && <div aria-hidden="true" style={{ height: 76 }} />}
       {/* Page change: the new page sharpens out of a short blur and rises slightly (lialive-style) */}
-      <main key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter">{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} post={post} /> : PAGES[page](lang)}</main>
+      <main key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter"><Suspense fallback={<div style={{ minHeight: '60vh' }} aria-busy="true" />}>{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} post={post} /> : PAGES[page](lang)}</Suspense></main>
       <SiteFinale key={mode} lang={lang} />
       <SectionDots lang={lang} page={page} />
-      <AIAssistant lang={lang} hideLauncher />
-      <VoiceIntake lang={lang} />
+      <Suspense fallback={null}>
+        <AIAssistant lang={lang} hideLauncher />
+        <VoiceIntake lang={lang} />
+      </Suspense>
       <ChatLauncher label={SITE_UI[lang].openChat} onOpen={() => openAssistant(false)} />
     </div>
   );

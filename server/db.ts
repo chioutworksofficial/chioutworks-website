@@ -52,3 +52,7 @@ export async function kvGet<T>(k: string): Promise<T | null> {
 export async function kvSet(k: string, value: unknown): Promise<void> {
   await dbUpsert('kv', { key: k, value, updated_at: new Date().toISOString() }, 'key');
 }
+/** Call a Postgres function (RPC) via PostgREST, e.g. dbRpc('rl_hit', { p_key, p_window_sec }). */
+export async function dbRpc<T = unknown>(name: string, args: object): Promise<T> {
+  return (await (await call(`rpc/${name}`, { method: 'POST', body: JSON.stringify(args) })).json()) as T;
+}

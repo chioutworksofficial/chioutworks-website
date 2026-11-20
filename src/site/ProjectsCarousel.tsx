@@ -9,7 +9,7 @@ import Duotone from './Duotone';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const IMG: Record<string, string> = { workero: '/images/workero-preview.png', tmpr: '/images/tmpr-preview.png' };
+const IMG: Record<string, string> = { workero: '/images/workero-preview.webp', tmpr: '/images/tmpr-preview.webp' };
 
 export default function ProjectsCarousel({ lang }: { lang: Lang }) {
   const root = useRef<HTMLElement>(null);

@@ -15,6 +15,20 @@ export default defineConfig({
     tailwindcss(),
     ...(HTTPS ? [basicSsl()] : []),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return 'vendor-react'
+          if (/node_modules\/(framer-motion|motion-dom|motion-utils)\//.test(id)) return 'vendor-motion'
+          if (id.includes('/gsap/')) return 'vendor-gsap'
+          if (/node_modules\/(recharts|d3-[a-z-]+|victory-vendor)\//.test(id)) return 'vendor-charts'
+          return undefined
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     // Reachable from devices on the same Wi-Fi (phone testing): http://<computer-ip>:3000. Dev only; the build is unaffected.

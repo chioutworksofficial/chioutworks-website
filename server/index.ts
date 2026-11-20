@@ -6,6 +6,8 @@ import { dbOn, dbInsert, dbUpsert, dbSelect, dbDelete, dbUpdate, kvGet, kvSet } 
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import { rlStore } from './rateStore.js';
+import { botGate, issueFormToken } from './botcheck.js';
 import Groq from 'groq-sdk';
 import fs from 'fs';
 import crypto from 'crypto';
@@ -153,12 +155,26 @@ let guardRejects = 0;
 // ── Express app ────────────────────────────────────────────────────────────
 const app = express();
 
-// Allowed browser origins: local dev + the public site (PUBLIC_ORIGIN, e.g. https://chioutworks.com, comma-separated)
-const ORIGINS = new Set(['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', ...String(process.env.PUBLIC_ORIGIN ?? '').split(',').map((x) => x.trim()).filter(Boolean)]);
+// Allowed browser origins: PUBLIC_ORIGIN (comma-separated), the Vercel deployment hosts, and local dev (never in production)
+const isProd = process.env.NODE_ENV === 'production';
+const vercelHosts = [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL, process.env.VERCEL_BRANCH_URL].filter(Boolean).map((h) => `https://${h}`);
+const ORIGINS = new Set([
+  ...(isProd ? [] : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3443', 'https://localhost:3443', 'http://localhost:5173']),
+  ...vercelHosts,
+  ...String(process.env.PUBLIC_ORIGIN ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+]);
 app.disable('x-powered-by');
 // Dev only: the dev site opened from a phone on the same Wi-Fi (http://192.168.x.x:3000 etc.). Never in production.
-const devLan = (origin: string) => process.env.NODE_ENV !== 'production' && /^http:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):3000$/.test(origin);
-app.use(cors({ origin: (o, cb) => cb(null, !o || ORIGINS.has(o) || devLan(o)), methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] }));
+const devLan = (origin: string) => !isProd && /^https?:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):(3000|3443)$/.test(origin);
+// A request without Origin, or whose Origin is this very host, is same-origin and always passes.
+const originOk = (req: express.Request) => {
+  const o = req.get('origin');
+  if (!o) return true;
+  let sameHost = false; try { sameHost = new URL(o).host === req.get('host'); } catch { return false; }
+  return sameHost || ORIGINS.has(o) || devLan(o);
+};
+app.use('/api', (req, res, next) => (originOk(req) ? next() : res.status(403).json({ error: 'forbidden_origin' })));   // before cors: no CORS headers on a refusal
+app.use(cors({ origin: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] }));
 
 // Basic security headers on every API response (the site's own headers live in vercel.json)
 app.use((_req, res, next) => {
@@ -184,7 +200,7 @@ app.use('/api/intake', express.json({ limit: '64kb' })); // client intake autosa
 app.use(express.json({ limit: '16kb' }));
 
 // Rate limit: 15 messages per minute per IP
-const limiter = rateLimit({
+const limiter = rateLimit({ store: rlStore('limiter'),
   windowMs: 60 * 1000,
   max: 15,
   standardHeaders: true,
@@ -285,8 +301,13 @@ const emailConfigured = () => Boolean(process.env.RESEND_API_KEY && process.env.
 // On Vercel the app always sits behind its proxy: without this every visitor would share one IP (and one rate limit).
 if (process.env.TRUST_PROXY || process.env.VERCEL) app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
 const demoLimitSkip = () => process.env.NODE_ENV !== 'production';
+const formTokenLimiter = rateLimit({ store: rlStore('formTokenLimiter'), windowMs: 10 * 60 * 1000, max: 60, skip: demoLimitSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
+app.get('/api/form-token', formTokenLimiter, (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ t: issueFormToken() }); });
+const gatedIntake: express.RequestHandler = (req, res, next) => (/^\/api\/intake\/[^/]+\/submit$/.test(req.path) && req.method === 'POST') ? botGate(req, res, next) : next();
+app.use(gatedIntake);
+app.post('/api/newsletter/subscribe', botGate);
 
-const demoRequestLimiter = rateLimit({
+const demoRequestLimiter = rateLimit({ store: rlStore('demoRequestLimiter'),
   windowMs: 15 * 60 * 1000,
   max: 15,
   skip: demoLimitSkip,
@@ -294,7 +315,7 @@ const demoRequestLimiter = rateLimit({
   legacyHeaders: false,
   message: { ok: false, error: 'rate_limited' },
 });
-const demoVerifyLimiter = rateLimit({
+const demoVerifyLimiter = rateLimit({ store: rlStore('demoVerifyLimiter'),
   windowMs: 15 * 60 * 1000,
   max: 30,
   skip: demoLimitSkip,
@@ -418,7 +439,7 @@ const saveRequest = (rec: Rec | Rec[]) => saveRows('quote_requests', QUOTE_STORE
 const deleteRequests = (ids: string[]) => deleteRows('quote_requests', QUOTE_STORE, ids);
 const QUOTE_MODULES = new Set(['core', 'qr', 'whatsapp', 'telegram', 'ai', 'payments', 'calendar', 'reviews', 'hosting']);
 
-const quoteLimiter = rateLimit({
+const quoteLimiter = rateLimit({ store: rlStore('quoteLimiter'),
   windowMs: 60 * 60 * 1000,
   max: 10,
   standardHeaders: true,
@@ -427,7 +448,7 @@ const quoteLimiter = rateLimit({
   message: { ok: false, error: 'rate_limited' },
 });
 
-app.post('/api/demo/quote', quoteLimiter, async (req, res) => {
+app.post('/api/demo/quote', quoteLimiter, botGate, async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase();
   if (!EMAIL_RE.test(email) || email.length > 254) return res.status(400).json({ ok: false, error: 'invalid_email' });
 
@@ -520,7 +541,7 @@ async function requireAdmin(req: express.Request, res: express.Response): Promis
 }
 const setAdminCookie = (res: express.Response, value: string, maxAgeMs: number) =>
   res.append('Set-Cookie', `${ADMIN_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(maxAgeMs / 1000)}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`);
-const loginLimiter = rateLimit({
+const loginLimiter = rateLimit({ store: rlStore('loginLimiter'),
   windowMs: 15 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false,
   message: { error: 'rate_limited', message: 'Çok fazla deneme yapıldı. Lütfen 15 dakika sonra tekrar deneyin.' },
 });
@@ -577,7 +598,7 @@ app.get('/api/rates', async (_req, res) => {
 
 // Savings calculator: optional e-mail left when downloading the PDF report → request in admin (source "calculator").
 // Stored only to reply in writing; no newsletter (marketing needs a separate double opt-in, see server/newsletter.ts).
-app.post('/api/roi-report', quoteLimiter, async (req, res) => {
+app.post('/api/roi-report', quoteLimiter, botGate, async (req, res) => {
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const email = str(req.body?.email, 254).toLowerCase();
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
@@ -600,7 +621,7 @@ app.post('/api/roi-report', quoteLimiter, async (req, res) => {
 
 // Proof of cookie consent (GDPR Art. 7(1)): random id, version, choices, time. No IP, no user agent.
 const CONSENT_STORE = path.join(__dirname, '../data/consents.json');
-const consentLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, skip: demoLimitSkip });
+const consentLimiter = rateLimit({ store: rlStore('consentLimiter'), windowMs: 10 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, skip: demoLimitSkip });
 app.post('/api/consent', consentLimiter, async (req, res) => {
   const b = req.body ?? {};
   const id = String(b.id ?? '');
@@ -678,7 +699,7 @@ function legacySource(r: LegacyReq, sessions: Map<string, VoiceSession['kind']>)
   return 'form';
 }
 
-app.post('/api/contact', quoteLimiter, async (req, res) => {
+app.post('/api/contact', quoteLimiter, botGate, async (req, res) => {
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   if (str(req.body?.website, 200)) return res.json({ ok: true }); // honeypot
   const email = str(req.body?.email, 254).toLowerCase();
@@ -807,11 +828,11 @@ const AZURE_VOICES: Record<string, { locale: string; voice: string }> = {
 };
 const xmlEscape = (t: string) => t.replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c] as string));
 
-const ttsLimiter = rateLimit({
+const ttsLimiter = rateLimit({ store: rlStore('ttsLimiter'),
   windowMs: 60 * 1000, max: 20, skip: demoLimitSkip,
   standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' },
 });
-const voiceLimiter = rateLimit({
+const voiceLimiter = rateLimit({ store: rlStore('voiceLimiter'),
   windowMs: 60 * 60 * 1000, max: 20, skip: demoLimitSkip,
   standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' },
 });
@@ -923,7 +944,7 @@ const getVoice = (id: string) => getRow('voice_sessions', VOICE_STORE, id) as Pr
 const saveVoice = (rec: VoiceSession | VoiceSession[]) => saveRows('voice_sessions', VOICE_STORE, (Array.isArray(rec) ? rec : [rec]) as unknown as Rec[]);
 const deleteVoice = (ids: string[]) => deleteRows('voice_sessions', VOICE_STORE, ids);
 
-const sessionLimiter = rateLimit({
+const sessionLimiter = rateLimit({ store: rlStore('sessionLimiter'),
   windowMs: 60 * 60 * 1000, max: 150, skip: demoLimitSkip,
   standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' },
 });
@@ -1050,7 +1071,7 @@ app.get('/api/cron/daily', async (req, res) => {
   return res.json({ ok: true });
 });
 
-app.post('/api/voice/session/:id/contact', voiceLimiter, async (req, res) => {
+app.post('/api/voice/session/:id/contact', voiceLimiter, botGate, async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase();
   if (!EMAIL_RE.test(email) || email.length > 254) return res.status(400).json({ error: 'invalid_email' });
   const contact = {
@@ -1089,7 +1110,7 @@ app.delete('/api/voice/session/:id', sessionLimiter, async (req, res) => {
 });
 
 // Optional: visitor sends the conversation as a written-evaluation request (kind 'voice-download'). No marketing use.
-app.post('/api/voice/session/:id/request', voiceLimiter, async (req, res) => {
+app.post('/api/voice/session/:id/request', voiceLimiter, botGate, async (req, res) => {
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const email = str(req.body?.email, 254).toLowerCase();
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
@@ -1187,7 +1208,7 @@ app.post('/api/admin/voice-sessions/bulk', async (req, res) => {
 
 
 // ── Gemini Live: ephemeral token, slot heartbeat, end-of-call extraction ───────────────────────
-const liveLimiter = rateLimit({
+const liveLimiter = rateLimit({ store: rlStore('liveLimiter'),
   windowMs: 10 * 60 * 1000, max: 150, skip: demoLimitSkip,
   standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' },
 });
@@ -1214,12 +1235,13 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
   const lang = DEMO_LANGS.has(b.lang) ? String(b.lang) : 'en';
   if (await voiceBlocked(abuseIds(req.ip ?? 'anon', b.bid))) return res.status(403).json({ error: 'voice_unavailable', message: ABUSE_MSG.voice(lang) });
   // A reconnect hands back the slot of the dropped call (verified): it takes the same place and does not count again.
-  const prev = typeof b.prevSessionId === 'string' ? b.prevSessionId : '';
+  const prev = slotId(b.prevSessionId);
   const resumed = Boolean(prev) && pool.has(prev);
   if (resumed) pool.release(prev);
   const cap = resumed ? null : (await capReached()) ?? (quotaRecently(10 * 60_000) ? 'daily' : null);
   if (cap) return res.status(503).json({ error: 'cap', scope: cap });
-  const slot = pool.acquire(typeof b.ticket === 'string' ? b.ticket.slice(0, 64) : undefined);
+  const slot = pool.acquire(typeof b.ticket === 'string' && SLOT_ID.test(b.ticket) ? b.ticket : undefined);
+  if (slot.ok === false && slot.overflow) return res.status(503).json({ error: 'busy', retryAfter: 30 });
   if (slot.ok === false) return res.status(503).json({ error: 'full', ticket: slot.ticket, position: slot.position, retryAfter: 5 });
   if (!resumed && !mintAllowed([`ip:${req.ip ?? 'anon'}`, ...(typeof b.bid === 'string' && b.bid ? [`bid:${b.bid.slice(0, 64)}`] : [])])) { pool.release(slot.id); return res.status(429).json({ error: 'rate_limited' }); }
   const vin = b.visitor ?? {};
@@ -1238,9 +1260,11 @@ app.post('/api/voice/live-token', liveLimiter, async (req, res) => {
 });
 
 app.get('/api/voice/live-status', liveLimiter, async (_req, res) => res.json(await livePressure()));
-app.post('/api/voice/live-heartbeat', liveLimiter, async (req, res) => res.json({ ok: pool.beat(String(req.body?.sessionId ?? '')) }));
+const SLOT_ID = /^[a-f0-9]{32}$/;   // slot ids/tickets are 128-bit random hex; anything else is ignored
+const slotId = (v: unknown) => (typeof v === 'string' && SLOT_ID.test(v) ? v : '');
+app.post('/api/voice/live-heartbeat', liveLimiter, async (req, res) => { const id = slotId(req.body?.sessionId); res.json({ ok: id ? pool.beat(id) : false }); });
 app.post('/api/voice/live-end', liveLimiter, async (req, res) => {
-  pool.release(String(req.body?.sessionId ?? ''));
+  const sid = slotId(req.body?.sessionId); if (sid) pool.release(sid);
   if (req.body?.abuse === true) await recordAbuse(abuseIds(req.ip ?? 'anon', req.body?.bid));   // call ended by finish_conversation(reason=abuse)
   return res.json({ ok: true });
 });
@@ -1258,7 +1282,7 @@ function validateExtract(o: any) {
     phone: (phone.match(/\d/g) ?? []).length >= 6 ? phone : '', email: EMAIL_RE.test(email) ? email : '', notes: s(o?.notes, 600),
   };
 }
-const extractLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 40, skip: demoLimitSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
+const extractLimiter = rateLimit({ store: rlStore('extractLimiter'), windowMs: 60 * 60 * 1000, max: 40, skip: demoLimitSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
 app.post('/api/voice/extract', extractLimiter, async (req, res) => {
   if (req.body?.consent !== true || req.body?.consentVersion !== VOICE_CONSENT_VERSION) return res.status(400).json({ error: 'consent_required' });
   const turns = cleanTurns(req.body?.transcript);

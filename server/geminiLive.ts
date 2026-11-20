@@ -1,5 +1,6 @@
 // Gemini Live (native audio) support: slot pool + wait queue, daily/monthly caps, ephemeral-token minting, system instruction.
 // The API key never leaves this file's callers: the browser only ever receives a one-use ephemeral token whose config is locked.
+import { randomBytes } from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -21,7 +22,8 @@ export class SlotPool {
     private ttlMs = 6 * 60_000,       // hard session expiry
     private beatMs = 90_000,          // no heartbeat for this long = gone
     private ticketMs = 20_000,        // a waiting visitor must poll at least this often
-    private id: () => string = () => Math.random().toString(36).slice(2) + Date.now().toString(36),
+    private id: () => string = () => randomBytes(16).toString('hex'),   // unguessable: the slot id is the capability
+    private maxQueue = 50,
   ) {}
   private sweep() {
     const n = this.now();
@@ -31,7 +33,7 @@ export class SlotPool {
   get active() { this.sweep(); return this.sessions.size; }
   has(id: string) { this.sweep(); return this.sessions.has(id); }
   /** Grants a slot, or returns the waiting position (1 = next). */
-  acquire(ticket?: string): { ok: true; id: string } | { ok: false; ticket: string; position: number } {
+  acquire(ticket?: string): { ok: true; id: string } | { ok: false; ticket: string; position: number; overflow?: true } {
     this.sweep();
     const n = this.now();
     if (ticket && this.queue.has(ticket)) {
@@ -41,6 +43,7 @@ export class SlotPool {
       return { ok: false, ticket, position: pos };
     }
     if (this.queue.size === 0 && this.sessions.size < this.max()) return this.grant();
+    if (this.queue.size >= this.maxQueue) return { ok: false, ticket: '', position: 0, overflow: true };
     const t = this.id();
     this.queue.set(t, n);
     return { ok: false, ticket: t, position: this.queue.size };

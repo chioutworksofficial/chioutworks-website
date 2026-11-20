@@ -12,6 +12,7 @@ import {
 } from '../lib/roiModel';
 import { ROI_SECTORS, ROI_UI } from './i18n/roi';
 import BtnArrow from './BtnArrow';
+import { guardFields, prefetchFormToken } from '../lib/formGuard';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -111,12 +112,13 @@ function Inner({ lang }: { lang: Lang }) {
     v: 1, sector, sectorLabel: sectorName(sector).slice(0, 60), tasks: tasks.map((t) => ({ ...t, name: t.name.slice(0, 60) })), staff, cost, currency, lang,
   });
   const send = () => { saveRoi(calc()); navigate(pagePath(lang, 'contact')); };
+  useEffect(() => { prefetchFormToken(); }, []);
   const download = () => {
     // Optional e-mail: kept with the calculation so the owner can reply (no newsletter); the PDF itself is made in the browser
     const mail = repEmail.trim();
     if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail)) {
-      fetch('/api/roi-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
-        body: JSON.stringify({ email: mail, name: repName.trim(), company: repCompany.trim(), lang, page: window.location.pathname, roiCalc: calc() }) }).catch(() => {});
+      void guardFields().then((g) => fetch('/api/roi-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+        body: JSON.stringify({ email: mail, name: repName.trim(), company: repCompany.trim(), lang, page: window.location.pathname, roiCalc: calc(), ...g }) })).catch(() => {});
     }
     const done = () => { document.body.classList.remove('roi-printing'); window.removeEventListener('afterprint', done); };
     document.body.classList.add('roi-printing');

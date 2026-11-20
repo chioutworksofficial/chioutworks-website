@@ -7,6 +7,7 @@ import { LANGS, intakePath, isLang, pagePath } from '../../lib/routes';
 import type { Lang } from '../../translations';
 import { StyleCta } from './StylePage';
 import type { Definition, L4, QDef } from '../../data/intakeSectors';
+import { guardFields, prefetchFormToken } from '../../lib/formGuard';
 
 type Answers = Record<string, string | boolean>;
 interface Payload { lang: Lang; secondLang: Lang | null; status: string; definition: Definition; answers: Answers }
@@ -142,8 +143,9 @@ export default function IntakePage() {
     if (answers.consent !== true) { setErr(u.needConsent); return; }
     setBusy(true); setErr(null);
     try {
+      prefetchFormToken();
       await flush();
-      const r = await fetch(`/api/intake/${encodeURIComponent(token)}/submit`, { method: 'POST' });
+      const r = await fetch(`/api/intake/${encodeURIComponent(token)}/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(await guardFields()) });
       if (!r.ok) throw new Error(String(r.status));
       setDone(true); window.scrollTo({ top: 0 });
     } catch { setErr(u.submitErr); }

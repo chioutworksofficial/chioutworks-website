@@ -15,6 +15,7 @@ import { createAudio, LiveCall, fetchToken, liveDayExceeded, bumpLiveDay, postLi
 import { wrongScript, namesOwner, usesWe } from '../lib/scriptGuard';
 import { writeVoiceSession, clearVoiceSession, downloadTranscript, printTranscript } from '../lib/voiceSession';
 import { StyleCta } from './pages/StylePage';
+import { guardFields, prefetchFormToken } from '../lib/formGuard';
 
 const cleanName = (v: string) => v.replace(/[^\p{L}\s.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 40);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -647,7 +648,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       if (v) {
         const r = await fetch(`/api/voice/session/${encodeURIComponent(v.id)}/request`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ secret: v.secret, email, firstName: cleanName(dFirst), lastName: cleanName(dLast), page: window.location.pathname }),
+          body: JSON.stringify({ ...(await guardFields()), secret: v.secret, email, firstName: cleanName(dFirst), lastName: cleanName(dLast), page: window.location.pathname }),
         });
         ok = r.ok;
       }
@@ -655,6 +656,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     setDBusy(false); setDl(false); setNotice(ok ? t.dlSent : t.dlSendError);
   };
 
+  useEffect(() => { prefetchFormToken(); }, []);
   const finish = async () => {
     const userTurns = turnsRef.current.filter((x) => x.role === 'user');
     if (userTurns.length === 0) { teardown(); setOpen(false); navigate(pagePath(lang, 'contact')); return; }
@@ -682,7 +684,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       const message = [card.service, card.notes].filter(Boolean).join('\n').slice(0, 1000);
       const r = await fetch('/api/contact', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, business: card.business.trim(), city: card.city.trim(), message, replyPreference: 'written', via: 'assistant', lang, page: window.location.pathname, ...(v ? { voiceSessionId: v.id, voiceSecret: v.secret } : {}) }),
+        body: JSON.stringify({ ...(await guardFields()), name, email, phone, business: card.business.trim(), city: card.city.trim(), message, replyPreference: 'written', via: 'assistant', lang, page: window.location.pathname, ...(v ? { voiceSessionId: v.id, voiceSecret: v.secret } : {}) }),
       });
       if (!r.ok) throw new Error(String(r.status));
       if (v) setStyleRef({ id: v.id, secret: v.secret }); setCardSent(true);

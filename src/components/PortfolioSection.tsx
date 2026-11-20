@@ -6,8 +6,8 @@ interface Props { lang: Lang; }
 
 // Full-page screenshots that animate as if scrolling
 const FULL_PREVIEWS: Record<string, string> = {
-  workero: '/images/workero-full.png',
-  tmpr:    '/images/tmpr-full.png',
+  workero: '/images/workero-full.webp',
+  tmpr:    '/images/tmpr-full.webp',
 };
 
 const LOGO_BG: Record<string, string> = {

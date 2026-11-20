@@ -10,7 +10,7 @@ import BtnArrow from '../BtnArrow';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const FULL: Record<string, string> = { workero: '/images/workero-full.png', tmpr: '/images/tmpr-full.png' };
+const FULL: Record<string, string> = { workero: '/images/workero-full.webp', tmpr: '/images/tmpr-full.webp' };
 const kicker: React.CSSProperties = { fontSize: 12, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--lq-silver)' };
 const h2: React.CSSProperties = { fontSize: 'clamp(32px, 4.6vw, 61px)', fontWeight: 500, lineHeight: 1, letterSpacing: '-0.02em', fontFamily: 'var(--font-display)', color: 'var(--lq-white)' };
 

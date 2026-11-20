@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { T, type Lang } from '../../translations';
 import type { DemoSlug } from '../../data/demos';
 import { demoText } from './demoText';
@@ -11,6 +11,8 @@ const inputCls = 'w-full rounded-[6px] px-3 py-2.5 text-sm outline-none focus:bo
 const h3Cls = 'text-lg tracking-[-0.02em] mb-3';
 import { BUILDER_UI } from './i18n/builder';
 import BtnArrow from '../../site/BtnArrow';
+import { guardFields, prefetchFormToken } from '../../lib/formGuard';
+import Honeypot from '../Honeypot';
 
 export type ModuleKey = 'core' | 'qr' | 'whatsapp' | 'telegram' | 'ai' | 'payments' | 'calendar' | 'reviews' | 'hosting';
 type CostType = 'none' | 'usage' | 'message' | 'transaction' | 'monthly';
@@ -52,6 +54,7 @@ export default function PackageBuilder({ lang, slug, email: initialEmail, compac
   const errors = T[lang].demos.modal.errors;
   const [selected, setSelected] = useState<Set<ModuleKey>>(() => new Set<ModuleKey>(['core', ...recommendedFor(slug)]));
   const [form, setForm] = useState({ email: initialEmail, name: '', business: '', message: '' });
+  useEffect(() => { prefetchFormToken(); }, []);
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [error, setError] = useState<DemoErrorCode | null>(null);
 
@@ -73,7 +76,7 @@ export default function PackageBuilder({ lang, slug, email: initialEmail, compac
       const r = await fetch('/api/demo/quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, demo: slug, lang, modules: [...selected] }),
+        body: JSON.stringify({ ...form, demo: slug, lang, modules: [...selected], ...(await guardFields()) }),
       });
       const data = await r.json().catch(() => null);
       if (r.status === 429) throw new Error('rate_limited');
@@ -176,6 +179,7 @@ export default function PackageBuilder({ lang, slug, email: initialEmail, compac
             <p role="status" className="rounded-[6px] p-4 text-sm font-medium" style={{ background: 'var(--c-quartz)', color: 'var(--c-abyss)' }}>{b.sent}</p>
           ) : (
             <form onSubmit={submit} className="space-y-2.5" noValidate>
+            <Honeypot />
               <Label text={b.email}><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} style={field} /></Label>
               <div className="grid grid-cols-2 gap-2">
                 <Label text={b.name}><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} style={field} maxLength={80} /></Label>

@@ -10,6 +10,7 @@ import VoiceTranscriptModal from '../site/VoiceTranscriptModal';
 import MonthCalendar from './MonthCalendar';
 import BtnArrow from '../site/BtnArrow';
 import { calcRoi, clearRoi, fmtMoney, fmtNum, readRoi, summaryLine, UNITS } from '../lib/roiModel';
+import { guardFields, prefetchFormToken } from '../lib/formGuard';
 
 interface Props { lang: Lang; }
 
@@ -63,6 +64,7 @@ export default function CTASection({ lang }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [website, setWebsite] = useState('');
+  useEffect(() => { prefetchFormToken(); }, []);
   const [preferredStart, setPreferredStart] = useState<string | null>(null);
   const [callTime, setCallTime] = useState('');
   const [blocked, setBlocked] = useState<Set<string>>(new Set());
@@ -87,7 +89,7 @@ export default function CTASection({ lang }: Props) {
       const r = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, address, phone, email, message, replyPreference: reply, ...(topic ? { topic } : roi ? { topic: 'roi' } : {}), ...(roi ? { roiCalc: roi } : {}), ...(preferredStart ? { preferredStart } : {}), ...(reply === 'phone' && callTime ? { callTime } : {}), lang, page: window.location.pathname, website, ...(voice && attachVoice ? { voiceSessionId: voice.id, voiceSecret: voice.secret } : {}) }),
+        body: JSON.stringify({ name, address, phone, email, message, replyPreference: reply, ...(topic ? { topic } : roi ? { topic: 'roi' } : {}), ...(roi ? { roiCalc: roi } : {}), ...(preferredStart ? { preferredStart } : {}), ...(reply === 'phone' && callTime ? { callTime } : {}), lang, page: window.location.pathname, ...(await guardFields()), ...(voice && attachVoice ? { voiceSessionId: voice.id, voiceSecret: voice.secret } : {}) }),
       });
       if (!r.ok) {
         const j = await r.json().catch(() => null);
@@ -161,7 +163,7 @@ export default function CTASection({ lang }: Props) {
                   <button type="button" onClick={() => setShowVoice(true)} style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--lq-white)' }}>{u.voiceView}</button>
                 </div>
               )}
-              <input type="text" name="website" value={website} onChange={e => setWebsite(e.target.value)} tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
+              <input type="text" name="website" data-hp="1" value={website} onChange={e => setWebsite(e.target.value)} tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
               <div className="grid gap-3.5 sm:grid-cols-2">
                 <Field label={d.nameLabel} type="text" value={name} onChange={setName} placeholder={d.namePlaceholder} />
                 <Field label={d.phoneLabel} type="tel" value={phone} onChange={setPhone} placeholder={d.phonePlaceholder} />

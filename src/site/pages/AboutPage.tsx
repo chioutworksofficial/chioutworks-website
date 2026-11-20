@@ -62,7 +62,7 @@ export default function AboutPage({ lang }: { lang: Lang }) {
           <div data-in className="relative">
             <span aria-hidden="true" className="absolute pointer-events-none" style={{ inset: '-20%', background: 'radial-gradient(circle, color-mix(in srgb, var(--lq-g2) 28%, transparent), transparent 65%)' }} />
             <div className="lq-card relative overflow-hidden">
-              <img src="/IMG_7937.png" alt="Chousein Chiout" style={{ display: 'block', width: '100%', height: 'auto' }} />
+              <img src="/IMG_7937.webp" alt="Chousein Chiout" style={{ display: 'block', width: '100%', height: 'auto' }} />
               <span aria-hidden="true" className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 55%, color-mix(in srgb, var(--lq-abyss) 85%, transparent))' }} />
               <div className="absolute left-4 bottom-4">
                 <p style={{ fontSize: 18, fontWeight: 500, letterSpacing: '-0.02em', fontFamily: 'var(--font-display)', color: 'var(--lq-white)' }}>Chousein Chiout</p>

@@ -5,6 +5,8 @@ import { SHOWCASE_UI } from './i18n/showcase';
 import { demoText } from './demoText';
 import { Label } from './ui';
 import BtnArrow from '../../site/BtnArrow';
+import { guardFields, prefetchFormToken } from '../../lib/formGuard';
+import Honeypot from '../Honeypot';
 
 const inputCls = 'w-full rounded-[6px] px-3 py-2.5 text-sm outline-none focus:border-[color:var(--lq-g2)]! placeholder:text-[color:var(--lq-silver)]';
 const field: React.CSSProperties = { background: 'var(--lq-deep)', border: '1px solid var(--lq-line)', color: 'var(--lq-white)' };
@@ -19,6 +21,7 @@ export default function DemoRequestModal({ lang, slug, email: initialEmail, onCl
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [error, setError] = useState<DemoErrorCode | null>(null);
 
+  useEffect(() => { prefetchFormToken(); }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -39,7 +42,7 @@ export default function DemoRequestModal({ lang, slug, email: initialEmail, onCl
       const r = await fetch('/api/demo/quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, demo: slug, lang, modules: [], kind: 'demo-request' }),
+        body: JSON.stringify({ ...form, demo: slug, lang, modules: [], kind: 'demo-request', ...(await guardFields()) }),
       });
       const data = await r.json().catch(() => null);
       if (r.status === 429) throw new Error('rate_limited');
@@ -70,6 +73,7 @@ export default function DemoRequestModal({ lang, slug, email: initialEmail, onCl
           <p role="status" className="rounded-[6px] p-4 text-sm font-medium" style={{ background: 'var(--c-quartz)', color: 'var(--c-abyss)' }}>{s.sent}</p>
         ) : (
           <form onSubmit={submit} className="space-y-3" noValidate>
+            <Honeypot />
             <Label text={b.email}><input type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={inputCls} style={field} /></Label>
             <div className="grid grid-cols-2 gap-2">
               <Label text={b.name}><input autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} style={field} maxLength={80} /></Label>

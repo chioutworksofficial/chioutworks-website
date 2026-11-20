@@ -163,7 +163,7 @@ export default function BlogModal({ post, onClose, lang = 'en' }: Props) {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <img
-                src="/IMG_7937.png"
+                src="/IMG_7937.webp"
                 alt="Chousein Chiout"
                 style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', objectPosition: 'top' }}
               />

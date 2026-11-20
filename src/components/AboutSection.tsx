@@ -57,7 +57,7 @@ export default function AboutSection({ lang }: Props) {
               }}
             >
               <img
-                src="/IMG_7937.png"
+                src="/IMG_7937.webp"
                 alt="Chousein Chiout"
                 style={{
                   display: 'block',
