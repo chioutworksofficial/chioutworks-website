@@ -36,7 +36,7 @@ export function StyleInline({ lang, v, set }: { lang: Lang; v: StyleVal; set: (v
         <p style={lab}>{w.stylePick}</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(150px, 100%), 1fr))', gap: 10 }}>
           {STYLE_PRESETS.map((p) => { const on = v.likes.includes(p.id); return (
-            <button key={p.id} type="button" onClick={() => toggle(p.id)} aria-pressed={on} aria-label={`${p.label[lang]}: ${on ? w.liked : w.like}`}
+            <button key={p.id} type="button" className="lq-square" onClick={() => toggle(p.id)} aria-pressed={on} aria-label={`${p.label[lang]}: ${on ? w.liked : w.like}`}
               style={{ ...chip(on), padding: 6, minWidth: 0, position: 'relative' }}>
               <Scaled><SitePreview look={presetLook(p)} lang={lang} /></Scaled>
               <span style={{ fontSize: 13, display: 'flex', justifyContent: 'space-between' }}><strong>{p.label[lang]}</strong><span aria-hidden>{on ? '♥' : '♡'}</span></span>
@@ -51,11 +51,11 @@ export function StyleInline({ lang, v, set }: { lang: Lang; v: StyleVal; set: (v
         <p style={lab}>{w.palette}</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(104px, 1fr))', gap: 8 }}>
           {PALETTES.map((x) => (
-            <button key={x.id} type="button" aria-pressed={v.pal === x.id} onClick={() => set({ ...v, pal: v.pal === x.id ? '' : x.id })} style={chip(v.pal === x.id)}>
+            <button key={x.id} type="button" className="lq-square" aria-pressed={v.pal === x.id} onClick={() => set({ ...v, pal: v.pal === x.id ? '' : x.id })} style={chip(v.pal === x.id)}>
               <span style={{ display: 'flex', height: 20, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--c-hairline)' }}>{[x.pal.bg, x.pal.surface, x.pal.accent, x.pal.text].map((c, i) => <i key={i} style={{ flex: i === 2 ? 1.6 : 1, background: c }} />)}</span>
               <span style={{ fontSize: 12.5 }}>{x.name[lang]}</span>
             </button>))}
-          <button type="button" aria-pressed={v.pal === 'own'} onClick={() => set({ ...v, pal: 'own' })} style={chip(v.pal === 'own')}>
+          <button type="button" className="lq-square" aria-pressed={v.pal === 'own'} onClick={() => set({ ...v, pal: 'own' })} style={chip(v.pal === 'own')}>
             <span style={{ display: 'flex', height: 20, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--c-hairline)' }}>{[own.bg, own.surface, own.accent, own.text].map((c, i) => <i key={i} style={{ flex: i === 2 ? 1.6 : 1, background: c }} />)}</span>
             <span style={{ fontSize: 12.5 }}>{w.own}</span>
           </button>
@@ -79,7 +79,7 @@ export function StyleInline({ lang, v, set }: { lang: Lang; v: StyleVal; set: (v
         <p style={lab}>{w.fonts}</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
           {pairsFor(lang).map((x) => (
-            <button key={x.id} type="button" aria-pressed={v.pair === x.id} onClick={() => set({ ...v, pair: v.pair === x.id ? '' : x.id })} style={chip(v.pair === x.id)}>
+            <button key={x.id} type="button" className="lq-square" aria-pressed={v.pair === x.id} onClick={() => set({ ...v, pair: v.pair === x.id ? '' : x.id })} style={chip(v.pair === x.id)}>
               <span style={{ fontFamily: fontCss(x.head), fontWeight: 700, fontSize: 18, lineHeight: 1.1 }}>{x.name[lang]}</span>
               <span style={{ fontFamily: fontCss(x.body), fontSize: 12, color: 'var(--c-mist)' }}>{tt.sub.split('.')[0]}.</span>
             </button>))}
