@@ -69,6 +69,7 @@ Lacivert tema (`[data-site-theme='liquid']` içinde, `src/styles/theme.css`). Y�
 ## Yönlendirme
 - **Ana harita: `context/HARITA.md`.** Her görevden önce oku: istenen şey zaten yapılmışsa bozma, sahibe "yapıldı, şurada" de; kısmen yapılmışsa eksiği söyle. Her görevden sonra güncelle. Oturum sonunda ve sahip sorduğunda yapıldı/yapılacak tablosunu ver.
 - Her görevde `context/README.md` haritasını oku (özet ve kurallar zorunlu).
+- Müşteri otomasyon / yapay zekâ projesi talebi gelirse: önce `context/rehberler/otomasyon-ajansi-teknik-rehber.md` okunur ve cevap oradaki formatla verilir.
 - Bakım ajanları: `agents/AGENT_REGISTRY.md`.
 - Eski tasarım belgeleri: `_yedek/` (güncel değil).
 

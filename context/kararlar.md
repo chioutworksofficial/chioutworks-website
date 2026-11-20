@@ -74,3 +74,5 @@
 - 2026-11-19 · Yayın akışı: değişiklik → GitHub (`chioutworksofficial/chioutworks-website`) → Vercel otomatik çeker (Chioutworks'ün ayrı Vercel hesabı, ekip `chioutworks`). Vercel'e doğrudan yayın yok; Vercel API anahtarı tutulmaz. Her iş sonunda Obsidian'a kayıt (`npm run obsidian`).
 
 - 2026-11-20 · Supabase ücretsiz planda kalınacak (sahibin kararı); otomatik geri yüklenebilir yedek yok, yerel yedek betiği önerildi (cevap bekleniyor).
+
+- 2026-11-20 · Admin paneli giriş şifresi (ADMIN_TOKEN) alan adı bağlandıktan sonra yenilenecek: `sh scripts/new-admin-token.sh` (sahip: "daha değil"). Kurucu adı arama motoru bilgisinden (index.html JSON-LD) kaldırılıyor (sahip onayı); ad yalnızca Impressum'da.

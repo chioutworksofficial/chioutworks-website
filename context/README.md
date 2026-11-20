@@ -37,4 +37,5 @@ Ajan çerçevesi (marka, hedef kitle, strateji, ajanlar) `../agents/` altındad�
 - Kesinleşmemiş fikirler, reddedilen seçenekler ve doğrulanmamış varsayımlar buraya yazılmaz.
 - Çelişki fark edilirse sessizce düzeltilmez; sahibine bildirilir.
 
+- `rehberler/otomasyon-ajansi-teknik-rehber.md` — müşteri yeni bir otomasyon/YZ projesi istediğinde: ihtiyacı anlama, sorulacak sorular, araç seçimi, kurulum adımları, maliyet, teslim ve test; cevap formatı (2026-11-20).
 - `GUVENLIK.md` — güvenlik standardı; her yeni özellik ve entegrasyonda uygulanır (2026-11-19).
