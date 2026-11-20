@@ -1564,3 +1564,4 @@ main:focus { outline: none; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 html[data-mode='light'] [data-site-theme='liquid'] .psc-site-btn.is-wide { color: var(--c-abyss); }
+html[data-mode='light'] [data-site-theme='liquid'] :is(.bks-steps li.is-on, .bks-result.is-on) .bks-num { color: var(--c-abyss); }
