@@ -43,7 +43,7 @@ export default function SiteHero({ lang }: { lang: Lang }) {
       {/* Right: industries (desktop column, mobile snap-scroll row) */}
       <div className="relative pb-16 lg:pb-0 lg:absolute lg:right-9 lg:top-[80px] lg:w-[300px]">
         <p className="px-5 md:px-9 lg:px-0 mb-4 lg:mb-6" style={{ fontSize: 20, fontWeight: 600, color: 'var(--lq-white)' }}>{ui.forLabel}</p>
-        <div className="hero-rail" onTouchStart={() => setTouch(true)} onTouchEnd={() => setTouch(false)} onTouchCancel={() => setTouch(false)}>
+        <div className="hero-rail" role="region" aria-label={ui.heroTitle} tabIndex={0} onTouchStart={() => setTouch(true)} onTouchEnd={() => setTouch(false)} onTouchCancel={() => setTouch(false)}>
           <ul className="hero-track flex lg:block gap-4 lg:gap-0 overflow-x-auto lg:overflow-visible snap-x snap-mandatory px-5 md:px-9 lg:px-0 [scrollbar-width:none]" data-touch={touch ? '1' : '0'}>
             {[...items, ...items].map((it, i) => (
               <li key={i} aria-hidden={i >= items.length ? true : undefined} className="snap-start shrink-0 w-[260px] lg:w-auto lg:pb-[54px]">

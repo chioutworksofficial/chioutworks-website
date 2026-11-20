@@ -146,11 +146,11 @@ export default function OfferPage() {
       <section className="lq-card" style={card} aria-label={u.acceptTitle}>
         <h2 style={h2}>{u.acceptTitle}</h2>
         <label style={{ display: 'block', fontSize: 14, marginBottom: 6 }} htmlFor="offer-name">{u.acceptName}</label>
-        <input id="offer-name" style={input} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+        <input id="offer-name" aria-invalid={!!err} aria-describedby={err ? "offer-err" : undefined} style={input} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
         <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 14, fontSize: 14, lineHeight: 1.5, cursor: 'pointer' }}>
           <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} style={{ marginTop: 3 }} />{u.acceptConfirm}
         </label>
-        {err && <p role="alert" style={{ color: 'var(--c-lilac)', fontSize: 14, margin: '12px 0 0' }}>{err}</p>}
+        {err && <p id="offer-err" role="alert" style={{ color: 'var(--c-lilac)', fontSize: 14, margin: '12px 0 0' }}>{err}</p>}
         <button type="button" className="lq-btn-ghost" style={{ marginTop: 18 }} onClick={accept} disabled={busy}>{busy ? u.accepting : u.accept}</button>
       </section>)}
 

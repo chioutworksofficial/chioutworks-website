@@ -2,6 +2,7 @@ import { demoText } from '../src/components/demos/demoText.js';
 import { T as SITE_T } from '../src/translations.js';
 import { CATALOG_UI } from '../src/components/demos/i18n/catalog.js';
 import './env.js';
+import { runNightlySnapshot, listSnapshots } from './backup.js';
 import { dbOn, dbInsert, dbUpsert, dbSelect, dbDelete, dbUpdate, kvGet, kvSet } from './db.js';
 import express from 'express';
 import cors from 'cors';
@@ -1108,6 +1109,12 @@ app.delete('/api/admin/errors', async (req, res) => {
   return res.json({ ok: true });
 });
 
+app.get('/api/admin/backups', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  if (!dbOn()) return res.json({ snapshots: [] });
+  try { return res.json({ snapshots: await listSnapshots() }); } catch { return res.status(502).json({ error: 'backup_list_failed' }); }
+});
+
 app.get('/api/cron/daily', async (req, res) => {
   const secret = process.env.CRON_SECRET;
   if (!secret) return res.status(503).json({ error: 'cron_not_configured' });
@@ -1115,6 +1122,7 @@ app.get('/api/cron/daily', async (req, res) => {
   if (!crypto.timingSafeEqual(given, crypto.createHash('sha256').update(`Bearer ${secret}`).digest())) return res.status(401).json({ error: 'unauthorized' });
   if (dbOn()) await kvSet('keepalive', { at: new Date().toISOString() });
   await pruneVoice();
+  if (dbOn()) await runNightlySnapshot().then((b) => console.log(`[cron] backup ${b.file} tables=${b.tables} rows=${b.rows} failed=${b.failed.length} pruned=${b.pruned}`)).catch((e) => { void recordError('cron/backup-failed', e); console.error('[cron] backup failed', (e as Error).message); });
   if (dbOn()) await dbDelete('app_errors', `t=lt.${new Date(Date.now() - 30 * 86400e3).toISOString()}`).catch((e) => console.error('[cron] errors prune failed', (e as Error).message));   // 30-day retention
   return res.json({ ok: true });
 });

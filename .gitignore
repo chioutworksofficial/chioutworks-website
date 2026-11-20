@@ -51,3 +51,6 @@ tanitim/kaynak-dosyalar/*
 
 # _yedek/ (archive) is intentionally tracked; uncomment the next line to ignore it
 # _yedek/
+
+# ── Local backups (personal data) ──
+/backups/

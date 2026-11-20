@@ -1355,7 +1355,7 @@ svg.is-in .bc-draw, svg.is-in .bc-grow, svg.is-in .bc-write, svg.is-in .bc-pen {
 [data-site-theme='liquid'] .bks-fill small { display: block; margin-top: 5px; font-size: 9.5px; color: var(--lq-silver); }
 [data-site-theme='liquid'] .bks-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 [data-site-theme='liquid'] .bks-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; border: 1px solid transparent; opacity: .42; transition: opacity .35s, background .35s, border-color .35s; }
-[data-site-theme='liquid'] .bks-steps li.is-past { opacity: .7; }
+[data-site-theme='liquid'] .bks-steps li.is-past { opacity: 1; }
 [data-site-theme='liquid'] .bks-steps li.is-on { opacity: 1; background: color-mix(in srgb, var(--c-signal) 12%, transparent); border-color: color-mix(in srgb, var(--c-lilac) 35%, transparent); }
 [data-site-theme='liquid'] .bks-steps b { display: block; font-size: 15.5px; font-weight: 500; color: var(--lq-white); font-family: var(--font-display); }
 [data-site-theme='liquid'] .bks-steps small { display: block; margin-top: 3px; font-size: 13px; color: var(--lq-silver); }
@@ -1563,3 +1563,4 @@ main:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+html[data-mode='light'] [data-site-theme='liquid'] .psc-site-btn.is-wide { color: var(--c-abyss); }
