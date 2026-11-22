@@ -28,3 +28,17 @@ Kapsamı yazılmayan iş sınırsız iş olur. Bu bir iskelettir, hukuki metin d
 - Destek sözü: kanal (form/e-posta; site kuralı: toplantı, SMS vaadi yok), çalışma saati, ilk cevap süresi, kapsam dışı iki madde.
 - Hesaplar ve veriler müşterinin adına.
 - En altta: "Avukata doğrulatılacak taslaktır." (Sahip: gerekirse yaptırılacak.)
+
+## 3. Risk → bugün yazılacak kural (sahibin verdiği tablo, 2026-11-23)
+Anlaşma ve teklif hazırlanırken bu sekiz risk mutlaka kapatılır:
+
+| Risk | Yazılı kural |
+|---|---|
+| Sınırsız iş | Kapsam beş madde |
+| Sonsuz revizyon | İki tur, sonrası ücretli |
+| Kod kimin | Müşteride, lisanslı |
+| Veri kimin | Müşterinin; sahip yalnızca işler (veri işleyen) |
+| Tanıdığa ayrıcalık | Herkese aynı kural |
+| Sözlü anlaşma | Tek sayfa, yazılı |
+| Ödeme tarihi yok | Tarih + gecikme kuralı |
+| Çıkış yok | 30 gün önceden yazılı bildirim |
