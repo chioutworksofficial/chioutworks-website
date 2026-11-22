@@ -1,4 +1,12 @@
-> **PAZARTESİ 2026-11-23 — 3. iş: analiz formu sayfaları daha anlaşılır.** Sahip formda ilerlerken "Size özel uygulama / panel" sayfasının yalnızca kendine özel uygulama isteyenler için olduğunu sonradan anladı; önceki sayfalarda da aynı sorular soruluyor sandı. Her sayfanın başına kime yönelik olduğunu anlatan kısa açıklama (örn. "Bu sayfa yalnızca size özel bir uygulama/panel istiyorsanız içindir; istemiyorsanız doğrudan geçebilirsiniz") + belirgin "Bu sayfayı geç" seçeneği; benzer görünen sorularda hangi ürün için sorulduğu netleşsin. 4 dil. 2026-11-21'de yapılmadı (sahibin isteği).
+> **PAZARTESİ 2026-11-23 — 3. iş (genişletildi, sahip onayı bekleniyor): analiz formunu kolay, eğlenceli, teknolojik yapmak.** Sahibin istekleri:
+> - Web sitesi formu 18 sayfa, sıkıcı geliyor; sorular değerli, kalsın. Otomasyon ve diğer ürünlerin formlarına da aynısı.
+> - Her sayfanın başında: kime/ne için olduğu ("bu sayfa yalnızca size özel uygulama istiyorsanız içindir, istemiyorsanız geçin"), cevaplanınca sitede/sistemde ne olacağı ("bu sayfadaki cevaplarla sitenizde şu bölümler olur"); belirgin "Bu sayfayı geç".
+> - Bazı sorularda birden fazla seçim yapılamıyor (hangisi olduğu tespit edilecek) → çoklu seçim.
+> - Hazır cevap önerileri: tıklayınca metin kutusuna hazır metin girer, kişi düzenleyebilir; "Emin değilim" seçeneği. Öneriler sahibi zor durumda bırakacak vaat içermesin (fiyat/süre/özellik sözü yok).
+> - Görünüm: daha eğlenceli, animasyonlu, teknolojik (otomasyon sayfalarındaki 3D/sahne havası); tasarım dili sitenin lacivert teması.
+> - En başta bütçe sorusu (bütçe aralıkları; 5.000 € altı tek seçenek değil, alt aralıklar da: ör. 1.500 € altı, 1.500–3.000 €, 3.000–5.000 €, 5.000–10.000 €, 10.000 € üstü, "henüz bilmiyorum").
+> - Örnek alınan site (yalnızca fikir, kopya değil): adım göstergesi "Schritt 01/03", büyük başlık, seçilebilir kartlar (çoklu seçim), sade alt çizgili alanlar, bütçe hapları. Ekran görüntüleri: `referans-gorseller/form-ornegi/adim-1..3.png` (yerelde, git dışı).
+> - Amaç: müşteri formu bitirsin, sahip hızlı ve doğru teklif versin.
 
 > **PAZARTESİ 2026-11-23 — 2. iş: SEO/GEO dosyası.** Sahip `/Users/chouseinchiout/Downloads/SEO ve GEO Sistemi - Mantigi.md` dosyasını verdi; gözden geçirilip siteye uygulanacak (önce okunup sahibe özet + plan sunulacak). 2026-11-21'de hiçbir şey yapılmadı (sahibin isteği).
 
