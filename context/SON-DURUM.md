@@ -1,4 +1,6 @@
-> **PAZARTESİ 2026-11-23 — 3. iş (genişletildi, sahip onayı bekleniyor): analiz formunu kolay, eğlenceli, teknolojik yapmak.** Sahibin istekleri:
+> **PAZARTESİ — 4. iş (vakit kalırsa): teklif ve sözleşme yapay zekâsı.** Kurallar `context/rehberler/teklif-ve-sozlesme-sablonu.md`: tek sayfa 4 satırlık teklif (durum/çözüm/fiyat/sonraki adım), fiyat kuralı, 3 paket, dahil olmayanlar, 14 gün; 5 maddelik sade anlaşma + destek sözü + "avukata doğrulatılacak taslaktır". `server/offers.ts` ve `server/contract.ts` buna göre uyarlanacak; müşterinin istediği ve sunulan hizmete göre.
+
+> **PAZARTESİ 2026-11-23 — 3. iş (genişletildi, sahip 9 maddenin hepsini onayladı: açıklama, geç butonu, "bu cevaplarla şunlar olur", çoklu seçim, hazır öneriler + emin değilim, bütçe en başta (1.500 altı · 1.500–3.000 · 3.000–5.000 · 5.000–10.000 · 10.000 üstü · bilmiyorum), animasyonlu teknolojik görünüm, tüm formlara, soru silmeden ~10–12 sayfa): analiz formunu kolay, eğlenceli, teknolojik yapmak.** Sahibin istekleri:
 > - Web sitesi formu 18 sayfa, sıkıcı geliyor; sorular değerli, kalsın. Otomasyon ve diğer ürünlerin formlarına da aynısı.
 > - Her sayfanın başında: kime/ne için olduğu ("bu sayfa yalnızca size özel uygulama istiyorsanız içindir, istemiyorsanız geçin"), cevaplanınca sitede/sistemde ne olacağı ("bu sayfadaki cevaplarla sitenizde şu bölümler olur"); belirgin "Bu sayfayı geç".
 > - Bazı sorularda birden fazla seçim yapılamıyor (hangisi olduğu tespit edilecek) → çoklu seçim.

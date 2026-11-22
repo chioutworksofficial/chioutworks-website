@@ -38,4 +38,5 @@ Ajan çerçevesi (marka, hedef kitle, strateji, ajanlar) `../agents/` altındad�
 - Çelişki fark edilirse sessizce düzeltilmez; sahibine bildirilir.
 
 - `rehberler/otomasyon-ajansi-teknik-rehber.md` — müşteri yeni bir otomasyon/YZ projesi istediğinde: ihtiyacı anlama, sorulacak sorular, araç seçimi, kurulum adımları, maliyet, teslim ve test; cevap formatı (2026-11-20).
+- `rehberler/teklif-ve-sozlesme-sablonu.md` — teklif (4 satır, fiyat kuralı, 3 paket) ve 5 maddelik anlaşma iskeleti; teklif/sözleşme yapay zekâsı buna uyar (2026-11-23).
 - `GUVENLIK.md` — güvenlik standardı; her yeni özellik ve entegrasyonda uygulanır (2026-11-19).
