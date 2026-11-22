@@ -36,7 +36,7 @@ Anlaşma ve teklif hazırlanırken bu sekiz risk mutlaka kapatılır:
 |---|---|
 | Sınırsız iş | Kapsam beş madde |
 | Sonsuz revizyon | İki tur, sonrası ücretli |
-| Kod kimin | Müşteride, lisanslı |
+| Kod kimin | Sahipte (Chioutworks), müşteriye lisanslı |
 | Veri kimin | Müşterinin; sahip yalnızca işler (veri işleyen) |
 | Tanıdığa ayrıcalık | Herkese aynı kural |
 | Sözlü anlaşma | Tek sayfa, yazılı |
