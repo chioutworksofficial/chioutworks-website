@@ -42,3 +42,14 @@ Anlaşma ve teklif hazırlanırken bu sekiz risk mutlaka kapatılır:
 | Sözlü anlaşma | Tek sayfa, yazılı |
 | Ödeme tarihi yok | Tarih + gecikme kuralı |
 | Çıkış yok | 30 gün önceden yazılı bildirim |
+
+## 4. "Yazılmayan kapsam sınırsız kapsamdır" (sahibin verdiği görsel, 2026-11-23)
+
+| Böyle değil | Böyle |
+|---|---|
+| Sözlü: "hallederiz" | Beş madde tek sayfada |
+| Kapsam yok, revizyon sonsuz | Kapsam dışı beş şey yazılı |
+| Ödeme "iş bitince" | Yarısı başta, tarihli |
+| Kod ve veri kimin, belirsiz | Kod sahipte (müşteriye lisanslı), veri müşteride; yazılı |
+
+Not: anlaşmada "dahil olmayanlar" en az 5 madde (teklifte en az 3).
