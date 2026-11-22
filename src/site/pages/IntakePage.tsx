@@ -8,6 +8,7 @@ import type { Lang } from '../../translations';
 import { StyleCta } from './StylePage';
 import type { Definition, L4, QDef } from '../../data/intakeSectors';
 import { guardFields, prefetchFormToken } from '../../lib/formGuard';
+import { StyleInline, emptyStyle, styleBody, normUrl, URL_RE, type StyleVal } from '../StyleInline';
 
 type Answers = Record<string, string | boolean>;
 interface Payload { lang: Lang; secondLang: Lang | null; status: string; definition: Definition; answers: Answers }
@@ -28,15 +29,29 @@ const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 // Untrimmed value for controlled inputs: trimming on every keystroke swallows the space the user just typed
 const raw = (v: unknown) => (typeof v === 'string' ? v : '');
 
-const chipStyle = (on: boolean): React.CSSProperties => ({
-  display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', textAlign: 'left',
-  minHeight: 48, padding: '10px 18px', cursor: 'pointer', fontSize: 15, lineHeight: 1.25,
-  background: on ? 'var(--c-cobalt)' : 'var(--c-abyss)', border: '1px solid ' + (on ? 'var(--c-lilac)' : 'var(--c-hairline)'), color: 'var(--c-quartz)',
-});
+/** Parse the saved style_choice JSON back into the picker state. */
+const parseStyle = (raw0: unknown): StyleVal => {
+  const e = emptyStyle();
+  try {
+    const o = JSON.parse(String(raw0));
+    const pal = o?.palette;
+    return { likes: Array.isArray(o?.likes) ? o.likes.filter((x: unknown) => typeof x === 'string') : [], pal: pal?.custom ? 'own' : typeof pal?.id === 'string' ? pal.id : '', pair: typeof o?.font === 'string' ? o.font : '', own: pal?.custom ? { ...e.own, ...pal.custom } : e.own };
+  } catch { return e; }
+};
+/** Selectable card: radio (single) or checkbox (multi); arrow keys move focus inside the group (and select for radios). */
 function Chip({ on, onClick, label, sub, role, sec }: { on: boolean; onClick: () => void; label: string; sub?: string; role: 'radio' | 'checkbox'; sec: string | null }) {
+  const key = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    if (!d) return;
+    const all = Array.from(e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button[role]') ?? []);
+    const nx = all[(all.indexOf(e.currentTarget) + d + all.length) % all.length];
+    if (!nx) return;
+    e.preventDefault(); nx.focus(); if (role === 'radio') nx.click();
+  };
   return (
-    <button type="button" role={role} aria-checked={on} onClick={onClick} style={chipStyle(on)}>
+    <button type="button" role={role} aria-checked={on} onClick={onClick} onKeyDown={key} className="cw-opt lq-square">
       <span>{label}</span>{sub && <span lang={sec ?? undefined} style={{ fontSize: 12, color: on ? 'var(--c-mist)' : 'var(--c-ash)' }}>{sub}</span>}
+      <i aria-hidden="true">✓</i>
     </button>
   );
 }
@@ -62,6 +77,9 @@ export default function IntakePage() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [otherOpen, setOtherOpen] = useState<Record<string, boolean>>({});
+  const [skipped, setSkipped] = useState<Record<string, boolean>>({});
+  const [badUrls, setBadUrls] = useState<Record<string, boolean>>({});
+  const [svLocal, setSvLocal] = useState<StyleVal | null>(null);
 
   const pending = useRef<Answers>({});
   const timer = useRef<number | undefined>(undefined);
@@ -103,6 +121,7 @@ export default function IntakePage() {
       if (!r.ok) throw new Error(String(r.status));
       const j = await r.json();
       if (j.definition) setDef(j.definition as Definition);
+      if (Array.isArray(j.badUrls)) setBadUrls((b) => ({ ...b, ...Object.fromEntries((j.badUrls as string[]).map((k) => [k, true])) }));
       setSave(Object.keys(pending.current).length ? 'saving' : 'saved');
     }).catch(() => { pending.current = { ...batch, ...pending.current }; setSave('error'); }));
     return inflight.current;
@@ -113,11 +132,18 @@ export default function IntakePage() {
   const set = (k: string, v: string | boolean) => {
     setAnswers((a) => { const n = { ...a }; if (v === '' || v === false) delete n[k]; else n[k] = v; return n; });
     pending.current[k] = v;
+    setBadUrls((b) => (b[k] ? { ...b, [k]: false } : b));
     setSave('saving');
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => void flush(), 800);
   };
 
+  const pick = (q: QDef, id: string) => {
+    const k = `${q.id}__${id}`, o = q.opts?.find((x) => x.id === id);
+    const turnOn = answers[k] !== true;
+    for (const x of q.opts ?? []) { const kk = `${q.id}__${x.id}`; if (kk !== k && answers[kk] === true && turnOn && (o?.exclusive || x.exclusive)) set(kk, false); }
+    set(k, turnOn);
+  };
   const sections = def?.sections ?? [];
   const total = sections.length;
   const isReview = step >= total;
@@ -219,12 +245,19 @@ export default function IntakePage() {
 
   const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', background: 'var(--c-abyss)', border: '1px solid var(--c-hairline)', color: 'var(--c-quartz)', font: '400 16px/1.4 var(--font-body)' };
 
+  const urlBad = (id: string) => { const t = str(answers[id]); return !!badUrls[id] || (!!t && !URL_RE.test(normUrl(t))); };
+  const addText = (id: string, t: string) => {
+    const cur0 = raw(answers[id]);
+    set(id, !cur0.trim() || cur0 === (def.unsureLabel?.[lang] || u.unsureText) ? t : `${cur0.replace(/[,\s]+$/, '')}, ${t}`);
+    window.setTimeout(() => { const el = document.getElementById(`q-${id}`) as HTMLTextAreaElement | null; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 0);
+  };
   const Question = ({ q }: { q: QDef }) => {
     const v = answers[q.id];
     const label = q.t[lang] || q.t.en;
     const meta = q.id.startsWith('meta_');
     const hint = q.type === 'multi' ? u.many : q.type === 'single' ? u.one : q.type === 'yn' ? u.unsureHint : '';
-    const unsureOn = v === u.unsureText;
+    const unsureTxt = def.unsureLabel?.[lang] || u.unsureText;
+    const unsureOn = v === unsureTxt;
     return (
       <fieldset className="lq-card" style={{ padding: '20px 22px', margin: 0, minInlineSize: 0 }}>
         <legend style={{ display: 'contents' }} />
@@ -235,7 +268,7 @@ export default function IntakePage() {
           </label>
           <span style={{ fontSize: 11, color: 'var(--c-ash)', whiteSpace: 'nowrap', letterSpacing: '.04em' }}>{q.required ? u.required : u.optional}</span>
         </div>
-        {hint && <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--c-ash)' }}>{hint}</p>}
+        {hint && (q.type === 'multi' ? <p className="cw-hint" style={{ margin: '8px 0 0' }}>{hint}</p> : <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--c-ash)' }}>{hint}</p>)}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, margin: '6px 0 12px' }}>
           {q.help && <button type="button" aria-expanded={!!helpOpen[q.id]} onClick={() => setHelpOpen((o) => ({ ...o, [q.id]: !o[q.id] }))}
             style={q.mustRead
@@ -260,25 +293,31 @@ export default function IntakePage() {
         {q.type === 'text' && (meta
           ? <input id={`q-${q.id}`} style={inputStyle} type={q.id === 'meta_email' ? 'email' : q.id === 'meta_phone' ? 'tel' : 'text'} autoComplete={q.id === 'meta_email' ? 'email' : q.id === 'meta_contact' ? 'name' : q.id === 'meta_phone' ? 'tel' : 'organization'}
               value={raw(v)} onChange={(e) => set(q.id, e.target.value)} />
+          : q.format === 'url'
+          ? <>
+              <input id={`q-${q.id}`} style={inputStyle} type="text" inputMode="url" autoComplete="url" placeholder={u.urlPh} aria-invalid={urlBad(q.id)} value={raw(v)} onChange={(e) => set(q.id, e.target.value)} />
+              {urlBad(q.id) && <p role="alert" className="cw-err">{u.badUrl}</p>}
+            </>
           : <>
               <textarea id={`q-${q.id}`} style={{ ...inputStyle, minHeight: 84, resize: 'vertical' }} rows={3} placeholder={u.textPh} value={typeof v === 'string' ? v : ''} onChange={(e) => set(q.id, e.target.value)} />
-              <div style={{ marginTop: 10 }}>
-                <button type="button" aria-pressed={unsureOn} className="lq-btn-ghost" onClick={() => set(q.id, unsureOn ? '' : u.unsureText)}
-                  style={{ padding: '8px 14px', fontSize: 11, background: unsureOn ? 'var(--c-cobalt)' : undefined }}>{u.unsureText}</button>
-              </div>
+              {(!!q.suggestions?.length || q.unsure) && (
+                <div className="cw-sugs"><span>{u.suggest}</span>
+                  {q.suggestions?.map((x, i) => { const t = x[lang] || x.en; return <button key={i} type="button" className="cw-sug lq-square" onClick={() => addText(q.id, t)}>{t}</button>; })}
+                  {q.unsure && <button type="button" aria-pressed={unsureOn} className="cw-sug lq-square" onClick={() => set(q.id, unsureOn ? '' : unsureTxt)}>{unsureTxt}</button>}
+                </div>)}
             </>)}
 
         {(q.type === 'single' || q.type === 'yn') && (
-          <div role="radiogroup" aria-label={label} style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <div role="radiogroup" aria-label={label} className={'cw-opts' + (q.id === 'budget_range' ? ' cw-opts--lg' : '')}>
             {q.opts?.map((o) => <Chip sec={helper} key={o.id} role="radio" on={v === o.id} onClick={() => set(q.id, v === o.id ? '' : o.id)} label={o.t[lang] || o.t.en} sub={subOf(o.t, q.id)} />)}
           </div>
         )}
 
         {q.type === 'multi' && (
-          <div role="group" aria-label={label} style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <div role="group" aria-label={label} className="cw-opts">
             {q.opts?.map((o) => {
               const k = `${q.id}__${o.id}`;
-              return <Chip sec={helper} key={o.id} role="checkbox" on={answers[k] === true} onClick={() => set(k, answers[k] !== true)} label={o.t[lang] || o.t.en} sub={subOf(o.t, q.id)} />;
+              return <Chip sec={helper} key={o.id} role="checkbox" on={answers[k] === true} onClick={() => pick(q, o.id)} label={o.t[lang] || o.t.en} sub={subOf(o.t, q.id)} />;
             })}
             {q.other && <Chip sec={helper} role="checkbox" on={!!otherOpen[q.id]} label={u.other} onClick={() => { if (otherOpen[q.id]) set(`${q.id}__other`, ''); setOtherOpen((s) => ({ ...s, [q.id]: !s[q.id] })); }} />}
           </div>
@@ -333,21 +372,23 @@ export default function IntakePage() {
         )}
       </div>
 
-      <div aria-hidden="true" style={{ height: 6, borderRadius: 9999, background: 'var(--c-inkline)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: 'var(--c-signal)', borderRadius: 9999, transition: 'width .3s' }} />
+      <div className="cw-step" role="status">
+        <span>{u.step} {String(Math.min(step + 1, total + 1)).padStart(2, '0')} {u.of} {String(total + 1).padStart(2, '0')}</span>
+        <small>{save === 'saving' ? u.saving : save === 'saved' ? u.saved : save === 'error' ? u.saveErr : ''}</small>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--c-ash)', margin: '8px 0 24px' }} role="status">
-        <span>{u.step} {Math.min(step + 1, total + 1)} {u.of} {total + 1}</span>
-        <span>{save === 'saving' ? u.saving : save === 'saved' ? u.saved : save === 'error' ? u.saveErr : ''}</span>
-      </div>
+      <div className="cw-bar" role="progressbar" aria-label={u.stepAria} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><i style={{ transform: `scaleX(${Math.max(pct, 4) / 100})` }} /></div>
 
       <IntakeProgress lang={lang} token={token} step={step} total={total} def={def} answers={answers} setStep={setStep} />
 
+      <div key={step} className="cw-page">
       {!isReview && cur && (
         <>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, color: 'var(--c-quartz)', margin: '0 0 16px', fontWeight: 500 }}>
-            {cur.title[lang] || cur.title.en}{Sub({ x: cur.title })}
-          </h2>
+          <h2 className="cw-title">{cur.title[lang] || cur.title.en}{Sub({ x: cur.title })}</h2>
+          {(cur.forWho || cur.outcome) && (
+            <div className="cw-soft">
+              {cur.forWho && <p><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg><span>{cur.forWho[lang] || cur.forWho.en}{Sub({ x: cur.forWho })}</span></p>}
+              {cur.outcome && <p style={{ color: 'var(--c-quartz)' }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg><span>{cur.outcome[lang] || cur.outcome.en}{Sub({ x: cur.outcome })}</span></p>}
+            </div>)}
           {cur.intro && <p style={{ margin: '-4px 0 18px', fontSize: 15, lineHeight: 1.6, color: 'var(--c-mist)' }}>{cur.intro[lang] || cur.intro.en}{Sub({ x: cur.intro })}</p>}
           {cur.flow && (
             <ol aria-label={cur.title[lang]} style={{ listStyle: 'none', margin: '0 0 20px', padding: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', gap: 8 }}>
@@ -359,7 +400,8 @@ export default function IntakePage() {
                   {i < cur.flow!.length - 1 && <span aria-hidden="true" style={{ color: 'var(--c-lilac)', fontSize: 18 }}>→</span>}
                 </li>))}
             </ol>)}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {cur.kind === 'style' && <StyleInline lang={lang} v={svLocal ?? parseStyle(answers.style_choice)} set={(nv) => { setSvLocal(nv); set('style_choice', nv.likes.length || nv.pal || nv.pair ? JSON.stringify(styleBody(nv)) : ''); }} />}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: cur.kind === 'style' && cur.qs.length ? 14 : 0 }}>
             {cur.qs.map((q) => <Fragment key={q.id}>{Question({ q })}</Fragment>)}
           </div>
         </>
@@ -373,7 +415,7 @@ export default function IntakePage() {
             {sections.map((s, i) => (
               <div key={s.id} className="lq-card" style={{ padding: '16px 20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <strong style={{ color: 'var(--c-quartz)', fontWeight: 500 }}>{s.title[lang] || s.title.en}</strong>
+                  <strong style={{ color: 'var(--c-quartz)', fontWeight: 500 }}>{s.title[lang] || s.title.en}{skipped[s.id] && !s.qs.some((q) => summary(q)) && <em style={{ marginLeft: 8, fontSize: 12, color: 'var(--c-ash)', fontWeight: 400 }}>· {u.skipped}</em>}</strong>
                   <button type="button" className="lq-btn-ghost" style={{ padding: '6px 12px', fontSize: 11 }} onClick={() => go(i)}>{u.edit}</button>
                 </div>
                 {!s.qs.some((q) => summary(q)) && <p style={{ margin: 0, fontSize: 13, color: 'var(--c-ash)' }}>{u.empty}</p>}
@@ -398,11 +440,14 @@ export default function IntakePage() {
 
       {err && <div role="alert" style={{ margin: '18px 0 0', padding: '12px 14px', border: '1px solid var(--c-lilac)', background: 'var(--c-inkline)', color: 'var(--c-quartz)', borderRadius: 12, fontSize: 14 }}>{err}</div>}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 28, flexWrap: 'wrap' }}>
-        <button type="button" className="lq-btn-ghost" onClick={() => go(step - 1)} disabled={step === 0} style={{ visibility: step === 0 ? 'hidden' : 'visible' }}>{u.back}</button>
+      <div className="cw-actions">
+        {step > 0 && <button type="button" className="lq-btn-ghost" onClick={() => go(step - 1)}>{u.back}</button>}
+        <span className="cw-spacer" />
+        {!isReview && cur?.skippable && <button type="button" className="lq-btn-ghost" onClick={() => { setSkipped((x) => ({ ...x, [cur.id]: true })); void go(step + 1); }}>{u.skip}</button>}
         {!isReview
-          ? <button type="button" className="lq-btn-ghost" onClick={() => go(step + 1)}>{step === total - 1 ? u.toReview : u.next}</button>
-          : <button type="button" className="lq-btn-ghost" onClick={submit} disabled={busy}>{busy ? u.submitting : u.submit}</button>}
+          ? <button type="button" className="cw-primary" onClick={() => go(step + 1)}>{step === total - 1 ? u.toReview : u.next}</button>
+          : <button type="button" className="cw-primary" onClick={submit} disabled={busy}>{busy ? u.submitting : u.submit}</button>}
+      </div>
       </div>
 
       <p style={{ marginTop: 40, fontSize: 12, color: 'var(--c-ash)', lineHeight: 1.6 }}>

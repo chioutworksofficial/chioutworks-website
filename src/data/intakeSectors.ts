@@ -197,6 +197,16 @@ export const START_Q: StaticQ[] = [
     ] },
 ];
 
+START_Q.push({ id: 'budget_range', type: 'single', required: true, t: l4(['Bu iş için yaklaşık hangi bütçe aralığını düşünüyorsunuz?', 'Which budget range do you roughly have in mind for this?', 'Welchen Budgetrahmen haben Sie dafür ungefähr im Kopf?', 'Ποιο εύρος προϋπολογισμού έχετε περίπου στο μυαλό σας για αυτό;']),
+  options: [
+    o('lt1500', ['1.500 € altı', 'Under €1,500', 'Unter 1.500 €', 'Κάτω από 1.500 €']),
+    o('1500_3000', ['1.500–3.000 €', '€1,500–3,000', '1.500–3.000 €', '1.500–3.000 €']),
+    o('3000_5000', ['3.000–5.000 €', '€3,000–5,000', '3.000–5.000 €', '3.000–5.000 €']),
+    o('5000_10000', ['5.000–10.000 €', '€5,000–10,000', '5.000–10.000 €', '5.000–10.000 €']),
+    o('gt10000', ['10.000 € üstü', 'Over €10,000', 'Über 10.000 €', 'Πάνω από 10.000 €']),
+    o('unknown', ['Henüz bilmiyorum', 'I don’t know yet', 'Weiß ich noch nicht', 'Δεν γνωρίζω ακόμα']),
+  ] });
+
 export const TECH_Q: StaticQ[] = [
   { id: 'tech_site', type: 'yn', detail: true, t: l4(['Şu an bir web siteniz veya alan adınız (domain) var mı? Varsa hangisi?', 'Do you already have a website or domain? If so, which?', 'Haben Sie bereits eine Website oder Domain? Wenn ja, welche?', 'Έχετε ήδη ιστοσελίδα ή domain; Αν ναι, ποιο;']) },
   { id: 'tech_hosting', type: 'text', t: l4(['Nerede barındırılıyor, kim yönetiyor? (ör. hosting firması, ajans, bilmiyorum)', 'Where is it hosted and who manages it? (e.g. provider, agency, no idea)', 'Wo wird sie gehostet und wer verwaltet sie? (z. B. Anbieter, Agentur, weiß ich nicht)', 'Πού φιλοξενείται και ποιος τη διαχειρίζεται; (π.χ. πάροχος, εταιρεία, δεν ξέρω)']) },
@@ -352,7 +362,7 @@ export const BOOKING_Q: StaticQ[] = [
   { id: 'bk_staff', type: 'single', t: l4(['Randevuları kaç kişi karşılıyor?', 'How many people take appointments?', 'Wie viele Personen nehmen Termine wahr?', 'Πόσα άτομα εξυπηρετούν ραντεβού;']),
     options: [o('one', ['Sadece ben', 'Only me', 'Nur ich', 'Μόνο εγώ']), o('few', ['2–5 kişi', '2–5 people', '2–5 Personen', '2–5 άτομα']), o('many', ['6 veya daha fazla', '6 or more', '6 oder mehr', '6 ή περισσότερα'])] },
   { id: 'bk_hours', type: 'text', t: l4(['Çalışma saatleriniz nedir?', 'What are your opening hours?', 'Wie lauten Ihre Öffnungszeiten?', 'Ποιες είναι οι ώρες λειτουργίας σας;']) },
-  { id: 'bk_now', type: 'single', t: l4(['Randevuları şu an nasıl alıyorsunuz?', 'How do you take bookings today?', 'Wie nehmen Sie Termine derzeit entgegen?', 'Πώς κλείνετε ραντεβού σήμερα;']),
+  { id: 'bk_now', type: 'multi', t: l4(['Randevuları şu an nasıl alıyorsunuz?', 'How do you take bookings today?', 'Wie nehmen Sie Termine derzeit entgegen?', 'Πώς κλείνετε ραντεβού σήμερα;']),
     options: [
       o('phone', ['Telefonla', 'By phone', 'Telefonisch', 'Τηλεφωνικά']),
       o('msg', ['Mesajla', 'By message', 'Per Nachricht', 'Με μήνυμα']),
@@ -373,7 +383,7 @@ export const BOOKING_Q: StaticQ[] = [
 export const INV_Q: StaticQ[] = [
   { id: 'inv_volume', type: 'single', required: true, t: l4(['Ayda yaklaşık kaç teklif veya fatura hazırlıyorsunuz?', 'Roughly how many quotes or invoices per month?', 'Wie viele Angebote oder Rechnungen erstellen Sie ungefähr pro Monat?', 'Περίπου πόσες προσφορές ή τιμολόγια εκδίδετε τον μήνα;']),
     options: [o('s', ['20’den az', 'Fewer than 20', 'Weniger als 20', 'Λιγότερα από 20']), o('m', ['20–100', '20–100', '20–100', '20–100']), o('l', ['100’den fazla', 'More than 100', 'Mehr als 100', 'Περισσότερα από 100'])] },
-  { id: 'inv_now', type: 'single', t: l4(['Şu an nasıl hazırlıyorsunuz?', 'How do you prepare them today?', 'Wie erstellen Sie diese derzeit?', 'Πώς τα ετοιμάζετε σήμερα;']),
+  { id: 'inv_now', type: 'multi', t: l4(['Şu an nasıl hazırlıyorsunuz?', 'How do you prepare them today?', 'Wie erstellen Sie diese derzeit?', 'Πώς τα ετοιμάζετε σήμερα;']),
     options: [
       o('office', ['Word / Excel ile', 'With Word / Excel', 'Mit Word / Excel', 'Με Word / Excel']),
       o('software', ['Bir muhasebe programıyla', 'With accounting software', 'Mit einer Buchhaltungssoftware', 'Με λογιστικό πρόγραμμα']),
@@ -455,6 +465,9 @@ export const CONSENT_AI: L4 = l4([
 ]);
 
 // ── Definition shape served by GET /api/intake/:token (shared with the client page) ──
-export interface QDef { id: string; no?: number; type: 'text' | 'single' | 'multi' | 'yn'; t: L4; opts?: { id: string; t: L4 }[]; other?: boolean; detail?: boolean; required?: boolean; help?: L4; costNote?: L4; mustRead?: boolean }
-export interface SecDef { id: string; title: L4; qs: QDef[]; intro?: L4; flow?: L4[] }
-export interface Definition { sections: SecDef[]; consent: L4; market: Market; sector: SectorKey; wants: string[] }
+// Optional additions (UI step): opts[].exclusive (choosing it clears the others), suggestions (clickable example answers for
+// free text), unsure (offer the shared "not sure" choice, label in Definition.unsureLabel), forWho/outcome/skippable per page.
+export interface QDef { id: string; no?: number; type: 'text' | 'single' | 'multi' | 'yn'; t: L4; opts?: { id: string; t: L4; exclusive?: boolean }[]; other?: boolean; detail?: boolean; required?: boolean; help?: L4; costNote?: L4; mustRead?: boolean; suggestions?: L4[]; unsure?: boolean; format?: 'url' }
+export interface SecDef { id: string; title: L4; qs: QDef[]; intro?: L4; flow?: L4[]; forWho?: L4; outcome?: L4; skippable?: boolean; kind?: 'style' }
+export interface Definition { sections: SecDef[]; consent: L4; market: Market; sector: SectorKey; wants: string[]; unsureLabel?: L4 }
+export const UNSURE_LABEL: L4 = l4(['Emin değilim', 'Not sure', 'Weiß ich noch nicht', 'Δεν είμαι σίγουρος/η']);

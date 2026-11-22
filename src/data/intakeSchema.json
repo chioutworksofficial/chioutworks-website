@@ -189,8 +189,8 @@
        "id": "property_mgmt",
        "text": {
         "de": "Wohnanlagen / Hausverwaltungen",
-        "tr": "Apartman / Hausverwaltung",
-        "el": "Πολυκατοικίες / Hausverwaltung",
+        "tr": "Apartman / site yönetimi",
+        "el": "Πολυκατοικίες / διαχείριση κτιρίων",
         "tr_TR": "Apartman / site yönetimleri",
         "el_GR": "Πολυκατοικίες / διαχειρίσεις"
        }
@@ -199,8 +199,8 @@
        "id": "commercial",
        "text": {
         "de": "Gewerbe",
-        "tr": "Gewerbe (ticari işletmeler)",
-        "el": "Επαγγελματικοί χώροι (Gewerbe)",
+        "tr": "Ticari işletmeler",
+        "el": "Επαγγελματικοί χώροι",
         "tr_TR": "Ticari işletmeler",
         "el_GR": "Επαγγελματικοί χώροι"
        }
@@ -1606,7 +1606,7 @@
     {
      "no": 51,
      "id": "target_customer_type",
-     "type": "single",
+     "type": "multi",
      "text": {
       "de": "Möchten Sie eher mehr Privat- oder mehr Geschäftskunden gewinnen?",
       "tr": "Daha fazla bireysel müşteri mi, yoksa kurumsal müşteri mi istiyorsunuz?",

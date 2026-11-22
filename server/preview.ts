@@ -91,7 +91,7 @@ function viewsOf(i: Intake): View[] {
 }
 function featuresOf(i: Intake): PreviewFeatures {
   const a = i.answers; const w = wantsOf(a); const yes = (k: string) => a[k] === 'yes';
-  const ch = String(a.messenger_notify ?? '');
+  const ch = ['telegram', 'whatsapp', 'email'].find((c) => a[`messenger_notify__${c}`] === true || a.messenger_notify === c) ?? '';
   let languages: string[] = [];
   try {
     const q = defOf(i).sections.flatMap((s) => s.qs).find((x) => x.id === 'website_languages');

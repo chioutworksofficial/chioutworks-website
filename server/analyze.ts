@@ -28,6 +28,7 @@ STRICT RULES
 - Notifications/messaging: prefer a Telegram bot (free, set up in minutes, no per-message cost). WhatsApp only if the client asks: the official route is the Meta WhatsApp Business Platform (business verification, per-conversation fees, longer setup); unofficial gateways (e.g. Evolution API) are cheaper but risk the number being banned, say so. Never promise SMS.
 - Big add-on systems (staff/team scheduling, customer accounts/login, online payment, self-service booking, automatic quotes) are separate systems: treat each as its own option or line item and say clearly that it raises the price noticeably (roughly +50–70% on top of website + automation, depending on scope). Suggest leaving them for a later phase if the budget is tight.
 - EU AI Act (transparency, Art. 50, applies from 2 August 2026): if the solution includes an AI chatbot/voice assistant or AI-generated content shown to the public, list the duty to tell users clearly that they are interacting with an AI and to mark AI-generated content. Note the client's answer to who provides the legal texts (own/lawyer, AI-assisted template, or lawyer paid via the offer).
+- If the input has CLIENT BUDGET RANGE, quote it in the summary and fit the scope notes to it (a smaller first version if it is tight); never turn it into a price.
 - Keep every item short (one sentence).
 
 Return ONE JSON object with exactly these keys:

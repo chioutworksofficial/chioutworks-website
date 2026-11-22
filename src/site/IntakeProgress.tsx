@@ -99,8 +99,8 @@ export default function IntakeProgress({ lang, token, step, total, def, answers,
     if (yes('quote_form')) out.push(t.quoteForm);
     if (yes('online_payment')) out.push(t.payment);
     if (yes('customer_accounts')) out.push(t.accounts);
-    const ch = String(answers.messenger_notify ?? '');
-    if (['telegram', 'whatsapp', 'email'].includes(ch)) out.push(t.notify(label('messenger_notify', ch)));
+    const ch = ['telegram', 'whatsapp', 'email'].find((c) => on(`messenger_notify__${c}`) || answers.messenger_notify === c) ?? '';
+    if (ch) out.push(t.notify(label('messenger_notify', ch)));
     if (yes('auto_email')) out.push(t.autoEmail);
     if (yes('auto_crm')) out.push(t.autoCrm);
     if (yes('auto_quotes')) out.push(t.autoQuotes);
@@ -117,7 +117,7 @@ export default function IntakeProgress({ lang, token, step, total, def, answers,
   return (
     <>
       {/* milestone dots: one per page, filled when done */}
-      <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'space-between', margin: '-14px 0 18px', padding: '0 1px' }}>
+      <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'space-between', margin: '0 0 18px', padding: '0 1px' }}>
         {Array.from({ length: total + 1 }, (_, i) => (
           <span key={i} style={{ width: 7, height: 7, borderRadius: 9999, background: i < step ? 'var(--c-signal)' : i === step ? 'var(--c-lilac)' : 'var(--c-hairline)', transition: 'background .3s' }} />
         ))}

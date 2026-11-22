@@ -10,11 +10,12 @@ import { fileURLToPath } from 'url';
 import { EN, EN_SECTIONS } from '../src/data/intakeEn.js';
 import { dbOn, dbSelect, dbUpsert, dbDelete, kvGet, kvSet } from './db.js';
 import {
-  AI_Q, APP_Q, AUTO_Q, BOOKING_Q, CONSENT, FINAL_Q, INV_Q, QR_Q, CONSENT_AI, CRM_Q, SECTION_STATIC, SECTOR_LABEL, SECTOR_OVERRIDE, START_Q, TECH_Q, YN_LABEL, isSector, l4,
+  AI_Q, APP_Q, AUTO_Q, BOOKING_Q, CONSENT, FINAL_Q, INV_Q, QR_Q, CONSENT_AI, CRM_Q, SECTION_STATIC, SECTOR_LABEL, SECTOR_OVERRIDE, START_Q, TECH_Q, UNSURE_LABEL, YN_LABEL, isSector, l4,
   type L, type L4, type Market, type SectorKey, type StaticQ, type QDef, type SecDef, type Definition,
 } from '../src/data/intakeSectors.js';
 import { INTAKE_SLUG } from '../src/lib/routes.js';
-import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, DREAM_IDS, DREAM_TITLE, EXTRA_SYSTEM, LEGAL_Q, MESSENGER_Q, QUESTION_HELP, SECTION_INTRO, SECTION_ORDER } from '../src/data/intakeHelp.js';
+import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, DREAM_IDS, DREAM_TITLE, EXAMPLES_Q, EXAMPLES_TITLE, EXTRA_SYSTEM, LEGAL_Q, MERGE_INTO, MESSENGER_Q, QUESTION_HELP, SECTION_INTRO, SECTION_META, SECTION_ORDER, STYLE_TITLE, SUGGESTIONS } from '../src/data/intakeHelp.js';
+import { applyChoice, saveChoice, styleSummary, type StyleRec } from './styles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORE = path.join(__dirname, '../data/intakes.json');
@@ -97,11 +98,13 @@ export function buildDefinition(market: Market, sector: SectorKey, wants: string
     booking: ['booking', BOOKING_Q], qr: ['qr', QR_Q], crm: ['crm', CRM_Q], invoices: ['invoices', INV_Q], ai: ['ai', AI_Q], automation: ['automation', AUTO_Q],
   };
   const blockSec = (k: string, tools = false): SecDef => ({ id: BLOCKS[k][0], title: SECTION_STATIC[BLOCKS[k][0] as 'qr'], qs: [...BLOCKS[k][1], ...(tools && (k === 'crm' || k === 'invoices') && !(k === 'invoices' && wants.includes('crm')) ? toolsQ : [])].map(fromStatic) });
+  const visualPages = (): SecDef[] => [{ id: 'style', title: STYLE_TITLE, qs: [], kind: 'style' }, { id: 'examples', title: EXAMPLES_TITLE, qs: EXAMPLES_Q.map((q) => ({ ...q })) }];
   const focused = wants.length > 0 && wants.every((w) => COMPACT.includes(w));
   if (focused) {
     for (const k of COMPACT) if (wants.includes(k)) secs.push(blockSec(k, true));
+    if (wants.includes('qr')) secs.push(...visualPages());
     secs.push({ id: 'final', title: SECTION_STATIC.final, qs: FINAL_Q.map(fromStatic) });
-    return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants };
+    return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants, unsureLabel: UNSURE_LABEL };
   }
   for (const s of SCHEMA.sections as any[]) {
     if (skip.has(s.id)) continue;
@@ -132,7 +135,8 @@ export function buildDefinition(market: Market, sector: SectorKey, wants: string
     if (qs.length) secs.push({ id: s.id, title: all4(s.title, EN_SECTIONS[s.id], market), qs });
   }
   for (const k of ['booking', 'qr', 'invoices', 'ai']) if (wants.includes(k)) secs.push(blockSec(k));
-  return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants };
+  if (wants.length === 0 || ['website', 'app', 'qr', 'all'].some((w) => wants.includes(w))) secs.push(...visualPages());
+  return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants, unsureLabel: UNSURE_LABEL };
 }
 
 const dedupe = (secs: SecDef[]): SecDef[] => { const seen = new Set<string>(); for (const s of secs) s.qs = s.qs.filter((q) => !seen.has(q.id) && !!seen.add(q.id)); return secs; };
@@ -142,22 +146,35 @@ const consentOf = (market: Market) => {
 };
 /** Friendlier flow: motivating "dream" page second, technical + budget pages last, plain-language help and intros. No question is dropped. */
 function friendly(secs: SecDef[]): SecDef[] {
+  // fewer pages: related pages are merged, no question is dropped
+  for (const [from, m] of Object.entries(MERGE_INTO)) {
+    const a = secs.find((s) => s.id === from), b = secs.find((s) => s.id === m.into);
+    if (!a) continue;
+    if (!b) { a.id = m.into; a.title = m.title; continue; }
+    b.title = m.title; b.qs = m.front ? [...a.qs, ...b.qs] : [...b.qs, ...a.qs]; secs.splice(secs.indexOf(a), 1);
+  }
   const dream: QDef[] = [];
   for (const id of DREAM_IDS) for (const s of secs) { const i = s.qs.findIndex((q) => q.id === id); if (i >= 0) { dream.push(s.qs[i]); s.qs.splice(i, 1); break; } }
   const project = secs.find((s) => s.id === 'project');
   if (project && !project.qs.some((q) => q.id === LEGAL_Q.id)) { const at = project.qs.findIndex((q) => q.id === 'budget_onetime'); project.qs.splice(at < 0 ? project.qs.length : at, 0, LEGAL_Q); }
-  const all = [...secs.filter((s) => s.qs.length), ...(dream.length ? [{ id: 'dream', title: DREAM_TITLE, qs: dream }] : [])];
+  const all = [...secs.filter((s) => s.qs.length || s.kind === 'style'), ...(dream.length ? [{ id: 'dream', title: DREAM_TITLE, qs: dream }] : [])];
   const rank = (id: string) => { const r = SECTION_ORDER.indexOf(id); return r < 0 ? SECTION_ORDER.length : r; };
-  return all.sort((a, b) => rank(a.id) - rank(b.id)).map((s) => ({
-    ...s, ...(SECTION_INTRO[s.id] ? { intro: SECTION_INTRO[s.id] } : {}), ...(s.id === 'automation' ? { flow: AUTOMATION_FLOW } : {}),
-    qs: s.qs.map((q) => {
-      if (q.id === MESSENGER_Q.id) return MESSENGER_Q;
-      if (q.id === LEGAL_Q.id) return LEGAL_Q;
-      const base = QUESTION_HELP[q.id] ?? EXTRA_SYSTEM[q.id];
-      if (!base) return q;
-      const cost = COST_IDS.has(q.id);
-      return { ...q, help: base, ...(cost ? { costNote: COST_NOTE } : {}), ...(cost || MUST_READ.has(q.id) ? { mustRead: true } : {}) };
-    }),
+  const sorted = all.sort((a, b) => rank(a.id) - rank(b.id));
+  const decorate = (q: QDef): QDef => {
+    const base = q.id === MESSENGER_Q.id ? MESSENGER_Q : q.id === LEGAL_Q.id ? LEGAL_Q : q;
+    const help = base === q ? QUESTION_HELP[q.id] ?? EXTRA_SYSTEM[q.id] : undefined;
+    const cost = COST_IDS.has(q.id);
+    const out: QDef = help ? { ...q, help, ...(cost ? { costNote: COST_NOTE } : {}), ...(cost || MUST_READ.has(q.id) ? { mustRead: true } : {}) } : { ...base };
+    if (out.type === 'text' && SUGGESTIONS[out.id]) out.suggestions = SUGGESTIONS[out.id];
+    if (out.type === 'multi' && out.opts) out.opts = out.opts.map((o) => (o.id === 'none' || o.id === 'unsure' ? { ...o, exclusive: true } : o));
+    if (!out.required && !out.id.startsWith('meta_') && !out.opts?.some((o) => o.id === 'unsure')) out.unsure = true;
+    return out;
+  };
+  return sorted.map((s, i) => ({
+    ...s, ...(s.id === 'project' && SECTION_INTRO.tech ? { intro: l4(LANGS.map((l) => `${SECTION_INTRO.tech[l]} ${SECTION_INTRO.project[l]}`) as [string, string, string, string]) } : SECTION_INTRO[s.id] ? { intro: SECTION_INTRO[s.id] } : {}),
+    ...(s.id === 'automation' ? { flow: AUTOMATION_FLOW } : {}), ...(SECTION_META[s.id] ?? {}),
+    skippable: i > 0 && i < sorted.length - 1 && !s.qs.some((q) => q.required),
+    qs: s.qs.map(decorate),
   }));
 }
 
@@ -171,21 +188,28 @@ export const defOf = (i: Intake) => {
 };
 
 // ── Readable answers (like read_answers.py) ─────────────────────────────────
+export const styleOf = (v: unknown): Record<string, unknown> | null => { try { const o = JSON.parse(String(v)); return o && typeof o === 'object' && !Array.isArray(o) ? o : null; } catch { return null; } };
+/** Owner-facing text of the style choice stored in the form (same wording as the admin style view). */
+const styleText = (v: unknown): string => {
+  const o = styleOf(v); if (!o) return '';
+  const rec: StyleRec = { token: '', ref: '', lang: 'tr', createdAt: '', doneAt: null, likes: [], dislikes: [], refs: [], note: '' };
+  return applyChoice(rec, o, true) ? styleSummary(rec) : '';
+};
 export function formatAnswers(i: Intake, lang: L = 'tr') {
   const def = defOf(i);
   const a = i.answers;
   const str = (k: string) => (typeof a[k] === 'string' ? (a[k] as string).trim() : '');
   const sections = def.sections.map((s) => ({
     title: s.title[lang],
-    items: s.qs.map((q) => {
+    items: [...(s.kind === 'style' && styleText(a.style_choice) ? [{ no: null, id: 'style_choice', q: s.title[lang], a: styleText(a.style_choice) }] : []), ...s.qs.map((q) => {
       let ans: string[] = [];
-      if (q.type === 'multi') ans = (q.opts ?? []).filter((o) => a[`${q.id}__${o.id}`] === true).map((o) => o.t[lang]);
+      if (q.type === 'multi') ans = (q.opts ?? []).filter((o) => a[`${q.id}__${o.id}`] === true || a[q.id] === o.id).map((o) => o.t[lang]); // a[q.id]: answers saved before the question became multi
       else if (q.type === 'single' || q.type === 'yn') { const o = q.opts?.find((x) => x.id === a[q.id]); if (o) ans = [o.t[lang]]; }
       else if (str(q.id)) ans = [str(q.id)];
       if (q.other && str(`${q.id}__other`)) ans.push(`(+ ${str(`${q.id}__other`)})`);
       if (q.detail && str(`${q.id}__detail`)) ans.push(`(${str(`${q.id}__detail`)})`);
       return { no: q.no ?? null, id: q.id, q: q.t[lang], a: ans.join(', ') };
-    }),
+    })],
   }));
   return { sections, consent: a.consent === true };
 }
@@ -210,9 +234,11 @@ export function answersForAi(i: Intake): string {
   const d = defOf(i);
   const out = [`Market: ${i.market}; sector: ${SECTOR_LABEL[d.sector].en}; form language: ${i.lang}; wants: ${d.wants.join(', ') || 'not stated'}`];
   for (const s of f.sections) {
-    const rows = s.items.filter((it) => it.a && !it.id.startsWith('meta_') && it.id !== 'biz_type' && it.id !== 'wants');
+    const rows = s.items.filter((it) => it.a && !it.id.startsWith('meta_') && it.id !== 'biz_type' && it.id !== 'wants' && it.id !== 'budget_range');
     if (rows.length) out.push(`\n## ${s.title}`, ...rows.map((it) => `- ${it.q} => ${it.a}`));
   }
+  const budget = f.sections.flatMap((s) => s.items).find((it) => it.id === 'budget_range')?.a;
+  if (budget) out.splice(1, 0, `CLIENT BUDGET RANGE (stated first; size the scope to it): ${budget}`);
   const company = str0(i.answers.meta_company);
   if (company) out.splice(1, 0, `Company: ${company}`);
   return out.join('\n');
@@ -240,7 +266,15 @@ const pathOf = (i: Intake) => `/${i.lang}/${INTAKE_SLUG[i.lang]}/${i.token}`;
 const mkToken = () => crypto.randomBytes(32).toString('base64url');
 const expired = (i: Intake) => new Date(i.expiresAt).getTime() < Date.now();
 const KEY_RE = /^[a-z0-9_]{1,60}$/;
-const REQUIRED = ['meta_company', 'meta_contact', 'meta_email', 'biz_type'];
+const REQUIRED = ['meta_company', 'meta_contact', 'meta_email', 'biz_type', 'budget_range'];
+const URL_RE = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+/** Keeps the style choice and example sites inside the form in sync with the admin style record (ref intake:<id>, as the old post-submit page). */
+async function syncStyle(i: Intake) {
+  const a = i.answers; const sc = styleOf(a.style_choice);
+  const refs = [1, 2, 3].map((n) => str0(a[`example_url_${n}`])).filter(Boolean).map((url) => ({ url, what: '' }));
+  const note = str0(a.example_likes);
+  if (sc || refs.length || note) await saveChoice(`intake:${i.id}`, i.lang, { ...(sc ?? {}), refs, note });
+}
 
 import { validate as v, z, s, bool, anyObj, idP, tokenP, LANG } from './validate.js';
 const answersS = z.object({ answers: z.record(z.string(), z.any()) });
@@ -322,10 +356,18 @@ export function registerIntake(app: Express, d: Deps) {
     if (!inc || typeof inc !== 'object' || Array.isArray(inc)) return res.status(400).json({ error: 'bad_request' });
     const before = JSON.stringify([i.answers.biz_type, wantsOf(i.answers)]);
     const next = { ...i.answers };
-    let n = 0;
+    let n = 0; const badUrls: string[] = [];
     for (const [k, v] of Object.entries(inc as Record<string, unknown>)) {
       const [qid, sub] = k.split('__');
       if (!KEY_RE.test(qid) || (sub !== undefined && !KEY_RE.test(sub)) || k.length > 130 || ++n > 400) return res.status(400).json({ error: 'bad_key' });
+      if (typeof v === 'string' && v.trim()) {
+        if (k === 'style_choice') { if (v.length > 1500 || !styleOf(v)) return res.status(400).json({ error: 'bad_value' }); }
+        else if (/^example_url_[123]$/.test(k)) { // only http(s) addresses are stored; invalid ones are reported back, other answers still save
+          const u = /^https?:\/\//i.test(v.trim()) ? v.trim() : `https://${v.trim()}`;
+          if (u.length > 200 || !URL_RE.test(u)) { badUrls.push(k); continue; }
+          next[k] = u; continue;
+        }
+      }
       if (v === false || v === '' || v === null) delete next[k];
       else if (v === true) next[k] = true;
       else if (typeof v === 'string') next[k] = clean(v, 4000);
@@ -338,8 +380,9 @@ export function registerIntake(app: Express, d: Deps) {
     // Edits after submission update the same record (no new intake); admin sees "updated" and a stale-analysis hint
     if (i.status === 'submitted') i.updatedAt = new Date().toISOString();
     await saveIntake(i);
+    if (i.status === 'submitted') await syncStyle(i);
     const changed = before !== JSON.stringify([i.answers.biz_type, wantsOf(i.answers)]);
-    return res.json(changed ? { ok: true, definition: defOf(i) } : { ok: true });
+    return res.json({ ok: true, ...(changed ? { definition: defOf(i) } : {}), ...(badUrls.length ? { badUrls } : {}) });
   });
 
   app.post('/api/intake/:token/submit', limiter, v(undefined, tokenP), async (req, res) => {
@@ -353,6 +396,7 @@ export function registerIntake(app: Express, d: Deps) {
     const now = new Date().toISOString();
     i.status = 'submitted'; i.submittedAt = now; i.consentAt = now;
     await saveIntake(i);
+    await syncStyle(i);
     return res.json({ ok: true });
   });
 
@@ -361,7 +405,7 @@ export function registerIntake(app: Express, d: Deps) {
     id: i.id, requestId: i.requestId, lang: i.lang, secondLang: i.secondLang, market: i.market, sector: i.sector, status: i.status,
     createdAt: i.createdAt, openedAt: i.openedAt, submittedAt: i.submittedAt, expiresAt: i.expiresAt, cancelledAt: i.cancelledAt ?? null,
     emailedAt: i.emailedAt ?? null, company: str0(i.answers.meta_company) || i.prefill.company, contact: str0(i.answers.meta_contact) || i.prefill.contact,
-    email: str0(i.answers.meta_email) || i.prefill.email, hasAnalysis: !!i.analysis, updatedAt: i.updatedAt ?? null,
+    email: str0(i.answers.meta_email) || i.prefill.email, budgetRange: str0(i.answers.budget_range) || null, hasAnalysis: !!i.analysis, updatedAt: i.updatedAt ?? null,
     analysisStale: !!(i.analysis && i.updatedAt && i.updatedAt > ((i.analysis as { at?: string }).at ?? '')), path: pathOf(i), expired: expired(i),
   });
 
