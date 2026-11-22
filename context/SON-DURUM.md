@@ -1,3 +1,5 @@
+> **PAZARTESİ AKŞAM — 5. iş: admin paneli düzeni (sahip, 2026-11-23).** Panel karışık geliyor. İstenenler: neyin nereden geldiği net (kaynak: form / sesli / sohbet / hesaplayıcı / elle), hangisinin analiz edildiği/işlendiği net durum etiketi, basit silme, toplu seçme + toplu işlem (sil, arşivle, durum değiştir), sade ve az buton, düzenli menü/gruplama, admin'e açık/koyu mod düğmesi. Tasarım lacivert tema, CSS değişkenleri.
+
 > **PAZARTESİ — 4. iş (vakit kalırsa): teklif ve sözleşme yapay zekâsı.** Kurallar `context/rehberler/teklif-ve-sozlesme-sablonu.md`: tek sayfa 4 satırlık teklif (durum/çözüm/fiyat/sonraki adım), fiyat kuralı, 3 paket, dahil olmayanlar, 14 gün; 5 maddelik sade anlaşma + destek sözü + "avukata doğrulatılacak taslaktır". `server/offers.ts` ve `server/contract.ts` buna göre uyarlanacak; müşterinin istediği ve sunulan hizmete göre.
 
 > **PAZARTESİ 2026-11-23 — 3. iş (genişletildi, sahip 9 maddenin hepsini onayladı: açıklama, geç butonu, "bu cevaplarla şunlar olur", çoklu seçim, hazır öneriler + emin değilim, bütçe en başta (1.500 altı · 1.500–3.000 · 3.000–5.000 · 5.000–10.000 · 10.000 üstü · bilmiyorum), animasyonlu teknolojik görünüm, tüm formlara, soru silmeden ~10–12 sayfa): analiz formunu kolay, eğlenceli, teknolojik yapmak.** Sahibin istekleri:
@@ -8,6 +10,7 @@
 > - Görünüm: daha eğlenceli, animasyonlu, teknolojik (otomasyon sayfalarındaki 3D/sahne havası); tasarım dili sitenin lacivert teması.
 > - En başta bütçe sorusu (bütçe aralıkları; 5.000 € altı tek seçenek değil, alt aralıklar da: ör. 1.500 € altı, 1.500–3.000 €, 3.000–5.000 €, 5.000–10.000 €, 10.000 € üstü, "henüz bilmiyorum").
 > - Örnek alınan site (yalnızca fikir, kopya değil): adım göstergesi "Schritt 01/03", büyük başlık, seçilebilir kartlar (çoklu seçim), sade alt çizgili alanlar, bütçe hapları. Ekran görüntüleri: `referans-gorseller/form-ornegi/adim-1..3.png` (yerelde, git dışı).
+> - Renk/tarz seçimi ve örnek site bağlantıları formun İÇİNDE (son sayfalardan önce), tek "Gönder" ile hepsi admin'e gider; ayrı sayfa yok.
 > - Amaç: müşteri formu bitirsin, sahip hızlı ve doğru teklif versin.
 
 > **PAZARTESİ 2026-11-23 — 2. iş: SEO/GEO dosyası.** Sahip `/Users/chouseinchiout/Downloads/SEO ve GEO Sistemi - Mantigi.md` dosyasını verdi; gözden geçirilip siteye uygulanacak (önce okunup sahibe özet + plan sunulacak). 2026-11-21'de hiçbir şey yapılmadı (sahibin isteği).
