@@ -1640,3 +1640,7 @@ html[data-mode='light'] [data-site-theme='liquid'].cw-intake .cw-opt { border-co
 html[data-mode='light'] [data-site-theme='liquid'].cw-intake .cw-opt[aria-checked='true'] { border-color: var(--c-signal); }
 [data-site-theme='liquid'].cw-intake .cw-step { color: var(--c-lilac); }
 [data-site-theme='liquid'].cw-intake .cw-soft svg { color: var(--c-lilac); }
+
+/* Industries wheel centre block: kicker/sub centred and balanced in every language (wraps instead of hugging the left of a half-width box) */
+[data-site-theme='liquid'] .iw-centre { width: max-content; max-width: min(88vw, 340px); text-align: center; }
+[data-site-theme='liquid'] .iw-centre > p { text-align: center; text-wrap: balance; margin-inline: auto; }

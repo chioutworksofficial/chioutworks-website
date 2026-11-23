@@ -165,7 +165,7 @@ export default function IndustriesWheel({ lang }: { lang: Lang }) {
 
         {/* centre disc */}
         <div aria-hidden="true" className="absolute rounded-full" style={{ width: g.disc, height: g.disc, left: '50%', top: g.cy - g.disc / 2, marginLeft: -g.disc / 2, background: 'var(--lq-abyss)', border: '1px solid var(--lq-line)' }} />
-        <div className="absolute left-1/2 flex flex-col items-center -translate-x-1/2" style={{ top: g.head, gap: g.small ? 14 : 28, zIndex: 2 }}>
+        <div className="iw-centre absolute left-1/2 flex flex-col items-center -translate-x-1/2" style={{ top: g.head, gap: g.small ? 14 : 28, zIndex: 2 }}>
           <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--lq-silver)' }}>{ui.kicker}</p>
           <Logo size={g.small ? 34 : 44} stacked />
           <p style={{ fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--lq-silver)' }}>{ui.sub}</p>

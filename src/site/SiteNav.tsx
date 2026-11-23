@@ -10,6 +10,7 @@ import { LANGS, pagePath, solutionPath, switchLangPath, type PageKey } from '../
 import { SITE_UI } from './i18n';
 import { SOLUTION_UI } from './i18n/solutionDeck';
 import Logo from './Logo';
+import { getLenis } from '../lib/smoothScroll';
 
 /** Top bar: logo · MENU + · "Get in touch" pill. MENU opens a right-hand slide-in panel with pages, demos and languages. */
 export default function SiteNav({ lang }: { lang: Lang }) {
@@ -65,7 +66,14 @@ export default function SiteNav({ lang }: { lang: Lang }) {
       <header className="fixed top-0 inset-x-0 z-[60] transition-colors duration-300"
         style={{ background: 'transparent' /* lialive: header never forms a bar; content scrolls under it */ }}>
         <div className="site-nav-row mx-auto flex items-center justify-between gap-4 px-5 md:px-9 h-[76px]">
-          <Link to={pagePath(lang, 'home')} aria-label="Chioutworks" className="site-nav-logo shrink-0">
+          <Link to={pagePath(lang, 'home')} aria-label="Chioutworks" className="site-nav-logo shrink-0" onClick={(e) => {
+            setOpen(false);
+            if (pathname.replace(/\/+$/, '') !== pagePath(lang, 'home').replace(/\/+$/, '')) return; // other page: router navigates, App resets scroll to top
+            e.preventDefault();
+            const l = getLenis();
+            if (l) l.scrollTo(0, { duration: 1.2 });
+            else window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+          }}>
             <span className="nav-logo-desk"><Logo size={30} /></span>
             <span className="nav-logo-mob"><Logo size={22} stacked /></span>
           </Link>
