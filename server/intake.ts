@@ -30,7 +30,7 @@ export interface Intake {
   answers: Record<string, string | boolean>;
   status: 'sent' | 'opened' | 'in_progress' | 'submitted';
   createdAt: string; openedAt: string | null; submittedAt: string | null; expiresAt: string;
-  cancelledAt?: string | null; consentAt?: string | null; emailedAt?: string | null; updatedAt?: string | null;
+  closesAt?: string | null; cancelledAt?: string | null; consentAt?: string | null; emailedAt?: string | null; updatedAt?: string | null;
   analysis?: unknown;
 }
 
@@ -287,7 +287,9 @@ const MARKET_SET = new Set(['DE', 'TR', 'GR', 'other']);
 const clean = (v: unknown, n: number) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
 const pathOf = (i: Intake) => `/${i.lang}/${INTAKE_SLUG[i.lang]}/${i.token}`;
 const mkToken = () => crypto.randomBytes(32).toString('base64url');
-const expired = (i: Intake) => new Date(i.expiresAt).getTime() < Date.now();
+/** Once the visitor saved a first answer, closesAt (first answer + 24 h) replaces the creation-time expiry. */
+const expired = (i: Intake) => !i.closesAt && new Date(i.expiresAt).getTime() < Date.now();
+const closed = (i: Intake) => !!i.closesAt && new Date(i.closesAt).getTime() < Date.now();
 const KEY_RE = /^[a-z0-9_]{1,60}$/;
 const REQUIRED = ['meta_company', 'meta_contact', 'meta_email', 'biz_type', 'budget_range'];
 const URL_RE = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
@@ -302,7 +304,7 @@ async function syncStyle(i: Intake) {
 import { validate as v, z, s, bool, anyObj, idP, tokenP, LANG } from './validate.js';
 const answersS = z.object({ answers: z.record(z.string(), z.any()) });
 const createS = z.object({ lang: s(8), secondLang: s(8), market: s(20), sector: s(40), requestId: s(60), prefill: anyObj }).passthrough();
-const actionS = z.object({ action: z.enum(['cancel', 'renew']).nullish() });
+const actionS = z.object({ action: z.enum(['cancel', 'renew', 'reopen']).nullish() });
 const mailS = z.object({ to: s(120), origin: s(200) });
 
 import { recordError } from './errors.js';
@@ -314,7 +316,7 @@ export function registerIntake(app: Express, d: Deps) {
     return i && !i.cancelledAt && !expired(i) ? i : null;
   };
   const pub = (i: Intake) => ({
-    lang: i.lang, secondLang: i.secondLang, market: i.market, status: i.status, expiresAt: i.expiresAt, submittedAt: i.submittedAt,
+    lang: i.lang, secondLang: i.secondLang, market: i.market, status: i.status, expiresAt: i.expiresAt, closesAt: i.closesAt ?? null, submittedAt: i.submittedAt,
     definition: defOf(i), answers: i.answers,
   });
 
@@ -375,6 +377,7 @@ export function registerIntake(app: Express, d: Deps) {
   app.patch('/api/intake/:token', limiter, v(answersS, tokenP), async (req, res) => {
     const i = await getIntakeByToken(String(req.params.token));
     if (!i || i.cancelledAt || expired(i)) return res.status(404).json({ error: 'not_found' });
+    if (closed(i)) return res.status(410).json({ error: 'closed' });
     const inc = req.body?.answers;
     if (!inc || typeof inc !== 'object' || Array.isArray(inc)) return res.status(400).json({ error: 'bad_request' });
     const before = JSON.stringify([i.answers.biz_type, wantsOf(i.answers)]);
@@ -399,18 +402,20 @@ export function registerIntake(app: Express, d: Deps) {
     if (Object.keys(next).length > 600) return res.status(413).json({ error: 'too_large' });
     i.answers = next;
     if (isSector(next.biz_type)) i.sector = next.biz_type;
+    if (!i.closesAt && Object.values(inc as Record<string, unknown>).some((x) => x === true || (typeof x === 'string' && x.trim()))) i.closesAt = new Date(Date.now() + DAY).toISOString();
     if (i.status === 'sent' || i.status === 'opened') i.status = 'in_progress';
     // Edits after submission update the same record (no new intake); admin sees "updated" and a stale-analysis hint
     if (i.status === 'submitted') i.updatedAt = new Date().toISOString();
     await saveIntake(i);
     if (i.status === 'submitted') await syncStyle(i);
     const changed = before !== JSON.stringify([i.answers.biz_type, wantsOf(i.answers)]);
-    return res.json({ ok: true, ...(changed ? { definition: defOf(i) } : {}), ...(badUrls.length ? { badUrls } : {}) });
+    return res.json({ ok: true, closesAt: i.closesAt ?? null, ...(changed ? { definition: defOf(i) } : {}), ...(badUrls.length ? { badUrls } : {}) });
   });
 
   app.post('/api/intake/:token/submit', limiter, v(undefined, tokenP), async (req, res) => {
     const i = await getIntakeByToken(String(req.params.token));
     if (!i || i.cancelledAt || expired(i)) return res.status(404).json({ error: 'not_found' });
+    if (closed(i)) return res.status(410).json({ error: 'closed' });
     const missing = REQUIRED.filter((k) => !str0(i.answers[k]));
     for (const s of defOf(i).sections) for (const q of s.qs) if (q.required && !REQUIRED.includes(q.id) && isVisible(q, i.answers) && !Object.keys(i.answers).some((k) => (k === q.id || k.startsWith(`${q.id}__`)) && i.answers[k] !== false && i.answers[k] !== '')) missing.push(q.id);
     if (!wantsOf(i.answers).length) missing.push('wants');
@@ -427,10 +432,10 @@ export function registerIntake(app: Express, d: Deps) {
   // ── Admin ──
   const brief = (i: Intake) => ({
     id: i.id, requestId: i.requestId, lang: i.lang, secondLang: i.secondLang, market: i.market, sector: i.sector, status: i.status,
-    createdAt: i.createdAt, openedAt: i.openedAt, submittedAt: i.submittedAt, expiresAt: i.expiresAt, cancelledAt: i.cancelledAt ?? null,
+    createdAt: i.createdAt, openedAt: i.openedAt, submittedAt: i.submittedAt, expiresAt: i.expiresAt, closesAt: i.closesAt ?? null, cancelledAt: i.cancelledAt ?? null,
     emailedAt: i.emailedAt ?? null, company: str0(i.answers.meta_company) || i.prefill.company, contact: str0(i.answers.meta_contact) || i.prefill.contact,
     email: str0(i.answers.meta_email) || i.prefill.email, budgetRange: str0(i.answers.budget_range) || null, hasAnalysis: !!i.analysis, updatedAt: i.updatedAt ?? null,
-    analysisStale: !!(i.analysis && i.updatedAt && i.updatedAt > ((i.analysis as { at?: string }).at ?? '')), path: pathOf(i), expired: expired(i),
+    analysisStale: !!(i.analysis && i.updatedAt && i.updatedAt > ((i.analysis as { at?: string }).at ?? '')), path: pathOf(i), expired: expired(i), closed: closed(i),
   });
 
   app.post('/api/admin/intakes', v(createS), async (req, res) => {
@@ -472,6 +477,7 @@ export function registerIntake(app: Express, d: Deps) {
     if (!i) return res.status(404).json({ error: 'not_found' });
     if (req.body?.action === 'cancel') i.cancelledAt = new Date().toISOString();
     else if (req.body?.action === 'renew') { if (i.cancelledAt) return res.status(409).json({ error: 'revoked' }); i.token = mkToken(); i.cancelledAt = null; i.expiresAt = new Date(Date.now() + 30 * DAY).toISOString(); }
+    else if (req.body?.action === 'reopen') { if (i.cancelledAt) return res.status(409).json({ error: 'revoked' }); i.closesAt = new Date(Date.now() + DAY).toISOString(); }
     else return res.status(400).json({ error: 'bad_action' });
     await saveIntake(i);
     return res.json({ intake: brief(i) });

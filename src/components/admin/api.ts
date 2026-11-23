@@ -14,7 +14,7 @@ export interface AnalysisData {
 export interface Analysis { at: string; model: string; data: AnalysisData }
 export interface IntakeBrief {
   id: string; requestId: string | null; lang: string; secondLang: string | null; market: string; sector: string; status: 'sent' | 'opened' | 'in_progress' | 'submitted';
-  createdAt: string; openedAt: string | null; submittedAt: string | null; updatedAt?: string | null; analysisStale?: boolean; expiresAt: string; cancelledAt: string | null; emailedAt: string | null;
+  createdAt: string; openedAt: string | null; submittedAt: string | null; updatedAt?: string | null; analysisStale?: boolean; expiresAt: string; closesAt?: string | null; closed?: boolean; cancelledAt: string | null; emailedAt: string | null;
   company: string; contact: string; email: string; hasAnalysis: boolean; path: string; expired: boolean;
 }
 export interface Turn { role: 'user' | 'assistant'; text: string; at: number }

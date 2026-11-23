@@ -36,7 +36,7 @@ export default function IntakesView({ go }: { go: (t: Tab, id?: string) => void 
     setOpenId(id); setDetail(null); setConfirm(false); setRevoke(false); setNewLang(''); setMsg(null);
     api<Detail>(`/api/admin/intakes/${id}`).then(setDetail).catch(() => setMsg('Kayıt açılamadı.'));
   }, []);
-  const act = async (action: 'renew' | 'cancel') => {
+  const act = async (action: 'renew' | 'cancel' | 'reopen') => {
     if (!openId) return;
     try { await api(`/api/admin/intakes/${openId}`, 'PATCH', { action }); view(openId); load(); }
     catch { setMsg('İşlem yapılamadı, tekrar deneyin.'); }
@@ -69,6 +69,7 @@ export default function IntakesView({ go }: { go: (t: Tab, id?: string) => void 
                 <span className="adm-meta">Oluşturuldu {fmtDate(x.createdAt)}{x.openedAt ? ` · açıldı ${fmtDate(x.openedAt)}` : ''}{x.submittedAt ? ` · teslim ${fmtDate(x.submittedAt)}` : ''}{x.updatedAt ? ` · güncellendi ${fmtDate(x.updatedAt)}` : ''}</span>
               </span>
               <span className="adm-chip tag">{statusOf(x)}</span>
+              {x.closesAt && <span className="adm-chip">{x.closed ? 'Kapandı' : `Kapanış: ${fmtDate(x.closesAt)}`}</span>}
               <span className="adm-chip tag" style={{ fontWeight: 700 }}>Dil: {LANG_NAME[x.lang] ?? x.lang}{x.secondLang ? ` + ${x.secondLang.toUpperCase()}` : ''}</span>
               <span className="adm-chip">{x.market}</span>
               {x.updatedAt && <span className="adm-chip tag">Güncellendi</span>}
@@ -91,7 +92,7 @@ export default function IntakesView({ go }: { go: (t: Tab, id?: string) => void 
               <span className="adm-chip">{SECTORS.find(([k]) => k === i.sector)?.[1]}</span>
               <span className="adm-chip tag" style={{ fontWeight: 700 }}>Dil: {LANG_NAME[i.lang]}{i.secondLang ? ` + ${LANG_NAME[i.secondLang]}` : ''}</span>
               <span className="adm-chip">{i.market}</span>
-              <span className="adm-chip">Geçerlilik: {fmtDate(i.expiresAt)}</span>
+              {i.closesAt ? <span className="adm-chip tag">{i.closed ? 'Kapandı' : `Kapanış: ${fmtDate(i.closesAt)}`}</span> : <span className="adm-chip">Geçerlilik: {fmtDate(i.expiresAt)}</span>}
             </div>
             {!i.cancelledAt && !i.expired && <IntakeLink b={i} defaultEmail={i.email} />}
             {i.cancelledAt && <div className="adm-actions">
@@ -101,6 +102,7 @@ export default function IntakesView({ go }: { go: (t: Tab, id?: string) => void 
             </div>}
             <div className="adm-actions">
               {!i.cancelledAt && <button className="lq-btn-ghost adm-btn sm" onClick={() => act('renew')}>Linki yenile</button>}
+              {!i.cancelledAt && i.closesAt && <button className="lq-btn-ghost adm-btn sm" onClick={() => act('reopen')}>24 saat daha aç</button>}
               {!i.cancelledAt && i.status !== 'submitted' && (!revoke ? <button className="lq-btn-ghost adm-btn sm" onClick={() => setRevoke(true)}>Bağlantıyı geri al</button>
                 : <><button className="lq-btn-ghost adm-btn sm" onClick={() => { setRevoke(false); void act('cancel'); }}>Evet, geri al</button><button className="lq-btn-ghost adm-btn sm" onClick={() => setRevoke(false)}>Vazgeç</button></>)}
               {!confirm ? <button className="lq-btn-ghost adm-btn sm" onClick={() => setConfirm(true)}>Sil</button>

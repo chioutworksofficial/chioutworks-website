@@ -12,7 +12,7 @@ import { guardFields, prefetchFormToken } from '../../lib/formGuard';
 import { StyleInline, emptyStyle, styleBody, normUrl, URL_RE, type StyleVal } from '../StyleInline';
 
 type Answers = Record<string, string | boolean>;
-interface Payload { lang: Lang; secondLang: Lang | null; status: string; definition: Definition; answers: Answers }
+interface Payload { lang: Lang; secondLang: Lang | null; status: string; definition: Definition; answers: Answers; closesAt?: string | null }
 
 const LABEL: Record<Lang, string> = { tr: 'TR', en: 'EN', de: 'DE', el: 'EL' };
 const NAME: Record<Lang, string> = { tr: 'Türkçe', en: 'English', de: 'Deutsch', el: 'Ελληνικά' };
@@ -75,6 +75,8 @@ export default function IntakePage() {
   const [showSecond, setShowSecond] = useState(false);
   const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [done, setDone] = useState(false);
+  const [closesAt, setClosesAt] = useState<string | null>(null);
+  const [closed, setClosed] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [otherOpen, setOtherOpen] = useState<Record<string, boolean>>({});
@@ -105,6 +107,7 @@ export default function IntakePage() {
       setData(p); setDef(p.definition); setAnswers(p.answers);
       setSecond(p.secondLang); setShowSecond(!!p.secondLang);
       setDone(p.status === 'submitted'); setState('ok');
+      setClosesAt(p.closesAt ?? null); setClosed(!!p.closesAt && new Date(p.closesAt).getTime() < Date.now());
       setOtherOpen(Object.fromEntries(Object.keys(p.answers).filter((k) => k.endsWith('__other')).map((k) => [k.slice(0, -7), true])));
     }).catch(() => live && setState('invalid'));
     return () => { live = false; };
@@ -119,8 +122,10 @@ export default function IntakePage() {
     inflight.current = inflight.current.then(() => fetch(`/api/intake/${encodeURIComponent(token)}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers: batch }),
     }).then(async (r) => {
+      if (r.status === 410) { setClosed(true); return; }
       if (!r.ok) throw new Error(String(r.status));
       const j = await r.json();
+      if (typeof j.closesAt === 'string') setClosesAt(j.closesAt);
       if (j.definition) setDef(j.definition as Definition);
       if (Array.isArray(j.badUrls)) setBadUrls((b) => ({ ...b, ...Object.fromEntries((j.badUrls as string[]).map((k) => [k, true])) }));
       setSave(Object.keys(pending.current).length ? 'saving' : 'saved');
@@ -177,6 +182,7 @@ export default function IntakePage() {
       prefetchFormToken();
       await flush();
       const r = await fetch(`/api/intake/${encodeURIComponent(token)}/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(await guardFields()) });
+      if (r.status === 410) { setClosed(true); return; }
       if (!r.ok) throw new Error(String(r.status));
       setDone(true); window.scrollTo({ top: 0 });
     } catch { setErr(u.submitErr); }
@@ -237,11 +243,12 @@ export default function IntakePage() {
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--c-quartz)', margin: '0 0 12px' }}>{u.invalidTitle}</h1>
       <p style={{ margin: 0, lineHeight: 1.6 }}>{state === 'revoked' ? u.revokedBody : u.invalidBody}</p>
     </div>);
-  if (done) return shell(<>
+  const when = closesAt ? new Date(closesAt).toLocaleString(lang, { dateStyle: 'long', timeStyle: 'short' }) : '';
+  if (done && !closed) return shell(<>
     <div className="lq-card" style={{ padding: 40, textAlign: 'center' }}>
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 34, color: 'var(--c-quartz)', margin: '0 0 14px' }}>{u.doneTitle}</h1>
       <p style={{ margin: '0 auto', maxWidth: 520, lineHeight: 1.6, fontSize: 17 }}>{u.doneBody}</p>
-      <p style={{ margin: '18px auto 0', maxWidth: 520, lineHeight: 1.6, fontSize: 15, color: 'var(--c-ash)' }}>{u.editNote}</p>
+      <p style={{ margin: '18px auto 0', maxWidth: 520, lineHeight: 1.6, fontSize: 15, color: 'var(--c-ash)' }}>{u.editNote(when)}</p>
       <button type="button" className="lq-btn-ghost" style={{ marginTop: 22 }} onClick={() => setDone(false)}>{u.editAgain}</button>
     </div>
     {/* the "your website will look like this" demo preview was removed (owner, 2026-11-19); IntakePreview stays for the admin view */}
@@ -349,6 +356,16 @@ export default function IntakePage() {
     return str(answers[q.id]);
   };
 
+  if (closed) return shell(
+    <div className="lq-card" style={{ padding: 28 }}>
+      <p style={{ margin: '0 0 20px', lineHeight: 1.6, color: 'var(--c-quartz)' }}>{u.closedBody}</p>
+      <dl style={{ margin: 0, display: 'grid', gap: 10, fontSize: 14 }}>
+        {sections.flatMap((s) => s.qs).map((q) => { const t = summary(q); return t ? (
+          <div key={q.id}><dt style={{ color: 'var(--c-ash)', fontSize: 12 }}>{q.t[lang] || q.t.en}</dt><dd style={{ margin: 0, color: 'var(--c-quartz)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{t}</dd></div>
+        ) : null; })}
+      </dl>
+    </div>);
+
   const pct = Math.round((Math.min(step, total) / total) * 100);
 
   return shell(
@@ -381,6 +398,7 @@ export default function IntakePage() {
         <span>{u.step} {String(Math.min(step + 1, total + 1)).padStart(2, '0')} {u.of} {String(total + 1).padStart(2, '0')}</span>
         <small>{save === 'saving' ? u.saving : save === 'saved' ? u.saved : save === 'error' ? u.saveErr : ''}</small>
       </div>
+      {closesAt && <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--c-ash)' }}>{u.closesAt(when)}</p>}
       <div className="cw-bar" role="progressbar" aria-label={u.stepAria} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><i style={{ transform: `scaleX(${Math.max(pct, 4) / 100})` }} /></div>
 
       <IntakeProgress lang={lang} token={token} step={step} total={total} sections={sections} answers={answers} setStep={setStep} />
