@@ -17,6 +17,21 @@
 - Also available: law office management, print shop product designer, e-book studio, carousel design studio, pet care and boarding management
 Every app can be customised to the person and business, and new features can be added.
 
+## Packages (one page each, with how it works)
+- CRM (customer and sales management): https://chioutworks.com/en/packages/crm
+- Website: https://chioutworks.com/en/packages/website
+- Online booking: https://chioutworks.com/en/packages/booking
+- AI chat and voice assistant: https://chioutworks.com/en/packages/assistant
+- Quote and invoice automation: https://chioutworks.com/en/packages/invoices — connected to the customer's own accounting software; the legal core (invoice numbering, tamper-proof archive, e-invoice format, GoBD / myDATA / e-Fatura) stays in that software or a certified provider, final tax sign-off with the customer's tax advisor
+- QR menu and ordering: https://chioutworks.com/en/packages/qr
+
+## Key pages
+- Services: https://chioutworks.com/en/services
+- Live demos: https://chioutworks.com/en/demos
+- FAQ: https://chioutworks.com/en/faq
+- Blog: https://chioutworks.com/en/blog
+- Languages: every page exists in English (/en), German (/de), Turkish (/tr) and Greek (/el)
+
 ## Who it is for
 Small and medium businesses in Germany, Austria, Switzerland, Türkiye, Greece and Cyprus, especially salons, clinics, cleaning companies, cafés, retail shops, law offices and service businesses.
 
