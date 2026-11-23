@@ -18,7 +18,7 @@ export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' |
 const GROUPS: { label: string; tabs: { key: Tab; label: string }[] }[] = [
   { label: 'Gelenler', tabs: [{ key: 'requests', label: 'Talepler' }, { key: 'intakes', label: 'Analiz formları' }, { key: 'voice', label: 'Sesli görüşmeler' }] },
   { label: 'İşler', tabs: [{ key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' }, { key: 'calendar', label: 'Takvim' }, { key: 'appointments', label: 'Randevular' }] },
-  { label: 'Site', tabs: [{ key: 'overview', label: 'Genel bakış' }, { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'errors', label: 'Hatalar / Errors' }] },
+  { label: 'Site', tabs: [{ key: 'overview', label: 'Genel bakış' }, { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'errors', label: 'Hatalar ve e-posta' }] },
 ];
 
 function Login({ unset, onDone }: { unset: boolean; onDone: () => void }) {
@@ -72,6 +72,8 @@ export default function Admin() {
   const [openOffer, setOpenOffer] = useState<string | null>(null);
   const [offerUnread, setOfferUnread] = useState(0);
   const [projectUnread, setProjectUnread] = useState(0);
+  const [notifyMail, setNotifyMail] = useState<string | null>(null);   // null = not loaded yet
+  useEffect(() => { if (auth !== 'in' || DEMO) return; api<{ email: string }>('/api/admin/settings/error-notify').then((r) => setNotifyMail(r.email ?? '')).catch(() => {}); }, [auth]);
 
   useEffect(() => {
     try { localStorage.removeItem('cw_admin_token'); } catch { /* ignore */ }
@@ -139,6 +141,7 @@ export default function Admin() {
       </header>
       <main className="adm-main">
         {err && <div className="adm-banner" role="alert">{err}</div>}
+        {notifyMail === '' && tab !== 'errors' && <div className="adm-banner" role="status" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>Hata bildirim e-postası henüz girilmedi. <button className="lq-btn-ghost adm-btn sm adm-pri" onClick={() => go('errors')}>E-postamı yaz</button></div>}
         {tab === 'overview' && <Overview reqs={reqs} sessions={sessions} usage={usage} blocked={blocked} go={go} />}
         {tab === 'requests' && <RequestsView reqs={reqs} setReqs={setReqs} openId={openReq} setOpenId={setOpenReq} go={go} setSessions={setSessions} />}
         {tab === 'intakes' && <IntakesView go={go} />}
@@ -148,7 +151,7 @@ export default function Admin() {
         {tab === 'calendar' && <AvailabilityPanel onSaved={setBlocked} />}
         {tab === 'analytics' && <AnalyticsView />}
         {tab === 'appointments' && <AppointmentsView />}
-        {tab === 'errors' && <ErrorsView />}
+        {tab === 'errors' && <ErrorsView onMailSaved={setNotifyMail} />}
       </main>
     </div>
   );

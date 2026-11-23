@@ -167,3 +167,7 @@ html[data-mode='light'] .adm-chip[data-src], html[data-mode='light'] .adm-chip[d
 html[data-mode='light'] button.adm-chip[data-src][aria-pressed='true'] { background: var(--c); color: #fff; }
 html[data-mode='light'] .adm-badge { color: #fff; }
 html[data-mode='light'] .adm-bar i, html[data-mode='light'] .adm-cols i { background: var(--c-signal); }
+
+/* Primary action (e.g. save the error-notification e-mail): filled, clearly the main button */
+.adm .adm-pri { background: var(--c-signal); border-color: var(--c-signal); color: var(--c-quartz); }
+.adm .adm-pri:hover, .adm .adm-pri:focus-visible { background: var(--c-pulse); border-color: var(--c-pulse); }

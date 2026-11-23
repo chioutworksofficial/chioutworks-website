@@ -4,7 +4,7 @@ import { api, fmtDate } from './api';
 // Own error log (server/errors.ts): last 200 server errors, masked, deduplicated per hour. Admin UI is Turkish.
 interface Row { id: number | string; t: string; route: string; kind: string; message: string; count: number }
 
-export default function ErrorsView() {
+export default function ErrorsView({ onMailSaved }: { onMailSaved?: (email: string) => void } = {}) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const load = useCallback(() => {
@@ -17,7 +17,7 @@ export default function ErrorsView() {
   const [mailOn, setMailOn] = useState(true);
   const [note, setNote] = useState<string | null>(null);
   useEffect(() => { api<{ email: string; mailConfigured: boolean }>('/api/admin/settings/error-notify').then((r) => { setMail(r.email); setMailOn(r.mailConfigured); }).catch(() => {}); }, []);
-  const saveMail = async () => { try { await api('/api/admin/settings/error-notify', 'PUT', { email: mail.trim() }); setNote('Kaydedildi.'); } catch { setNote('Kaydedilemedi (e-posta geçersiz olabilir).'); } };
+  const saveMail = async () => { try { await api('/api/admin/settings/error-notify', 'PUT', { email: mail.trim() }); setNote('Kaydedildi.'); onMailSaved?.(mail.trim()); } catch { setNote('Kaydedilemedi (e-posta geçersiz olabilir).'); } };
   const testMail = async () => { try { await api('/api/admin/settings/error-notify/test', 'POST'); setNote('Deneme e-postası gönderildi.'); } catch { setNote('Gönderilemedi: önce kaydedin; e-posta servisi ayarlı olmalı.'); } };
   const source = (r: Row) => (r.kind.startsWith('client:') ? 'Tarayıcı' : 'Sunucu');
   const clear = async () => {
@@ -28,20 +28,23 @@ export default function ErrorsView() {
     <>
       <h1 className="adm-h1">Hatalar / Errors</h1>
       <p className="adm-sub">Sunucu ve tarayıcı hataları (son 200). E-posta, telefon, IP ve anahtarlar maskelenir; aynı hata bir saat içinde sayaçla birleşir; 30 gün sonra silinir.</p>
+      <div id="err-mail-card" className="lq-card adm-card" style={{ marginBottom: 20, border: '1px solid var(--c-lilac)' }}>
+        <h2>Hata bildirim e-postası</h2>
+        <p className="adm-sub" style={{ marginTop: 6 }}>Sitede yeni bir hata olursa bu adrese e-posta gelir. Adresini aşağıdaki kutuya yaz, sonra <b>Kaydet</b>’e bas.</p>
+        <label htmlFor="err-mail" className="adm-sub" style={{ display: 'block', marginTop: 12 }}>E-posta adresin</label>
+        <input id="err-mail" className="adm-input" type="email" placeholder="E-posta adresini buraya yaz" value={mail} onChange={(e) => setMail(e.target.value)} maxLength={254} autoComplete="off" style={{ marginTop: 6, maxWidth: 420 }} />
+        <div className="adm-actions" style={{ marginTop: 10 }}>
+          <button className="lq-btn-ghost adm-btn sm adm-pri" onClick={saveMail}>Kaydet</button>
+          <button className="lq-btn-ghost adm-btn sm" onClick={testMail} disabled={!mail.trim() || !mailOn}>Deneme e-postası gönder</button>
+        </div>
+        {note && <p className="adm-sub" role="status" style={{ marginTop: 8, color: 'var(--c-quartz)' }}>{note}</p>}
+        <p className="adm-sub" style={{ marginTop: 8 }}>Alan adı doğrulanana kadar e-posta yalnızca e-posta servisindeki hesap adresine gidebilir. Yeni bir hata türünde en çok 10 dakikada bir e-posta gelir.</p>
+      </div>
       <div className="adm-actions" style={{ marginBottom: 16 }}>
         <button className="lq-btn-ghost adm-btn sm" onClick={load}>Yenile</button>
         <button className="lq-btn-ghost adm-btn sm" onClick={clear} disabled={!rows?.length}>Temizle</button>
         <select value={src} onChange={(e) => setSrc(e.target.value as typeof src)} aria-label="Kaynak"><option value="all">Tümü</option><option value="Sunucu">Sunucu</option><option value="Tarayıcı">Tarayıcı</option></select>
         <a className="lq-btn-ghost adm-btn sm" href="https://chioutworks.sentry.io/issues/" target="_blank" rel="noopener noreferrer">Sentry'de aç</a>
-      </div>
-      <div className="lq-card adm-card" style={{ marginBottom: 16, padding: 16 }}>
-        <label htmlFor="err-mail"><b>Hata bildirim e-postası</b></label>
-        <div className="adm-actions" style={{ marginTop: 8 }}>
-          <input id="err-mail" type="email" value={mail} onChange={(e) => setMail(e.target.value)} maxLength={254} autoComplete="off" />
-          <button className="lq-btn-ghost adm-btn sm" onClick={saveMail}>Kaydet</button>
-          <button className="lq-btn-ghost adm-btn sm" onClick={testMail} disabled={!mail.trim() || !mailOn}>Deneme e-postası gönder</button>
-        </div>
-        <p className="adm-sub" style={{ marginTop: 8 }}>Alan adı doğrulanana kadar e-posta yalnızca e-posta servisindeki hesap adresine gidebilir. Yeni bir hata türünde en çok 10 dakikada bir e-posta gelir.{note ? ` ${note}` : ''}</p>
       </div>
       {err && <div className="adm-banner" role="alert">{err}</div>}
       {!rows ? (!err && <div className="adm-list"><div className="adm-skel" /><div className="adm-skel" /></div>)
