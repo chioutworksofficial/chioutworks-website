@@ -36,7 +36,7 @@ Anlaşma ve teklif hazırlanırken bu sekiz risk mutlaka kapatılır:
 |---|---|
 | Sınırsız iş | Kapsam beş madde |
 | Sonsuz revizyon | İki tur, sonrası ücretli |
-| Kod kimin | Sahipte (Chioutworks), müşteriye lisanslı |
+| Kod kimin | Abonelik sürerken sahipte (müşteri lisansla kullanır); abonelik bitince ya da tek seferlik işte teslimde müşteriye devredilir (bkz. bölüm 6) |
 | Veri kimin | Müşterinin; sahip yalnızca işler (veri işleyen) |
 | Tanıdığa ayrıcalık | Herkese aynı kural |
 | Sözlü anlaşma | Tek sayfa, yazılı |
@@ -63,3 +63,10 @@ Not: anlaşmada "dahil olmayanlar" en az 5 madde (teklifte en az 3).
 | İngiltere, ABD | İngilizce | Online / dijital kabul |
 | Diğer ülkeler | İngilizce | Online / dijital kabul |
 Not: tüketici (bireysel müşteri) sözleşmelerinde bazı ülkeler yerel dilde metin isteyebilir; şüphede avukata sorulur (sahip: gerekirse yapılacak).
+
+## 6. Kod ve sistem sahipliği (sahibin kararı, 2026-11-23)
+- **Kurulum + aylık hizmet:** aylık hizmet sürdükçe kod ve sistem sahipte kalır; barındırma, güncelleme, güvenlik ve küçük destek sahipte; müşteri lisansla kullanır.
+- **Müşteri aylık hizmeti bırakırsa:** kurulum zaten ödendiği için sistem ve kod **ek ücretsiz** müşteriye devredilir. Devirden sonra barındırma, alan adı, güncelleme, güvenlik, yedekleme ve sorunlar tamamen müşterinin sorumluluğundadır. Sonradan istenen her iş saat başı 65–75 €.
+- **Yalnızca tek seferlik iş (aylık yok):** teslimde sistem ve kod müşteriye devredilir; sonrası müşteride; ek iş saat başı 65–75 €.
+- **Her durumda:** veriler müşterinindir; sahip yalnızca işler. Sahibin birçok projede kullandığı genel şablon ve araçlar sahibinde kalır (müşteri kendi projesini alır) — sahip itiraz etmedi, sözleşmede bu şekilde yazılır.
+- Not: önceki plandaki "iptalde devir 65–75 €/saat" kuralı bununla değişti; devir ücretsiz, saat ücreti yalnızca ek işler için.
