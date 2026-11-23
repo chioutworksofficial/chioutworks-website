@@ -69,7 +69,10 @@ function Defer({ id, minH, children }: { id?: string; minH: string; children: Re
     return () => io.disconnect();
   }, [on]);
   const fb = <section ref={ph} id={id} aria-hidden="true" style={{ minHeight: minH }} />;
-  return on ? <Suspense fallback={fb}>{children}<Mounted /></Suspense> : fb;
+  // Stable wrapper (hotfix 2026-11-23): GSAP pins move sections into a pin-spacer; without a wrapper React's insertBefore
+  // used a pinned sibling as reference and crashed the page with NotFoundError on phones. Inside its own div React only
+  // ever appends here, so pinned neighbours are never touched.
+  return <div data-defer="">{on ? <Suspense fallback={fb}>{children}<Mounted /></Suspense> : fb}</div>;
 }
 
 type SitePage = Exclude<PageKey, 'privacy' | 'terms' | 'docs' | 'solutions'>;
