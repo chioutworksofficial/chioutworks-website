@@ -279,10 +279,10 @@ export const ONETIME_ACK_Q: QDef = {
   id: 'onetime_ack', type: 'single', required: true,
   t: l4(['Tek seferlik kurulum bilgilendirmesi', 'One-time setup notice', 'Hinweis zur einmaligen Einrichtung', 'Ενημέρωση για την εφάπαξ εγκατάσταση']),
   notice: l4([
-    'Tek seferlik kurulumda teslimden sonra barındırma, alan adı, güncellemeler, güvenlik, yedekleme ve olası sorunlarla tamamen siz ilgilenirsiniz. Daha sonra değişiklik veya destek isterseniz bu iş saat ücretiyle yapılır: saat başı 65–75 € (işin türüne göre).',
-    'With a one-time setup, after delivery you take care of hosting, the domain, updates, security, backups and any problems entirely yourself. If you later want changes or support, that work is billed hourly: €65–75 per hour (depending on the type of work).',
-    'Bei einer einmaligen Einrichtung kümmern Sie sich nach der Übergabe vollständig selbst um Hosting, Domain, Updates, Sicherheit, Backups und mögliche Probleme. Wünschen Sie später Änderungen oder Support, wird diese Arbeit nach Stundensatz berechnet: 65–75 € pro Stunde (je nach Art der Arbeit).',
-    'Στην εφάπαξ εγκατάσταση, μετά την παράδοση φροντίζετε εσείς πλήρως το hosting, το domain, τις ενημερώσεις, την ασφάλεια, τα αντίγραφα ασφαλείας και τυχόν προβλήματα. Αν αργότερα θελήσετε αλλαγές ή υποστήριξη, η εργασία χρεώνεται ανά ώρα: 65–75 € ανά ώρα (ανάλογα με το είδος της εργασίας).',
+    'Tek seferlik kurulumda teslimden sonra sistem ve kod size devredilir. Bundan sonra barındırma, alan adı, güncellemeler, güvenlik, yedekleme ve olası sorunlarla tamamen siz ilgilenirsiniz. Daha sonra değişiklik veya destek isterseniz bu iş saat ücretiyle yapılır: saat başı 65–75 € (işin türüne göre).',
+    'With a one-time setup, the system and code are handed over to you after delivery. From then on, you take care of hosting, the domain, updates, security, backups and any problems entirely yourself. If you later want changes or support, that work is billed hourly: €65–75 per hour (depending on the type of work).',
+    'Bei einer einmaligen Einrichtung werden System und Code nach der Übergabe an Sie übertragen. Ab dann kümmern Sie sich vollständig selbst um Hosting, Domain, Updates, Sicherheit, Backups und mögliche Probleme. Wünschen Sie später Änderungen oder Support, wird diese Arbeit nach Stundensatz berechnet: 65–75 € pro Stunde (je nach Art der Arbeit).',
+    'Στην εφάπαξ εγκατάσταση, μετά την παράδοση το σύστημα και ο κώδικας μεταβιβάζονται σε εσάς. Από εκεί και πέρα φροντίζετε εσείς πλήρως το hosting, το domain, τις ενημερώσεις, την ασφάλεια, τα αντίγραφα ασφαλείας και τυχόν προβλήματα. Αν αργότερα θελήσετε αλλαγές ή υποστήριξη, η εργασία χρεώνεται ανά ώρα: 65–75 € ανά ώρα (ανάλογα με το είδος της εργασίας).',
   ]),
   opts: [{ id: 'ack', t: l4(['Okudum ve kabul ediyorum.', 'I have read and accept this.', 'Ich habe es gelesen und akzeptiere es.', 'Το διάβασα και το αποδέχομαι.']) }],
 };
