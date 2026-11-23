@@ -110,6 +110,7 @@
           var c = JSON.parse(localStorage.getItem('cw-consent') || 'null');
           if (!skip && c && c.functional) sessionStorage.setItem('cw-pre', '1');
         } catch (e) {}
+        if (!el) return;
         if (skip) el.remove();
         else { window.__cwPre = performance.now(); document.body.style.overflow = 'hidden'; }
       })();
