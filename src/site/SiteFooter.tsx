@@ -1,4 +1,4 @@
-import { NAV, FOOTER_LEGAL, RESOURCES_NAV, TOOLS_KICKER } from './navLabels';
+import { NAV, FOOTER_LEGAL, RESOURCES_NAV, TOOLS_KICKER } from './navLabels.js';
 import { openConsentSettings } from '../lib/consent';
 
 import { CONSENT_UI } from './i18n/consent';

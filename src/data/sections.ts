@@ -1,5 +1,5 @@
 import type { Lang } from '../translations';
-import { BLOG_IDS } from './blogIds';
+import { BLOG_IDS } from './blogIds.js';
 
 // ── ABOUT ─────────────────────────────────────────────────────────────────────
 export const ABOUT: Record<Lang, {

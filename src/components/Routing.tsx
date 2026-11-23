@@ -15,8 +15,8 @@ import NotFound from '../site/pages/NotFound';
 import { STYLE_SLUG, INTAKE_SLUG, OFFER_SLUG, PROJECT_SLUG, demoPath, isLang, pageFromSlug, pagePath, preferredLang, type PageKey } from '../lib/routes';
 const StylePage = lazy(() => import('../site/pages/StylePage'));
 import { toolById } from '../data/affiliates';
-import { PACKAGE_IDS } from '../site/i18n/packageIds';
-import { BLOG_IDS } from '../data/blogIds';
+import { PACKAGE_IDS } from '../site/i18n/packageIds.js';
+import { BLOG_IDS } from '../data/blogIds.js';
 
 const Lazy = ({ children }: { children: ReactNode }) => <Suspense fallback={<div style={{ minHeight: '100vh', background: 'var(--background, transparent)' }} aria-busy="true" />}>{children}</Suspense>;
 

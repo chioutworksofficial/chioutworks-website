@@ -1,5 +1,5 @@
-import { DEMO_ITEMS } from './translationsDemoItems';
-import { NAV, FOOTER_LEGAL } from './site/navLabels';
+import { DEMO_ITEMS } from './translationsDemoItems.js';
+import { NAV, FOOTER_LEGAL } from './site/navLabels.js';
 export type Lang = 'tr' | 'en' | 'de' | 'el';
 
 export const T = {

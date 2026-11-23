@@ -1,5 +1,5 @@
 import { FAQ_PAGE_UI } from './i18n/faqPage';
-import { NAV, RESOURCES_NAV } from './navLabels';
+import { NAV, RESOURCES_NAV } from './navLabels.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ModeToggle from './ModeToggle';

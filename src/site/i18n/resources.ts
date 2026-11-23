@@ -1,4 +1,4 @@
-import { RESOURCES_NAV } from '../navLabels';
+import { RESOURCES_NAV } from '../navLabels.js';
 export const RESOURCES_UI = {
   tr: {
     nav: RESOURCES_NAV.tr, word: 'Kaynaklar', intro: 'İşletmenizin her gün işine yarayacak, tarayıcıda çalışan ücretsiz dört araç. Kayıt yok, e-posta yok.', explore: 'Keşfet',

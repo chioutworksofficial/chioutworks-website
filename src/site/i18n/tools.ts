@@ -1,4 +1,4 @@
-import { TOOLS_KICKER } from '../navLabels';
+import { TOOLS_KICKER } from '../navLabels.js';
 import type { Lang } from '../../translations';
 import type { ToolId } from '../../data/affiliates';
 
