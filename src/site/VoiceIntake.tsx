@@ -54,6 +54,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const [queuePos, setQueuePos] = useState(1);
   const [blockedMsg, setBlockedMsg] = useState('');
   const [reconnecting, setReconnecting] = useState(false);
+  const [graceUi, setGraceUi] = useState(false);
   const [liveSpeak, setLiveSpeak] = useState(false);
   const [card, setCard] = useState<Card | null>(null);
   const [, setCardBusy] = useState(false);
@@ -119,6 +120,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const goAway = useRef(false);
   const limitAt = useRef(0);
   const reconnected = useRef(false);
+  const voiceStarted = useRef(false);   // startVoice runs once per call (idempotent against re-renders / double events)
   const liveRole = useRef<'user' | 'assistant' | null>(null);
   const outBuf = useRef('');
   const liveCut = useRef(false);   // last assistant bubble was interrupted
@@ -194,7 +196,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       sessionRef.current++; autoRef.current = true; deniedRef.current = false; inFlight.current = false;
       emptyRuns.current = 0; manualStop.current = false; unavailSaid.current = false;
       visitorRef.current = NO_VISITOR; setVFirst(''); setVLast(''); setVSal('none'); setNameDone(false); voiceId.current = null; deletedRef.current = false;
-      deadlineRef.current = 0; endReasonRef.current = ''; endedAtRef.current = 0; talkStart.current = 0; wrapSent.current = false; goAway.current = false; limitAt.current = 0; endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; softSent.current = false; reconnected.current = false;
+      deadlineRef.current = 0; endReasonRef.current = ''; endedAtRef.current = 0; talkStart.current = 0; wrapSent.current = false; goAway.current = false; limitAt.current = 0; endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; softSent.current = false; reconnected.current = false; voiceStarted.current = false; setGraceUi(false);
       liveRole.current = null; liveCut.current = false; outBuf.current = ''; corrections.current = 0; setReconnecting(false); setCard(null); setCardSent(false); setCardErr(''); setCardBusy(false);
       preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false);
       goPhase('consent'); startedAt.current = Date.now(); setOpen(true);
@@ -421,7 +423,15 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     const c = callRef.current;
     if (!c) { setTimeout(endCall, 700); return; }
     c.hold(true);   // mic muted; the end waits for the assistant's whole spoken turn (see shouldEnd)
-    void c.whenReallyDone().then(endCall);
+    // normal goodbye (finish_tool only): 5 s grace with a live mic so the visitor can say thanks; not after abuse/language/limits/errors
+    const grace = endReasonRef.current === 'finish_tool' && !abuseRef.current;
+    void c.whenReallyDone().then(async () => {
+      if (grace && callRef.current === c && !endingRef.current) {
+        endReasonRef.current = 'finish_tool+grace'; setGraceUi(true);
+        await c.whenGraceDone();
+      }
+      endCall();
+    });
   };
 
   const WRAP = 'WRAP_UP: the call time is over. Finish your current sentence, summarise briefly what was confirmed, then say the closing sentence exactly as instructed, completely with the farewell, and only then call finish_conversation with reason done as your very last action.';
@@ -520,6 +530,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     callRef.current?.close(); callRef.current = null;
     if (reconnected.current) { await startFallback(t.fallbackNote); return; }
     reconnected.current = true;
+    if (import.meta.env.DEV) console.debug('[live] reconnect');
     setReconnecting(true);
     const r = await fetchToken({ lang, consent: true, consentVersion: CONSENT_VERSION, visitor: { ...visitorRef.current, hour: new Date().getHours() }, prevSessionId: slotRef.current, transcript: turnsRef.current.map((x) => ({ role: x.role, text: x.text })) });
     if (sid !== sessionRef.current || endingRef.current) return;
@@ -531,6 +542,8 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   };
 
   const startVoice = async () => {
+    if (voiceStarted.current) return;
+    voiceStarted.current = true;
     unlockAudio();   // on the click: also wakes the output device for the fallback voice
     const sid = sessionRef.current;
     const supported = !!navigator.mediaDevices?.getUserMedia && 'AudioWorklet' in window;
@@ -586,7 +599,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     hbRef.current = setInterval(() => { fetch('/api/voice/live-heartbeat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: slotRef.current }) }).catch(() => {}); }, 25000);
     await sleep(350);   // let the orb show 100 %
     goPhase('live');
-    callRef.current?.sendText('START');
+    callRef.current?.kickoff();   // idempotent per LiveCall; a reconnect uses RESUME and never kicks off again
   };
 
   useEffect(() => {
@@ -827,7 +840,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
               <div aria-hidden style={{ width: 120, height: 4, borderRadius: 2, background: 'var(--lq-line)', overflow: 'hidden' }}>
                 <div style={{ width: `${liveSpeak ? 0 : Math.round(level * 100)}%`, height: '100%', background: 'var(--lq-gradient)', transition: 'width 120ms linear' }} />
               </div>
-              <span role="status" aria-live="polite" style={{ color: 'var(--lq-silver)', fontSize: 14 }}>{reconnecting ? t.reconnecting : liveSpeak ? t.liveSpeaking : t.liveListening}</span>
+              <span role="status" aria-live="polite" style={{ color: 'var(--lq-silver)', fontSize: 14 }}>{graceUi ? t.liveEnding : reconnecting ? t.reconnecting : liveSpeak ? t.liveSpeaking : t.liveListening}</span>
             </div>
           ) : typed ? (
             <form onSubmit={submitText} style={{ display: 'flex', gap: 8 }}>

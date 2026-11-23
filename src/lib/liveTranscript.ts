@@ -20,7 +20,7 @@ export function addLiveChunk<T extends LiveTurnLike>(turns: T[], role: T['role']
     out = [...turns.slice(0, -1), { ...last, text: last.text + sep + text }];
   } else {
     const t = text.trimStart();
-    if (role === 'assistant' && cut && last?.role === 'assistant' && restart(last.text, t)) { out = [...turns.slice(0, -1), { ...last, text: t }]; cutUsed = true; }
+    if (role === 'assistant' && (cut || turns.length === 1) && last?.role === 'assistant' && restart(last.text, t)) { out = [...turns.slice(0, -1), { ...last, text: t }]; cutUsed = true; }
     else out = [...turns, { role, text: t, at } as T];
   }
   const n = out.length;

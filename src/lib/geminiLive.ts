@@ -56,6 +56,19 @@ export function shouldEnd(o: { turnDone: boolean; playing: boolean; lastAudioAgo
   return o.turnDone && o.lastAudioAgoMs >= END_QUIET_MS;
 }
 
+export const GRACE_MS = 5000, GRACE_REPLY_MS = 1000, GRACE_NOREPLY_MS = 8000, GRACE_CAP_MS = 30000;
+/** Grace period after the farewell (mic live): ends after GRACE_MS of silence; if the visitor spoke, after the model's short reply
+ *  finished (turnComplete + playback done + GRACE_REPLY_MS). Never a second grace; safety caps when no reply comes. */
+export function graceEnd(o: { inGraceMs: number; heard: boolean; sinceHeardMs: number; playing: boolean; turnDone: boolean; audioAfterHeard: boolean; lastAudioAgoMs: number }): boolean {
+  if (o.playing) return false;
+  if (o.inGraceMs >= GRACE_CAP_MS) return true;
+  if (!o.heard) return o.inGraceMs >= GRACE_MS;
+  if (!o.audioAfterHeard) return o.sinceHeardMs >= GRACE_NOREPLY_MS;
+  return o.turnDone && o.lastAudioAgoMs >= GRACE_REPLY_MS;
+}
+
+const dbg = (...a: unknown[]) => { if (import.meta.env?.DEV) console.debug('[live]', ...a); };
+
 export class LiveCall {
   private ws: WebSocket | null = null;
   private node: AudioWorkletNode | null = null;
@@ -76,6 +89,11 @@ export class LiveCall {
   private passUntil = 0;
   private greeting = true;   // until the first assistant turn is done: mic muted, interruptions ignored
   private gotAudio = false;
+  private kickoffs = 0;
+  private grace = false;
+  private graceStart = 0;
+  private graceHeardAt = 0;
+  private audioAfterHeard = false;
   private sources = new Set<AudioBufferSourceNode>();
   constructor(private ctx: AudioContext, private stream: MediaStream, private h: LiveHandlers) {}
 
@@ -86,9 +104,10 @@ export class LiveCall {
       this.ws = ws;
       const fail = (m: string) => { clearTimeout(timer); reject(new Error(m)); };
       const timer = setTimeout(() => { fail('timeout'); this.close(); }, 12000);
-      ws.onopen = () => ws.send(JSON.stringify({ setup: {} }));
+      ws.onopen = () => { dbg('ws open'); ws.send(JSON.stringify({ setup: {} })); };
       ws.onerror = () => { if (!this.ready) fail('ws_error'); };
       ws.onclose = (e) => {
+        dbg('ws close', e.code, 'ready', this.ready);
         if (!this.ready) { fail(`closed_${e.code}`); return; }
         this.h.onClosed(this.closing || e.code === 1000, e.code);
       };
@@ -98,11 +117,16 @@ export class LiveCall {
         if (m.setupComplete && !this.ready) { this.ready = true; clearTimeout(timer); setTimeout(() => { this.greeting = false; }, 12000); this.startMic(); resolve(); return; }
         const sc = m.serverContent;
         if (sc) {
-          if (sc.interrupted && !this.greeting && !this.ending) { this.stopPlayback(); this.h.onInterrupted(); }
-          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) { this.gotAudio = true; this.generating = true; this.lastAudio = performance.now(); if (this.ending) this.audioAfterEnd = true; if (this.ending) this.turnDone = false; this.play(p.inlineData.data); }
-          if (sc.inputTranscription?.text) this.h.onInput(sc.inputTranscription.text);
+          if (sc.interrupted) {
+            dbg('interrupted', this.greeting ? '(ignored: greeting)' : this.ending ? '(ignored: ending)' : '');
+            // greeting: never cut playback or touch the bubble; the restarted turn needs its own turnComplete to end the guard
+            if (this.greeting) this.gotAudio = false;
+            else if (!this.ending) { this.stopPlayback(); this.h.onInterrupted(); }
+          }
+          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) { this.gotAudio = true; this.generating = true; this.lastAudio = performance.now(); if (this.ending) this.audioAfterEnd = true; if (this.ending || this.grace) this.turnDone = false; if (this.grace && this.graceHeardAt) this.audioAfterHeard = true; this.play(p.inlineData.data); }
+          if (sc.inputTranscription?.text) { if (this.grace) this.heardInGrace(); this.h.onInput(sc.inputTranscription.text); }
           if (sc.outputTranscription?.text) this.h.onOutput(sc.outputTranscription.text);
-          if (sc.turnComplete) { this.generating = false; this.lastTurnAt = performance.now(); if (this.ending) this.turnDone = true; if (this.gotAudio) this.greeting = false; this.h.onTurnComplete(); }
+          if (sc.turnComplete) { this.generating = false; this.lastTurnAt = performance.now(); if (this.ending || this.grace) this.turnDone = true; if (this.gotAudio && this.greeting) { this.greeting = false; dbg('first turnComplete: greeting guard released'); } this.h.onTurnComplete(); }
         }
         if (m.goAway) this.h.onGoAway?.();
         if (m.toolCall?.functionCalls) {
@@ -122,7 +146,9 @@ export class LiveCall {
       if (!this.ready || this.ws?.readyState !== WebSocket.OPEN) return;
       let pcm = new Uint8Array(e.data.pcm);
       const now = this.ctx.currentTime;
-      if (this.greeting || this.ending) pcm = new Uint8Array(pcm.length);
+      if (this.greeting) return;   // no frames at all until the greeting is done (not even silence: any stream may trigger server VAD)
+      if (this.grace && e.data.rms > BARGE_RMS) this.heardInGrace();
+      if (this.ending) pcm = new Uint8Array(pcm.length);
       else if (this.next + GATE_TAIL > now) {   // assistant audible (or just ended): echo gate
         if (e.data.rms > BARGE_RMS) this.passUntil = now + PASS_HOLD;
         else if (now > this.passUntil) pcm = new Uint8Array(pcm.length);
@@ -133,6 +159,14 @@ export class LiveCall {
     this.sink = this.ctx.createGain(); this.sink.gain.value = 0;   // keeps the worklet pulling without echoing the mic
     this.src.connect(node); node.connect(this.sink); this.sink.connect(this.ctx.destination);
     this.node = node;
+  }
+
+  /** The greeting trigger: idempotent per call (a second call is ignored). Returns true when it was sent. */
+  kickoff(text = 'START'): boolean {
+    if (this.kickoffs) { dbg('kickoff ignored (already sent)'); return false; }
+    this.kickoffs++; dbg('kickoff sent, count', this.kickoffs);
+    this.sendText(text);
+    return true;
   }
 
   sendText(text: string) { if (this.ready && this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ realtimeInput: { text } })); }
@@ -162,6 +196,21 @@ export class LiveCall {
       const tick = () => {
         const n = performance.now();
         if (shouldEnd({ turnDone: this.turnDone, playing: this.speaking(), lastAudioAgoMs: n - this.lastAudio, inEndingMs: n - this.endStart, audioAfterEnd: this.audioAfterEnd })) setTimeout(res, 500);
+        else setTimeout(tick, 100);
+      };
+      tick();
+    });
+  }
+
+  private heardInGrace() { if (!this.graceHeardAt) { this.graceHeardAt = performance.now(); this.turnDone = false; dbg('grace: visitor spoke'); } }
+
+  /** After the farewell: mic live again for GRACE_MS (see graceEnd). Resolves when the call may end. */
+  whenGraceDone(): Promise<void> {
+    this.ending = false; this.grace = true; this.graceStart = performance.now(); this.graceHeardAt = 0; this.turnDone = false; this.audioAfterHeard = false;
+    return new Promise((res) => {
+      const tick = () => {
+        const n = performance.now();
+        if (graceEnd({ inGraceMs: n - this.graceStart, heard: !!this.graceHeardAt, sinceHeardMs: n - this.graceHeardAt, playing: this.speaking(), turnDone: this.turnDone, audioAfterHeard: this.audioAfterHeard, lastAudioAgoMs: n - this.lastAudio })) res();
         else setTimeout(tick, 100);
       };
       tick();
