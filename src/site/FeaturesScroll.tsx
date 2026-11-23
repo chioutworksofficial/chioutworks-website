@@ -692,8 +692,9 @@ const CF_CSS = `
 .cf-marq{animation:cf-marq 70s linear infinite}
 @keyframes cf-marq{from{transform:translateX(0)}to{transform:translateX(-33.3333%)}}
 #features[data-vis="0"] .cf-marq{animation-play-state:paused}
-.cf-stage{--cw:min(860px,60vw,calc((100svh - 290px)*1.6));position:relative;perspective:1900px;touch-action:pan-y;user-select:none;-webkit-user-select:none;height:calc(var(--cw)*.625 + 44px);outline:none}
-.cf-card{position:absolute;left:50%;top:22px;width:var(--cw);margin-left:calc(var(--cw)/-2);aspect-ratio:16/10;container-type:inline-size;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.8,.2,1),opacity .65s cubic-bezier(.2,.8,.2,1);will-change:transform,opacity;border-radius:20px}
+.cf-stage{--cw:min(860px,60vw,calc((100svh - 290px)*1.6));position:relative;perspective:1900px;z-index:1;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;height:calc(var(--cw)*.625 + 44px);outline:none}
+.cf-card{position:absolute;left:50%;top:22px;width:var(--cw);margin-left:calc(var(--cw)/-2);aspect-ratio:16/10;container-type:inline-size;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.8,.2,1),opacity .65s cubic-bezier(.2,.8,.2,1),translate .45s cubic-bezier(.2,.8,.2,1);will-change:transform,opacity;border-radius:20px;translate:var(--dx,0px) 0}
+.cf-stage[data-drag="1"]{cursor:grabbing}.cf-stage[data-drag="1"] *{cursor:grabbing!important}.cf-stage[data-drag="1"] .cf-card{transition:none}
 .cf-card[data-d="0"]{transform:none}
 .cf-card[data-d="1"]{transform:translateX(57%) translateZ(-120px) rotateY(24deg) scale(.82);opacity:.95}
 .cf-card[data-d="-1"]{transform:translateX(-57%) translateZ(-120px) rotateY(-24deg) scale(.82);opacity:.95}
@@ -714,7 +715,7 @@ const CF_CSS = `
 .cf-cta:hover{transform:translateY(-1px);filter:brightness(1.12)}
 .cf-cta:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
 .cf-tag{position:absolute;top:3.2cqw;left:3.2cqw;z-index:4;border-radius:9999px;padding:.45em 1.1em;font-size:clamp(11px,1.5cqw,14px);font-weight:600;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-void,#0b0c0e) 62%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 18%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cf-glow{position:absolute;left:50%;top:50%;width:min(1100px,96vw);height:min(640px,70%);transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(50% 50% at 50% 50%,color-mix(in srgb,var(--c-signal,#2862d7) 34%,transparent),color-mix(in srgb,var(--c-cobalt,#12244f) 20%,transparent) 55%,transparent 80%);filter:blur(30px)}
+.cf-glow{z-index:0;position:absolute;left:50%;top:50%;width:min(1100px,96vw);height:min(640px,70%);transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(50% 50% at 50% 50%,color-mix(in srgb,var(--c-signal,#2862d7) 34%,transparent),color-mix(in srgb,var(--c-cobalt,#12244f) 20%,transparent) 55%,transparent 80%);filter:blur(30px)}
 html[data-mode="light"] .cf-glow{background:radial-gradient(50% 50% at 50% 50%,color-mix(in srgb,var(--c-signal,#2862d7) 16%,transparent),transparent 75%)}
 .cf-arrow{position:absolute;top:50%;z-index:200;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:58px;height:58px;border-radius:9999px;border:0;cursor:pointer;color:var(--c-void,#0b0c0e);background:var(--c-quartz,#fff);box-shadow:0 14px 30px -12px color-mix(in srgb,var(--c-void,#0b0c0e) 70%,transparent);transition:transform .2s,box-shadow .2s}
 .cf-arrow:hover{transform:translateY(-50%) scale(1.07)}
@@ -756,7 +757,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const [idx, setIdx] = useState(0);
   const [vis, setVis] = useState(true);
   const paused = useRef(false);
-  const drag = useRef<{ x: number; moved: boolean } | null>(null);
+  const drag = useRef<{ x: number; moved: boolean; t: number; lx: number; lt: number } | null>(null);
   const reduce = useRef(false);
 
   const go = useCallback((to: number) => setIdx(((to % N) + N) % N), []);
@@ -786,14 +787,43 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     return () => window.clearInterval(id);
   }, [vis, idx, step]);
 
-  const onDown = (e: React.PointerEvent) => { drag.current = { x: e.clientX, moved: false }; if (e.pointerType === 'touch') paused.current = true; };
-  const onMoveP = (e: React.PointerEvent) => { const d = drag.current; if (d && Math.abs(e.clientX - d.x) > 8) d.moved = true; };
+  const stage = useRef<HTMLDivElement>(null);
+  const suppress = useRef(false);
+  const wheelT = useRef(0);
+  const live = (v: number) => stage.current?.style.setProperty('--dx', `${v}px`);
+  const onDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && (e.button !== 0 || (e.target as HTMLElement).closest('.cf-arrow'))) return;
+    drag.current = { x: e.clientX, moved: false, t: e.timeStamp, lx: e.clientX, lt: e.timeStamp };
+    if (e.pointerType === 'touch') paused.current = true;
+  };
+  const onMoveP = (e: React.PointerEvent) => {
+    const d = drag.current; if (!d) return;
+    const dx = e.clientX - d.x;
+    if (e.pointerType !== 'mouse') { if (Math.abs(dx) > 8) d.moved = true; return; }
+    if (!d.moved && Math.abs(dx) > 6) { d.moved = true; stage.current?.setPointerCapture(e.pointerId); stage.current?.setAttribute('data-drag', '1'); }
+    if (d.moved) { d.lx = e.clientX; d.lt = e.timeStamp; live(dx * 0.6); }
+  };
   const onUp = (e: React.PointerEvent) => {
     const d = drag.current; drag.current = null;
     if (!d) return;
     const dx = e.clientX - d.x;
+    if (e.pointerType === 'mouse') {
+      if (!d.moved) return;
+      stage.current?.removeAttribute('data-drag'); live(0);
+      suppress.current = true; window.setTimeout(() => { suppress.current = false; }, 60);
+      const v = Math.abs(dx) / Math.max(1, e.timeStamp - d.t);
+      if (Math.abs(dx) > 60 || (Math.abs(dx) > 20 && v > 0.5)) step(dx < 0 ? 1 : -1);
+      return;
+    }
     if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1);
     if (e.pointerType === 'touch') window.setTimeout(() => { paused.current = false; }, 4000);
+  };
+  const onCancel = () => { drag.current = null; stage.current?.removeAttribute('data-drag'); live(0); };
+  const onWheel = (e: React.WheelEvent) => {
+    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
+    if (Math.abs(dx) < 4 || (!e.shiftKey && Math.abs(e.deltaX) <= Math.abs(e.deltaY))) return;
+    const now = e.timeStamp; const fresh = now - wheelT.current > 350; wheelT.current = now;
+    if (fresh) step(dx > 0 ? 1 : -1);
   };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); } else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
@@ -804,14 +834,14 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     <section ref={root} id="features" data-vis={vis ? '1' : '0'} className="relative overflow-hidden pt-10 pb-8 md:pt-14 md:pb-12" style={{ background: 'var(--c-void, #0b0c0e)' }}>
       <style>{FX_CSS}{CF_CSS}</style>
       <h2 className="sr-only">{ui.heading}</h2>
-      <div aria-hidden="true" className="absolute inset-x-0 top-[34%] md:top-1/2 -translate-y-1/2 flex flex-col pointer-events-none">
+      <div aria-hidden="true" className="absolute inset-x-0 top-[34%] md:top-1/2 -translate-y-1/2 flex flex-col pointer-events-none" style={{ zIndex: 0 }}>
         <Row text={ui.rowA} />
         <Row text={ui.rowB} rev />
       </div>
       <div aria-hidden="true" className="cf-glow" />
 
-      <div className="cf-stage" role="region" aria-roledescription="carousel" aria-label={ui.heading} tabIndex={0}
-        onKeyDown={onKey} onPointerDown={onDown} onPointerMove={onMoveP} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; }}
+      <div ref={stage} className="cf-stage" role="region" aria-roledescription="carousel" aria-label={ui.heading} tabIndex={0}
+        onKeyDown={onKey} onPointerDown={onDown} onPointerMove={onMoveP} onPointerUp={onUp} onPointerCancel={onCancel} onWheel={onWheel} onDragStart={(e) => e.preventDefault()} onClickCapture={(e) => { if (suppress.current) { e.preventDefault(); e.stopPropagation(); } }}
         onMouseEnter={hold(true)} onMouseLeave={hold(false)} onFocus={hold(true)} onBlur={hold(false)}>
         {ORDER.map((o, i) => {
           const it = ui.items[o];
@@ -841,7 +871,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
                   {d === 0 && <Link to={to} draggable={false} className="cf-cta">{slug ? ui.cta.demo : ui.cta.more}</Link>}
                 </div>
               </div>
-              {d !== 0 && <button type="button" tabIndex={-1} aria-label={it.title} className="cf-hit" onClick={() => { if (!drag.current?.moved) go(i); }} />}
+              {d !== 0 && <button type="button" tabIndex={-1} aria-label={it.title} className="cf-hit" onClick={() => go(i)} />}
             </div>
           );
         })}
