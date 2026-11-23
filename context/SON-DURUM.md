@@ -1,3 +1,5 @@
+> **NOT — reklam/tanıtım üretim alanı (sahip, 2026-11-23):** `tanitim/` klasörü (boş iskelet var) platformlara göre düzenlenecek: her sosyal medya için ayrı boyutlarda reklam görselleri ve videoları (Facebook, Instagram, TikTok, YouTube, LinkedIn…), viral ve "kancalı" (ilk saniyede dikkat çeken) içerik. Sahip araç depoları (repo) verecek ya da bilgisayarda hazır olanlar taranıp gerekenler tek yerde toplanacak; aynı aracı tekrar tekrar kurmamak için tek kurulum. Sahip depoları verince başlanır.
+
 > **NOT — ileride (sahip, 2026-11-23):**
 > - Alan adından sonra Google Search Console (+ Bing). GA4 şimdilik yok (çerezsiz kendi analizimiz yeterli).
 > - Facebook/Instagram reklamı başlarsa Facebook Pixel (çerez onayı + gizlilik politikası eki ile).
