@@ -4,7 +4,9 @@ import BookingScene from './BookingScene';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Lang } from '../../translations';
-import { demoPath, pagePath } from '../../lib/routes';
+import { demoPath, pagePath, packagePath } from '../../lib/routes';
+import { usePageMeta } from '../../hooks/usePageMeta';
+import { serviceLd } from '../../lib/structuredData';
 import { POPULAR_UI } from '../i18n/popular';
 import { PACKAGES_UI, PACKAGE_TEXT, PACKAGE_DEMO, PACKAGE_IDS, type PackageId, type FlowIcon } from '../i18n/packages';
 
@@ -164,6 +166,7 @@ export default function PackagePage({ lang, id }: { lang: Lang; id: PackageId })
   const x = PACKAGE_TEXT[id][lang];
   const pop = POPULAR_UI[lang].items[PACKAGE_IDS.indexOf(id)];
   const demo = PACKAGE_DEMO[id];
+  usePageMeta(lang, 'packages', { title: `${pop.title} — Chioutworks`, description: x.intro.slice(0, 155), path: packagePath(lang, id), alt: (l) => packagePath(l, id), crumbs: [{ name: pop.title, path: packagePath(lang, id) }], ld: [serviceLd(lang, pop.title, x.intro, packagePath(lang, id))] });
   const h2: React.CSSProperties = { fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 'clamp(26px, 3.2vw, 40px)', lineHeight: 1.1, letterSpacing: '-0.02em', color: 'var(--lq-white)', margin: 0 };
   return (
     <>

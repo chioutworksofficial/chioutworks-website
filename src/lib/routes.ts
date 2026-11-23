@@ -23,6 +23,7 @@ export const intakePath = (lang: Lang, token: string) => `/${lang}/${INTAKE_SLUG
 export const OFFER_SLUG: Record<Lang, string> = { tr: 'teklif', en: 'offer', de: 'angebot', el: 'prosfora' };
 export const offerPath = (lang: Lang, token: string) => `/${lang}/${OFFER_SLUG[lang]}/${token}`;
 /** Live project page (client portal), same slugs as server/projects.ts */
+export const STYLE_SLUG: Record<Lang, string> = { tr: 'tarz', en: 'style', de: 'stil', el: 'styl' };
 export const PROJECT_SLUG: Record<Lang, string> = { tr: 'proje', en: 'project', de: 'projekt', el: 'ergo' };
 
 export const isLang = (s: string | undefined): s is Lang => !!s && (LANGS as string[]).includes(s);

@@ -1,3 +1,4 @@
+import { TOOLS_KICKER } from '../navLabels';
 import type { Lang } from '../../translations';
 import type { ToolId } from '../../data/affiliates';
 
@@ -16,7 +17,7 @@ export interface ToolsUi {
 
 export const TOOLS_UI: Record<Lang, ToolsUi> = {
   tr: {
-    kicker: 'Kullandığım araçlar',
+    kicker: TOOLS_KICKER.tr,
     title: 'İşimde gerçekten kullandığım ve önerdiğim araçlar',
     sub: 'Burada yalnızca kendim kullandığım ve müşterilerime de önerdiğim araçlar var. Her birinin neden burada olduğunu, kimin işine yarayacağını ve zayıf yanlarını açıkça yazdım.',
     cardCta: 'Neden kullanıyorum',
@@ -38,7 +39,7 @@ export const TOOLS_UI: Record<Lang, ToolsUi> = {
     helpCta: 'Mesaj gönder',
   },
   en: {
-    kicker: 'Tools I use',
+    kicker: TOOLS_KICKER.en,
     title: 'Tools I actually use in my work and recommend',
     sub: 'Only tools I use myself and also recommend to my clients are listed here. For each one I explain why it is here, who it suits and where it falls short.',
     cardCta: 'Why I use it',
@@ -60,7 +61,7 @@ export const TOOLS_UI: Record<Lang, ToolsUi> = {
     helpCta: 'Send a message',
   },
   de: {
-    kicker: 'Tools, die ich nutze',
+    kicker: TOOLS_KICKER.de,
     title: 'Tools, die ich in meiner Arbeit wirklich nutze und empfehle',
     sub: 'Hier stehen nur Tools, die ich selbst nutze und auch meinen Kunden empfehle. Zu jedem erkläre ich, warum es hier steht, für wen es passt und wo seine Schwächen liegen.',
     cardCta: 'Warum ich es nutze',
@@ -82,7 +83,7 @@ export const TOOLS_UI: Record<Lang, ToolsUi> = {
     helpCta: 'Nachricht senden',
   },
   el: {
-    kicker: 'Εργαλεία που χρησιμοποιώ',
+    kicker: TOOLS_KICKER.el,
     title: 'Εργαλεία που χρησιμοποιώ πραγματικά στη δουλειά μου και προτείνω',
     sub: 'Εδώ υπάρχουν μόνο εργαλεία που χρησιμοποιώ ο ίδιος και προτείνω και στους πελάτες μου. Για το καθένα εξηγώ γιατί βρίσκεται εδώ, σε ποιον ταιριάζει και πού υστερεί.',
     cardCta: 'Γιατί το χρησιμοποιώ',

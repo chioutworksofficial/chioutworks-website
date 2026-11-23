@@ -21,16 +21,13 @@ const ToolsPage = lazy(() => import('./site/pages/ToolsPage'));
 const ToolPage = lazy(() => import('./site/pages/ToolsPage').then((m) => ({ default: m.ToolPage })));
 const PackagePage = lazy(() => import('./site/pages/PackagePage'));
 const BlogArticle = lazy(() => import('./site/pages/BlogArticle'));
-import { BLOG_POSTS } from './data/sections';
-import { PACKAGE_IDS, PACKAGE_TEXT, type PackageId } from './site/i18n/packages';
-import { POPULAR_UI } from './site/i18n/popular';
+import { BLOG_IDS } from './data/blogIds';
+import { PACKAGE_IDS, type PackageId } from './site/i18n/packageIds';
 import { toolById } from './data/affiliates';
-import { TOOL_TEXT } from './site/i18n/tools';
 import SectionDots from './site/SectionDots';
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
-import { toolPath, packagePath, blogPath, type PageKey } from './lib/routes';
+import type { PageKey } from './lib/routes';
 import { initSmoothScroll, getLenis } from './lib/smoothScroll';
-import { articleLd, serviceLd } from './lib/structuredData';
 import { usePageMeta } from './hooks/usePageMeta';
 import type { Lang } from './translations';
 import { useMode } from './site/ModeToggle';
@@ -157,16 +154,13 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
   const mode = useMode();   // canvas sections read their colours once: re-mount on light/dark change
   // Partner tool page (/:lang/<tools>/:id): own title, description, canonical and language alternates
   const tool = page === 'tools' ? toolById(sub) : undefined;
-  const toolText = tool ? TOOL_TEXT[tool.id][lang] : undefined;
   // Package page (/:lang/<packages>/:id)
   const pkg = page === 'packages' && (PACKAGE_IDS as readonly string[]).includes(sub ?? '') ? (sub as PackageId) : undefined;
-  const pkgTitle = pkg ? POPULAR_UI[lang].items[PACKAGE_IDS.indexOf(pkg)].title : '';
   // Blog article (/:lang/blog/:id)
-  const post = page === 'blog' && sub ? BLOG_POSTS[lang].find((p) => p.id === sub) : undefined;
+  const post = page === 'blog' && (BLOG_IDS as readonly string[]).includes(sub ?? '') ? sub : undefined;
 
-  usePageMeta(lang, page, tool && toolText ? { title: `${toolText.tagline} — Chioutworks`, description: toolText.short, path: toolPath(lang, tool.id), alt: (l) => toolPath(l, tool.id), crumbs: [{ name: toolText.tagline, path: toolPath(lang, tool.id) }] }
-    : pkg ? { title: `${pkgTitle} — Chioutworks`, description: PACKAGE_TEXT[pkg][lang].intro.slice(0, 155), path: packagePath(lang, pkg), alt: (l) => packagePath(l, pkg), crumbs: [{ name: pkgTitle, path: packagePath(lang, pkg) }], ld: [serviceLd(lang, pkgTitle, PACKAGE_TEXT[pkg][lang].intro, packagePath(lang, pkg))] }
-    : post ? { title: `${post.title} — Chioutworks`, description: post.excerpt.slice(0, 155), path: blogPath(lang, post.id), alt: (l) => blogPath(l, post.id), crumbs: [{ name: post.title, path: blogPath(lang, post.id) }], ld: [articleLd(lang, post, BLOG_POSTS.en.find((p) => p.id === post.id)?.date, blogPath(lang, post.id))] } : {});
+  // Detail pages (tool, package, article) set their own title/canonical in their lazy chunk, so their texts stay out of the entry
+  usePageMeta(lang, page, { skip: !!(tool || pkg || post) });
 
   useEffect(() => initSmoothScroll(), []);
 
@@ -195,7 +189,7 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
       {/* Fixed navbar: keep inner pages' first section clear of it (PageHero pages clear it themselves) */}
       {page !== 'home' && page !== 'blog' && page !== 'faq' && page !== 'resources' && <div aria-hidden="true" style={{ height: 76 }} />}
       {/* Page change: the new page sharpens out of a short blur and rises slightly (lialive-style) */}
-      <main id="main" tabIndex={-1} key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter"><Suspense fallback={<div style={{ minHeight: '60vh' }} aria-busy="true" />}>{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} post={post} /> : PAGES[page](lang)}</Suspense></main>
+      <main id="main" tabIndex={-1} key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter"><Suspense fallback={<div style={{ minHeight: '60vh' }} aria-busy="true" />}>{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} id={post} /> : PAGES[page](lang)}</Suspense></main>
       <Defer id="start" minH="calc(660px + clamp(240px, 30vw, 460px))"><SiteFinale key={mode} lang={lang} /></Defer>
       <SectionDots lang={lang} page={page} />
       <LateAssistants lang={lang} />

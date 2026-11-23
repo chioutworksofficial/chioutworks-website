@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { BLOG_POSTS, type BlogPost } from '../../data/sections';
 import { T, type Lang } from '../../translations';
 import { blogPath, pagePath } from '../../lib/routes';
+import { usePageMeta } from '../../hooks/usePageMeta';
+import { articleLd } from '../../lib/structuredData';
 import { BLOG_PAGE_UI } from '../i18n/blogPage';
 import BlogCover from '../BlogCover';
 import { readMinutes } from '../blogMeta';
@@ -23,10 +25,12 @@ export const PenIcon = ({ size = 22 }: { size?: number }) => (
 );
 const SOURCES: Record<Lang, string> = { tr: 'Kaynaklar', en: 'Sources', de: 'Quellen', el: 'Πηγές' };
 
-export default function BlogArticle({ lang, post }: { lang: Lang; post: BlogPost }) {
+export default function BlogArticle({ lang, id }: { lang: Lang; id: string }) {
   const ui = BLOG_PAGE_UI[lang];
   const u = T[lang].ui;
   const posts = BLOG_POSTS[lang];
+  const post = posts.find((p) => p.id === id) ?? posts[0];
+  usePageMeta(lang, 'blog', { title: `${post.title} — Chioutworks`, description: post.excerpt.slice(0, 155), path: blogPath(lang, post.id), alt: (l) => blogPath(l, post.id), crumbs: [{ name: post.title, path: blogPath(lang, post.id) }], ld: [articleLd(lang, post, BLOG_POSTS.en.find((p) => p.id === post.id)?.date, blogPath(lang, post.id))] });
   const idx = posts.findIndex((p) => p.id === post.id);
   const prev = posts[idx - 1], next = posts[idx + 1];
   const more = posts.filter((p) => p.id !== post.id).slice(0, 3);

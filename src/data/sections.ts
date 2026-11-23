@@ -1,4 +1,5 @@
 import type { Lang } from '../translations';
+import { BLOG_IDS } from './blogIds';
 
 // ── ABOUT ─────────────────────────────────────────────────────────────────────
 export const ABOUT: Record<Lang, {
@@ -582,3 +583,6 @@ export const CONTACT: Record<Lang, {
     successMessage: 'Ευχαριστώ — θα εξετάσω το αίτημά σας και θα σας στείλω γραπτή αξιολόγηση, το συντομότερο δυνατό.',
   },
 };
+
+// Dev only: the router validates blog URLs against BLOG_IDS (blogIds.ts), so the two lists must match.
+if (import.meta.env.DEV && BLOG_POSTS.en.map((p) => p.id).join() !== BLOG_IDS.join()) console.warn('[blog] update src/data/blogIds.ts to match BLOG_POSTS');

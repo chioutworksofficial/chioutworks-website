@@ -1,4 +1,5 @@
-import { T, type Lang } from '../../translations.js';
+import type { Lang } from '../../translations.js';
+import { DEMO_ITEMS } from '../../translationsDemoItems.js';
 import { CATALOG_UI } from './i18n/catalog.js';
 import { CUSTOM_UI } from './i18n/custom.js';
 
@@ -16,8 +17,8 @@ export function demoText(lang: Lang, slug: string): DemoText {
   }
   const cat = (CATALOG_UI[lang] as Record<string, DemoText | undefined>)[slug];
   if (cat) return cat;
-  const items = T[lang].demos.items as unknown as Record<string, { name: string; desc: string } | undefined>;
-  const feats = T[lang].demos.features as unknown as Record<string, readonly string[] | undefined>;
+  const items = DEMO_ITEMS[lang].items as unknown as Record<string, { name: string; desc: string } | undefined>;
+  const feats = DEMO_ITEMS[lang].features as unknown as Record<string, readonly string[] | undefined>;
   const it = items[slug];
   return {
     name: it?.name ?? slug,

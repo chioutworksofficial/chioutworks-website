@@ -4,6 +4,7 @@ import type { Lang } from '../../translations';
 import { AFFILIATES, type Affiliate } from '../../data/affiliates';
 import { TOOLS_UI, TOOL_TEXT } from '../i18n/tools';
 import { pagePath, toolPath } from '../../lib/routes';
+import { usePageMeta } from '../../hooks/usePageMeta';
 
 /**
  * "Tools I use": overview (cards) and one persuasive page per partner tool (owner, 2026-11-18).
@@ -185,6 +186,7 @@ export default function ToolsPage({ lang }: { lang: Lang }) {
 export function ToolPage({ lang, a }: { lang: Lang; a: Affiliate }) {
   const t = TOOLS_UI[lang];
   const x = TOOL_TEXT[a.id][lang];
+  usePageMeta(lang, 'tools', { title: `${x.tagline} — Chioutworks`, description: x.short, path: toolPath(lang, a.id), alt: (l) => toolPath(l, a.id), crumbs: [{ name: x.tagline, path: toolPath(lang, a.id) }] });
   const root = useToolFx();
   return (
     <div ref={root}>

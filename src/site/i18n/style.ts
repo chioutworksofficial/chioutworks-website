@@ -1,7 +1,7 @@
 import type { Lang } from '../../translations';
 
 // "Choose your style" page (owner, 2026-11-17): style cards + optional example sites. Sent after the intake form and after a voice call.
-export const STYLE_SLUG: Record<Lang, string> = { tr: 'tarz', en: 'style', de: 'stil', el: 'styl' };
+export { STYLE_SLUG } from '../../lib/routes';
 
 export const STYLE_UI: Record<Lang, {
   kicker: string; title: string; intro: string; like: string; liked: string; notMe: string; notMeOn: string; min: string;

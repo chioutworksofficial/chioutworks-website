@@ -1,6 +1,7 @@
+import { RESOURCES_NAV } from '../navLabels';
 export const RESOURCES_UI = {
   tr: {
-    nav: 'Kaynaklar', word: 'Kaynaklar', intro: 'İşletmenizin her gün işine yarayacak, tarayıcıda çalışan ücretsiz dört araç. Kayıt yok, e-posta yok.', explore: 'Keşfet',
+    nav: RESOURCES_NAV.tr, word: 'Kaynaklar', intro: 'İşletmenizin her gün işine yarayacak, tarayıcıda çalışan ücretsiz dört araç. Kayıt yok, e-posta yok.', explore: 'Keşfet',
     overviewEyebrow: 'Genel bakış', stPre: 'Küçük işlere büyük işlerin', stAccent: 'sakin ve pratik', stPost: 'araçları.',
     para: 'Müşterilerinize QR kod ve yorum bağlantısı verin, doğru mesajı doğru dilde gönderin, sitenizin yasal eksiklerini ülkenize göre görün. Hepsi bu sayfada, hepsi ücretsiz ve verileriniz cihazınızdan çıkmaz.',
     toolsEyebrow: 'Araçlar', cta1: 'Bunu sizin için otomatik kurayım mı?', cta2: 'Ücretsiz yazılı değerlendirme isteyin',
@@ -18,7 +19,7 @@ export const RESOURCES_UI = {
       items: [] },
   },
   en: {
-    nav: 'Resources', word: 'Resources', intro: 'Four free tools that run in your browser and help your business every day. No sign-up, no email.', explore: 'Explore',
+    nav: RESOURCES_NAV.en, word: 'Resources', intro: 'Four free tools that run in your browser and help your business every day. No sign-up, no email.', explore: 'Explore',
     overviewEyebrow: 'Overview', stPre: 'Calm and practical tools that', stAccent: 'small businesses', stPost: 'can use like big ones.',
     para: 'Give customers a QR code and a review link, send the right message in the right language, and see what your website still lacks legally in your country. Everything is on this page, free, and your data never leaves your device.',
     toolsEyebrow: 'Tools', cta1: 'Shall I set this up for you automatically?', cta2: 'Ask for a free written assessment',
@@ -36,7 +37,7 @@ export const RESOURCES_UI = {
       items: [] },
   },
   de: {
-    nav: 'Ressourcen', word: 'Ressourcen', intro: 'Vier kostenlose Werkzeuge, die im Browser laufen und Ihrem Betrieb jeden Tag helfen. Ohne Anmeldung, ohne E-Mail.', explore: 'Entdecken',
+    nav: RESOURCES_NAV.de, word: 'Ressourcen', intro: 'Vier kostenlose Werkzeuge, die im Browser laufen und Ihrem Betrieb jeden Tag helfen. Ohne Anmeldung, ohne E-Mail.', explore: 'Entdecken',
     overviewEyebrow: 'Überblick', stPre: 'Ruhige, praktische Werkzeuge, die', stAccent: 'kleine Betriebe', stPost: 'wie große nutzen.',
     para: 'Geben Sie Kunden einen QR-Code und einen Bewertungslink, senden Sie die passende Nachricht in der passenden Sprache und sehen Sie, was Ihrer Website in Ihrem Land rechtlich noch fehlt. Alles auf dieser Seite, kostenlos, und Ihre Daten verlassen nie Ihr Gerät.',
     toolsEyebrow: 'Werkzeuge', cta1: 'Soll ich das automatisch für Sie einrichten?', cta2: 'Kostenlose schriftliche Einschätzung anfragen',
@@ -54,7 +55,7 @@ export const RESOURCES_UI = {
       items: [] },
   },
   el: {
-    nav: 'Πόροι', word: 'Πόροι', intro: 'Τέσσερα δωρεάν εργαλεία που λειτουργούν στον περιηγητή και βοηθούν την επιχείρησή σας κάθε μέρα. Χωρίς εγγραφή, χωρίς email.', explore: 'Εξερευνήστε',
+    nav: RESOURCES_NAV.el, word: 'Πόροι', intro: 'Τέσσερα δωρεάν εργαλεία που λειτουργούν στον περιηγητή και βοηθούν την επιχείρησή σας κάθε μέρα. Χωρίς εγγραφή, χωρίς email.', explore: 'Εξερευνήστε',
     overviewEyebrow: 'Επισκόπηση', stPre: 'Ήρεμα, πρακτικά εργαλεία που κάνουν τις', stAccent: 'μικρές επιχειρήσεις', stPost: 'να δουλεύουν σαν μεγάλες.',
     para: 'Δώστε στους πελάτες QR και σύνδεσμο αξιολόγησης, στείλτε το σωστό μήνυμα στη σωστή γλώσσα και δείτε τι λείπει νομικά από τον ιστότοπό σας στη χώρα σας. Όλα σε αυτή τη σελίδα, δωρεάν, και τα δεδομένα σας δεν φεύγουν από τη συσκευή σας.',
     toolsEyebrow: 'Εργαλεία', cta1: 'Να το στήσω αυτόματα για εσάς;', cta2: 'Ζητήστε δωρεάν γραπτή αξιολόγηση',

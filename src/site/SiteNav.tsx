@@ -1,9 +1,9 @@
 import { FAQ_PAGE_UI } from './i18n/faqPage';
-import { RESOURCES_UI } from './i18n/resources';
+import { NAV, RESOURCES_NAV } from './navLabels';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ModeToggle from './ModeToggle';
-import { T, type Lang } from '../translations';
+import type { Lang } from '../translations';
 import { demoText } from '../components/demos/demoText';
 import { liveDemos, previewDemos } from '../data/demos';
 import { LANGS, pagePath, solutionPath, switchLangPath, type PageKey } from '../lib/routes';
@@ -15,7 +15,7 @@ import { getLenis } from '../lib/smoothScroll';
 /** Top bar: logo · MENU + · "Get in touch" pill. MENU opens a right-hand slide-in panel with pages, demos and languages. */
 export default function SiteNav({ lang }: { lang: Lang }) {
   const ui = SITE_UI[lang];
-  const nav = T[lang].nav; // [services, about, portfolio, demos, contact]
+  const nav = NAV[lang]; // [services, about, portfolio, demos, contact]
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [group, setGroup] = useState<'live' | 'apps' | null>(null);
@@ -49,7 +49,7 @@ export default function SiteNav({ lang }: { lang: Lang }) {
   const pages: { key: PageKey; label: string }[] = [
     { key: 'services', label: nav[0] },
     { key: 'portfolio', label: nav[2] },
-    { key: 'resources', label: RESOURCES_UI[lang].nav },
+    { key: 'resources', label: RESOURCES_NAV[lang] },
     { key: 'demos', label: nav[3] },
     { key: 'about', label: nav[1] },
     { key: 'blog', label: ui.blogLabel },

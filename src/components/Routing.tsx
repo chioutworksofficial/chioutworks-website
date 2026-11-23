@@ -12,12 +12,11 @@ const IntakePage = lazy(() => import('../site/pages/IntakePage'));
 const OfferPage = lazy(() => import('../site/pages/OfferPage'));
 const ProjectPage = lazy(() => import('../site/pages/ProjectPage'));
 import NotFound from '../site/pages/NotFound';
-import { INTAKE_SLUG, OFFER_SLUG, PROJECT_SLUG, demoPath, isLang, pageFromSlug, pagePath, preferredLang, type PageKey } from '../lib/routes';
+import { STYLE_SLUG, INTAKE_SLUG, OFFER_SLUG, PROJECT_SLUG, demoPath, isLang, pageFromSlug, pagePath, preferredLang, type PageKey } from '../lib/routes';
 const StylePage = lazy(() => import('../site/pages/StylePage'));
 import { toolById } from '../data/affiliates';
-import { PACKAGE_IDS } from '../site/i18n/packages';
-import { BLOG_POSTS } from '../data/sections';
-import { STYLE_SLUG } from '../site/i18n/style';
+import { PACKAGE_IDS } from '../site/i18n/packageIds';
+import { BLOG_IDS } from '../data/blogIds';
 
 const Lazy = ({ children }: { children: ReactNode }) => <Suspense fallback={<div style={{ minHeight: '100vh', background: 'var(--background, transparent)' }} aria-busy="true" />}>{children}</Suspense>;
 
@@ -61,7 +60,7 @@ export function DemoRoute() {
   if (pageSlug === STYLE_SLUG[lang]) return <NoReferrer><Lazy><StylePage /></Lazy></NoReferrer>;
   if (pageFromSlug(lang, pageSlug) === 'solutions') return <Lazy><SolutionDeck /></Lazy>;
   if (pageFromSlug(lang, pageSlug) === 'blog') {
-    return BLOG_POSTS.en.some((p) => p.id === slug) ? <App page="blog" sub={slug} /> : <Navigate to={pagePath(lang, 'blog')} replace />;
+    return (BLOG_IDS as readonly string[]).includes(slug ?? '') ? <App page="blog" sub={slug} /> : <Navigate to={pagePath(lang, 'blog')} replace />;
   }
   if (pageFromSlug(lang, pageSlug) === 'packages') {
     return (PACKAGE_IDS as readonly string[]).includes(slug ?? '') ? <App page="packages" sub={slug} /> : <Navigate to={pagePath(lang, 'packages')} replace />;

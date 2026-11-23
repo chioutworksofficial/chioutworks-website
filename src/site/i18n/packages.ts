@@ -2,8 +2,8 @@ import type { Lang } from '../../translations';
 
 // Package detail pages (owner, 2026-11-19): one page per "most popular" card, with an animated "how it works" flow.
 // Order and ids match POPULAR_UI items (src/site/i18n/popular.ts). Singular voice, honest, no invented numbers.
-export const PACKAGE_IDS = ['crm', 'website', 'booking', 'assistant', 'invoices', 'qr'] as const;
-export type PackageId = (typeof PACKAGE_IDS)[number];
+import { PACKAGE_IDS, type PackageId } from './packageIds';
+export { PACKAGE_IDS, type PackageId };
 /** Live demo per package (opens from the page), if there is one */
 export const PACKAGE_DEMO: Partial<Record<PackageId, string>> = { crm: 'democrm', booking: 'demokuafor', qr: 'demokafe' };
 /** Icon keys for the flow steps (see PackageFlow) */

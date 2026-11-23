@@ -43,11 +43,12 @@ function setLd(data: object | null) {
  * Keeps <html lang>, <title>, meta description, canonical and hreflang alternates
  * in sync with the current localized page. Pass `title` to override (e.g. demo pages).
  */
-export function usePageMeta(lang: Lang, page: PageKey, opts: { title?: string; description?: string; path?: string; noindex?: boolean; keepTitle?: boolean; alt?: (l: Lang) => string; crumbs?: Crumb[]; ld?: Record<string, unknown>[] } = {}) {
-  const { title, description, path, noindex, keepTitle, alt, crumbs, ld } = opts;
+export function usePageMeta(lang: Lang, page: PageKey, opts: { title?: string; description?: string; path?: string; noindex?: boolean; keepTitle?: boolean; skip?: boolean; alt?: (l: Lang) => string; crumbs?: Crumb[]; ld?: Record<string, unknown>[] } = {}) {
+  const { title, description, path, noindex, keepTitle, skip, alt, crumbs, ld } = opts;
   const ldKey = JSON.stringify([crumbs, ld]);
   const altKey = alt ? LANGS.map(alt).join('|') : '';
   useEffect(() => {
+    if (skip) return;   // a lazy detail page (blog article, package, tool) sets its own meta
     document.documentElement.lang = lang;
     const meta = PAGE_META[lang][page] ?? PAGE_META[lang].home!;
     if (!keepTitle) document.title = title ?? meta.title;
@@ -60,5 +61,5 @@ export function usePageMeta(lang: Lang, page: PageKey, opts: { title?: string; d
     setRobots(noindex ? 'noindex, nofollow' : null);
     setLd(noindex ? null : buildPageLd(lang, page, path ?? pagePath(lang, page), crumbs, ld));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- alt is compared by its output (altKey)
-  }, [lang, page, title, description, path, noindex, keepTitle, altKey, ldKey]);
+  }, [lang, page, title, description, path, noindex, keepTitle, skip, altKey, ldKey]);
 }

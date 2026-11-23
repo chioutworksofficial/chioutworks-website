@@ -1,14 +1,13 @@
-import { TOOLS_UI } from './i18n/tools';
+import { NAV, FOOTER_LEGAL, RESOURCES_NAV, TOOLS_KICKER } from './navLabels';
 import { openConsentSettings } from '../lib/consent';
 
 import { CONSENT_UI } from './i18n/consent';
 import { Link, useLocation } from 'react-router-dom';
-import { T, type Lang } from '../translations';
+import type { Lang } from '../translations';
 import { LANGS, pagePath, switchLangPath, type PageKey } from '../lib/routes';
 import { SITE_UI } from './i18n';
 import { OUTRO_UI } from './i18n/outro';
 import { FAQ_PAGE_UI } from './i18n/faqPage';
-import { RESOURCES_UI } from './i18n/resources';
 import Logo from './Logo';
 
 // text sits over the globe outline — a soft dark halo keeps it readable without a visible box
@@ -19,12 +18,11 @@ const link = { fontSize: 15, color: 'color-mix(in srgb, var(--c-quartz) 88%, tra
 export default function SiteFooter({ lang, variant = 'default' }: { lang: Lang; variant?: 'default' | 'overlay' }) {
   const overlay = variant === 'overlay';
   const { pathname } = useLocation();
-  const t = T[lang];
   const ui = SITE_UI[lang];
   const o = OUTRO_UI[lang];
-  const nav = t.nav as readonly string[];
-  const pages: [PageKey, string][] = [['services', nav[0]], ['portfolio', nav[2]], ['resources', RESOURCES_UI[lang].nav], ['tools', TOOLS_UI[lang].kicker], ['demos', nav[3]], ['about', nav[1]], ['blog', ui.blogLabel], ['faq', FAQ_PAGE_UI[lang].nav], ['contact', nav[4]]];
-  const legal: [PageKey, string][] = [['privacy', t.footer.legal[0]], ['terms', t.footer.legal[1]], ['docs', t.footer.legal[2]]];
+  const nav: readonly string[] = NAV[lang];
+  const pages: [PageKey, string][] = [['services', nav[0]], ['portfolio', nav[2]], ['resources', RESOURCES_NAV[lang]], ['tools', TOOLS_KICKER[lang]], ['demos', nav[3]], ['about', nav[1]], ['blog', ui.blogLabel], ['faq', FAQ_PAGE_UI[lang].nav], ['contact', nav[4]]];
+  const legal: [PageKey, string][] = [['privacy', FOOTER_LEGAL[lang][0]], ['terms', FOOTER_LEGAL[lang][1]], ['docs', FOOTER_LEGAL[lang][2]]];
 
   return (
     <footer style={overlay ? { background: 'linear-gradient(to bottom, transparent, color-mix(in srgb, var(--c-void) 55%, transparent) 30%, color-mix(in srgb, var(--c-void) 70%, transparent))' } : { background: 'transparent' }}>
@@ -47,7 +45,7 @@ export default function SiteFooter({ lang, variant = 'default' }: { lang: Lang; 
             <p className="mb-3" style={head}>{o.legal}</p>
             <ul className="flex flex-col gap-2">
               {legal.map(([k, l]) => <li key={k}><Link to={pagePath(lang, k)} style={link}>{l}</Link></li>)}
-              <li><Link to={`${pagePath(lang, 'docs')}#imprint`} style={link}>{t.footer.legal[3]}</Link></li>
+              <li><Link to={`${pagePath(lang, 'docs')}#imprint`} style={link}>{FOOTER_LEGAL[lang][3]}</Link></li>
               <li><button type="button" onClick={openConsentSettings} style={{ ...link, cursor: 'pointer', textAlign: 'left', minHeight: 24, padding: '2px 0' }}>{CONSENT_UI[lang].footerLink}</button></li>
             </ul>
           </nav>
