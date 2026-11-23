@@ -9,6 +9,10 @@ import { FEATURES_UI } from './i18n/features';
 import { ageText, makeFmt, makeRng, RATE, useSim } from './featureSim';
 
 gsap.registerPlugin(ScrollTrigger);
+// Phones (owner, 2026-11-23: card run felt stuck while scrolling): don't recompute every pin when the address bar hides/shows,
+// and follow the finger closely instead of trailing behind native touch scrolling.
+ScrollTrigger.config({ ignoreMobileResize: true });
+const TOUCH = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 const DEV = (import.meta as unknown as { env: { DEV: boolean } }).env.DEV;
 
 type Mock = (typeof FEATURES_UI)['en']['mock'];
@@ -711,7 +715,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
           if (!t) return;
           const raw = Math.max(-1.4, Math.min(1.4, (base[i] + x - vw / 2) / (vw * 0.5)));
           const a = Math.min(1, Math.abs(raw));
-          gsap.set(t, { rotateZ: raw * 7, rotateY: raw * -3, rotateX: a * 3, scale: 1 - a * 0.05, force3D: true });
+          gsap.set(t, TOUCH ? { rotateZ: raw * 7, scale: 1 - a * 0.05, force3D: true } : { rotateZ: raw * 7, rotateY: raw * -3, rotateX: a * 3, scale: 1 - a * 0.05, force3D: true });
           t.style.setProperty('--tx', raw.toFixed(3));
           const act = Math.abs(raw) < 1.15 ? '1' : '0';
           if (t.dataset.act !== act) t.dataset.act = act;
@@ -723,7 +727,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         defaults: { ease: 'none' },
         onUpdate: tilt,
         scrollTrigger: {
-          trigger: root.current, start: 'top top', end: () => { const l = (i: number) => tilts.current[i]!.parentElement!.parentElement as HTMLElement; return `+=${Math.round((dist() * CARD_PACE * vh) / (l(1).offsetLeft - l(0).offsetLeft))}`; }, pin: true, scrub: SCRUB, invalidateOnRefresh: true, onRefresh: () => { measure(); tilt(); },
+          trigger: root.current, start: 'top top', end: () => { const l = (i: number) => tilts.current[i]!.parentElement!.parentElement as HTMLElement; return `+=${Math.round((dist() * CARD_PACE * vh) / (l(1).offsetLeft - l(0).offsetLeft))}`; }, pin: true, anticipatePin: 1, scrub: TOUCH ? 0.35 : SCRUB, invalidateOnRefresh: true, onRefresh: () => { measure(); tilt(); },
           // No snap (owner, 2026-11-23): snapping stopped and re-settled the scroll at each card, which felt like stuttering.
         },
       });
