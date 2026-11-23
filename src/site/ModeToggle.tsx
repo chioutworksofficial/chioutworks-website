@@ -35,6 +35,7 @@ export default function ModeToggle({ lang }: { lang: Lang }) {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!reduced) html.classList.add('cw-mode-anim');
     if (next) html.setAttribute('data-mode', 'light'); else html.removeAttribute('data-mode');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', next ? '#f4f7fc' : '#0e111b');
     try { localStorage.setItem('cw-mode', next ? 'light' : 'dark'); } catch { /* storage blocked: works for this visit only */ }
     setLight(next);
     window.dispatchEvent(new Event('cw-mode'));

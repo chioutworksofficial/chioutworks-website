@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLang } from './hooks/useLang';
 import SiteNav from './site/SiteNav';
 import Preloader from './site/Preloader';
@@ -7,12 +7,7 @@ import { ChatLauncher } from './site/VoiceOrb';
 const VoiceIntake = lazy(() => import('./site/VoiceIntake'));
 import { SITE_UI } from './site/i18n';
 import StatementReveal from './site/StatementReveal';
-import FeaturesScroll from './site/FeaturesScroll';
-import IndustriesWheel from './site/IndustriesWheel';
 // FaqSection / ProjectsCarousel removed from home (owner request); FAQ lives on its own page
-import RoiCalculator from './site/RoiCalculator';
-import PartnerStrip from './site/PartnerStrip';
-import SiteFinale from './site/SiteFinale';
 const ServicesPage = lazy(() => import('./site/pages/ServicesPage'));
 const AboutPage = lazy(() => import('./site/pages/AboutPage'));
 const PortfolioPage = lazy(() => import('./site/pages/PortfolioPage'));
@@ -30,7 +25,6 @@ import { PACKAGE_IDS, PACKAGE_TEXT, type PackageId } from './site/i18n/packages'
 import { POPULAR_UI } from './site/i18n/popular';
 import { toolById } from './data/affiliates';
 import { TOOL_TEXT } from './site/i18n/tools';
-import PopularPackages from './site/PopularPackages';
 import SectionDots from './site/SectionDots';
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
 import { toolPath, packagePath, blogPath, type PageKey } from './lib/routes';
@@ -40,6 +34,44 @@ import { usePageMeta } from './hooks/usePageMeta';
 import type { Lang } from './translations';
 import { useMode } from './site/ModeToggle';
 
+// Below-the-fold home sections load as separate chunks (smaller first bundle, less main-thread work on phones)
+const loaders = {
+  features: () => import('./site/FeaturesScroll'), industries: () => import('./site/IndustriesWheel'),
+  roi: () => import('./site/RoiCalculator'), partners: () => import('./site/PartnerStrip'),
+  finale: () => import('./site/SiteFinale'), popular: () => import('./site/PopularPackages'),
+};
+const FeaturesScroll = lazy(loaders.features);
+const IndustriesWheel = lazy(loaders.industries);
+const RoiCalculator = lazy(loaders.roi);
+const PartnerStrip = lazy(loaders.partners);
+const SiteFinale = lazy(loaders.finale);
+const PopularPackages = lazy(loaders.popular);
+
+let refreshTimer = 0;
+/** Pinned ScrollTriggers measure on mount: re-measure (batched) once a lazy section has appeared; SectionDots rescans on resize. */
+function Mounted() {
+  useEffect(() => {
+    window.clearTimeout(refreshTimer);
+    refreshTimer = window.setTimeout(() => requestAnimationFrame(() => { void import('gsap/ScrollTrigger').then((m) => m.ScrollTrigger.refresh()); window.dispatchEvent(new Event('resize')); }), 120);
+  }, []);
+  return null;
+}
+/** Lazy section: placeholder (same id + height, no layout shift, anchors keep a target) until it is within ~1.2 screens, then the chunk loads. */
+function Defer({ id, minH, children }: { id?: string; minH: string; children: ReactNode }) {
+  const [on, setOn] = useState(false);
+  const ph = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = ph.current;
+    if (on || !el) return;
+    if (!('IntersectionObserver' in window)) { setOn(true); return; }
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) setOn(true); }, { rootMargin: '1200px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [on]);
+  const fb = <section ref={ph} id={id} aria-hidden="true" style={{ minHeight: minH }} />;
+  return on ? <Suspense fallback={fb}>{children}<Mounted /></Suspense> : fb;
+}
+
 type SitePage = Exclude<PageKey, 'privacy' | 'terms' | 'docs' | 'solutions'>;
 
 /** Which sections make up each page. Content stays in translations.ts / data — only layout lives here. */
@@ -48,12 +80,12 @@ const PAGES: Record<SitePage, (lang: Lang) => ReactNode> = {
   home: (lang) => (
     <>
       <SiteHero lang={lang} />
-      <FeaturesScroll lang={lang} />
+      <Defer id="features" minH="100vh"><FeaturesScroll lang={lang} /></Defer>
       <StatementReveal lang={lang} />
-      <PopularPackages lang={lang} />
-      <IndustriesWheel lang={lang} />
-      <PartnerStrip lang={lang} />
-      <RoiCalculator lang={lang} />
+      <Defer id="popular" minH="80vh"><PopularPackages lang={lang} /></Defer>
+      <Defer id="industries" minH="100vh"><IndustriesWheel lang={lang} /></Defer>
+      <Defer minH="40vh"><PartnerStrip lang={lang} /></Defer>
+      <Defer id="roi" minH="100vh"><RoiCalculator lang={lang} /></Defer>
     </>
   ),
   services: (lang) => <ServicesPage lang={lang} />,
@@ -65,7 +97,7 @@ const PAGES: Record<SitePage, (lang: Lang) => ReactNode> = {
   resources: (lang) => <ResourcesPage lang={lang} />,
   contact: (lang) => <ContactPage lang={lang} />,
   tools: (lang) => <ToolsPage lang={lang} />,
-  packages: (lang) => <PopularPackages lang={lang} />,
+  packages: (lang) => <Defer id="popular" minH="80vh"><PopularPackages lang={lang} /></Defer>,
 };
 
 export default function App({ page = 'home', sub }: { page?: SitePage; sub?: string }) {
@@ -86,6 +118,16 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
 
   useEffect(() => initSmoothScroll(), []);
 
+  // Warm the lazy section chunks on the first scroll/touch (or after 10 s) so a placeholder is rarely seen
+  useEffect(() => {
+    const go = () => { off(); Object.values(loaders).forEach((l) => void l()); };
+    const t = window.setTimeout(go, 10000);
+    const ev = ['scroll', 'touchstart', 'pointerdown', 'keydown', 'wheel'] as const;
+    const off = () => { window.clearTimeout(t); ev.forEach((e) => window.removeEventListener(e, go)); };
+    ev.forEach((e) => window.addEventListener(e, go, { passive: true, once: true }));
+    return off;
+  }, []);
+
   // New page → start at the top
   useEffect(() => {
     // Lenis keeps its own target position: reset it too, or the new page opens where the old one was (e.g. at the bottom)
@@ -102,7 +144,7 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
       {page !== 'home' && page !== 'blog' && page !== 'faq' && page !== 'resources' && <div aria-hidden="true" style={{ height: 76 }} />}
       {/* Page change: the new page sharpens out of a short blur and rises slightly (lialive-style) */}
       <main id="main" tabIndex={-1} key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter"><Suspense fallback={<div style={{ minHeight: '60vh' }} aria-busy="true" />}>{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} post={post} /> : PAGES[page](lang)}</Suspense></main>
-      <SiteFinale key={mode} lang={lang} />
+      <Defer id="start" minH="calc(660px + clamp(240px, 30vw, 460px))"><SiteFinale key={mode} lang={lang} /></Defer>
       <SectionDots lang={lang} page={page} />
       <Suspense fallback={null}>
         <AIAssistant lang={lang} hideLauncher />

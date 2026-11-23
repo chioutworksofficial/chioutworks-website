@@ -26,7 +26,7 @@ export default function SiteFinale({ lang }: { lang: Lang }) {
     const v = (n: string) => cs.getPropertyValue(n).trim();
     const col = { white: v('--lq-white'), kelp: v('--lq-kelp'), abyss: v('--lq-abyss'), g2: v('--lq-g2') };
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, matchMedia('(pointer: coarse)').matches ? 1.5 : 2);
 
     let W = 0, SH = 0, PH = 0, GAP = 0;
     type Star = { x: number; y: number; r: number; a: number; s: number; p: number };
@@ -93,15 +93,17 @@ export default function SiteFinale({ lang }: { lang: Lang }) {
     const frame = (now: number) => {
       lon += (now - last) * 0.006; last = now;
       drawStars(now); drawPlanet();
-      if (visible && !reduced) raf = requestAnimationFrame(frame);
+      if (visible && !document.hidden && !reduced) raf = requestAnimationFrame(frame);
     };
     const start = () => { cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); };
     size(); drawStars(performance.now()); drawPlanet();
     const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible && !reduced) start(); else cancelAnimationFrame(raf); });
     io.observe(sec);
+    const onVis = () => { if (document.hidden) cancelAnimationFrame(raf); else if (visible && !reduced) start(); };
+    document.addEventListener('visibilitychange', onVis);
     const ro = new ResizeObserver(() => { size(); drawStars(performance.now()); drawPlanet(); });
     ro.observe(sec);
-    return () => { cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); };
+    return () => { cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); document.removeEventListener('visibilitychange', onVis); };
   }, []);
 
   return (

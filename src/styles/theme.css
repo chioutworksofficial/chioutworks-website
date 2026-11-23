@@ -944,6 +944,7 @@ html:has([data-site-theme='liquid']) body::-webkit-scrollbar { display: none; wi
 /* Touch screens only (phones/tablets, desktop untouched): hover looks must not stay "stuck" after a tap.
    Instead a short press feedback (:active) while the finger is down; no grey tap box. */
 html { -webkit-tap-highlight-color: transparent; }
+a, button, summary, [role='button'], input, select, textarea, label { touch-action: manipulation; }   /* no 300 ms tap delay */
 @media (hover: none) {
   [data-site-theme='liquid'] .lq-btn-ghost:hover {
     border-color: color-mix(in srgb, var(--c-quartz) 14%, transparent);

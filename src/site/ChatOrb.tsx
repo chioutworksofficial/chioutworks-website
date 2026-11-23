@@ -26,7 +26,7 @@ export default function ChatOrb({ size = 200, active = false, points = 360 }: { 
     const ctx = cv?.getContext('2d');
     if (!cv || !ctx) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = Math.min(window.matchMedia('(pointer: coarse)').matches ? 1.5 : 2, window.devicePixelRatio || 1);
     cv.width = size * dpr; cv.height = size * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const A = tok(cv, '--c-lilac', '#85a6e9'), B = tok(cv, '--c-signal', '#2862d7'), W = tok(cv, '--c-quartz', '#ffffff');
@@ -70,13 +70,15 @@ export default function ChatOrb({ size = 200, active = false, points = 360 }: { 
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       t += dt; rot += dt * (activeRef.current ? 1.1 : 0.32);
-      if (visible) frame();
-      raf = requestAnimationFrame(loop);
+      frame();
+      raf = visible && !document.hidden ? requestAnimationFrame(loop) : 0;
     };
     if (reduce) frame(); else raf = requestAnimationFrame(loop);
-    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; });
+    const kick = () => { if (!raf && visible && !document.hidden && !reduce) { last = performance.now(); raf = requestAnimationFrame(loop); } };
+    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; kick(); });
     io.observe(cv);
-    return () => { cancelAnimationFrame(raf); io.disconnect(); };
+    document.addEventListener('visibilitychange', kick);
+    return () => { cancelAnimationFrame(raf); io.disconnect(); document.removeEventListener('visibilitychange', kick); };
   }, [size, points]);
 
   return <canvas ref={ref} aria-hidden="true" style={{ width: size, height: size, display: 'block' }} />;

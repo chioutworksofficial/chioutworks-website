@@ -42,7 +42,7 @@ export default function VoiceOrb({ label, onTalk, bare }: { label: string; onTal
 
     const resize = () => {
       f = Math.max(1, Math.floor(box.offsetWidth));
-      dpr = window.devicePixelRatio || 1;
+      dpr = Math.min(window.devicePixelRatio || 1, window.matchMedia('(pointer: coarse)').matches ? 1.5 : 8);
       cv.width = f * dpr; cv.height = f * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (reduce) frame();
