@@ -160,8 +160,9 @@ export default function IndustriesWheel({ lang }: { lang: Lang }) {
           <span aria-hidden="true" className="absolute rounded-full" style={{ inset: 0, border: '1px solid var(--lq-line-strong)' }} />
         </div>
 
-        {/* phones/tablets: soft top edge so the wheel blends into the hero above (no visible cut line) */}
-        {g.k < 1 && <div aria-hidden="true" className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: g.small ? 170 : 220, background: 'linear-gradient(to bottom, var(--c-void) 0%, color-mix(in srgb, var(--c-void) 70%, transparent) 45%, transparent 100%)', zIndex: 1 }} />}
+        {/* soft top + bottom edges so the wheel blends into the neighbouring sections (no visible cut line) */}
+        <div aria-hidden="true" className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: g.k === 1 ? 96 : g.small ? 170 : 220, background: 'linear-gradient(to bottom, var(--c-void) 0%, color-mix(in srgb, var(--c-void) 70%, transparent) 45%, transparent 100%)', zIndex: 1 }} />
+        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 pointer-events-none" style={{ height: g.k === 1 ? 72 : 96, background: 'linear-gradient(to top, var(--c-void) 0%, color-mix(in srgb, var(--c-void) 70%, transparent) 45%, transparent 100%)', zIndex: 1 }} />
 
         {/* centre disc */}
         <div aria-hidden="true" className="absolute rounded-full" style={{ width: g.disc, height: g.disc, left: '50%', top: g.cy - g.disc / 2, marginLeft: -g.disc / 2, background: 'var(--lq-abyss)', border: '1px solid var(--lq-line)' }} />
