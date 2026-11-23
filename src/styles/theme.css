@@ -1570,6 +1570,9 @@ html[data-mode='light'] [data-site-theme='liquid'] :is(.bks-steps li.is-on, .bks
 @keyframes cw-page-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes cw-check-pop { 0% { transform: scale(0); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
 [data-site-theme='liquid'] .cw-page { animation: cw-page-in 250ms ease-out both; }
+@keyframes cw-q-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+[data-site-theme='liquid'] .cw-q-in { animation: cw-q-in 220ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { [data-site-theme='liquid'] .cw-q-in { animation: none; } }
 [data-site-theme='liquid'] .cw-step { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-family: var(--font-mono); font-size: 13px; letter-spacing: .12em; color: var(--c-signal); text-transform: uppercase; }
 [data-site-theme='liquid'] .cw-step small { font-size: 11px; letter-spacing: .04em; color: var(--c-ash); text-transform: none; }
 [data-site-theme='liquid'] .cw-bar { height: 4px; margin: 10px 0 22px; border-radius: var(--r-pill); background: var(--c-inkline); overflow: hidden; }

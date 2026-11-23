@@ -14,7 +14,8 @@ import {
   type L, type L4, type Market, type SectorKey, type StaticQ, type QDef, type SecDef, type Definition,
 } from '../src/data/intakeSectors.js';
 import { INTAKE_SLUG } from '../src/lib/routes.js';
-import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, DREAM_IDS, DREAM_TITLE, EXAMPLES_Q, EXAMPLES_TITLE, EXTRA_SYSTEM, LEGAL_Q, MERGE_INTO, MESSENGER_Q, QUESTION_HELP, SECTION_INTRO, SECTION_META, SECTION_ORDER, STYLE_TITLE, SUGGESTIONS } from '../src/data/intakeHelp.js';
+import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, DREAM_IDS, DREAM_TITLE, EXAMPLES_Q, EXAMPLES_TITLE, EXTRA_SYSTEM, LEGAL_Q, LENGTH_NOTE, MERGE_INTO, MESSENGER_Q, QUESTION_HELP, SECTION_INTRO, SECTION_META, SECTION_ORDER, SHOW_IF, STYLE_TITLE, SUGGESTIONS } from '../src/data/intakeHelp.js';
+import { isVisible, visibleSections } from '../src/lib/intakeLogic.js';
 import { applyChoice, saveChoice, styleSummary, type StyleRec } from './styles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -104,7 +105,7 @@ export function buildDefinition(market: Market, sector: SectorKey, wants: string
     for (const k of COMPACT) if (wants.includes(k)) secs.push(blockSec(k, true));
     if (wants.includes('qr')) secs.push(...visualPages());
     secs.push({ id: 'final', title: SECTION_STATIC.final, qs: FINAL_Q.map(fromStatic) });
-    return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants, unsureLabel: UNSURE_LABEL };
+    return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants, unsureLabel: UNSURE_LABEL, lengthNote: LENGTH_NOTE };
   }
   for (const s of SCHEMA.sections as any[]) {
     if (skip.has(s.id)) continue;
@@ -136,7 +137,7 @@ export function buildDefinition(market: Market, sector: SectorKey, wants: string
   }
   for (const k of ['booking', 'qr', 'invoices', 'ai']) if (wants.includes(k)) secs.push(blockSec(k));
   if (wants.length === 0 || ['website', 'app', 'qr', 'all'].some((w) => wants.includes(w))) secs.push(...visualPages());
-  return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants, unsureLabel: UNSURE_LABEL };
+  return { sections: friendly(dedupe(secs)), consent: consentOf(market), market, sector, wants, unsureLabel: UNSURE_LABEL, lengthNote: LENGTH_NOTE };
 }
 
 const dedupe = (secs: SecDef[]): SecDef[] => { const seen = new Set<string>(); for (const s of secs) s.qs = s.qs.filter((q) => !seen.has(q.id) && !!seen.add(q.id)); return secs; };
@@ -165,6 +166,7 @@ function friendly(secs: SecDef[]): SecDef[] {
     const help = base === q ? QUESTION_HELP[q.id] ?? EXTRA_SYSTEM[q.id] : undefined;
     const cost = COST_IDS.has(q.id);
     const out: QDef = help ? { ...q, help, ...(cost ? { costNote: COST_NOTE } : {}), ...(cost || MUST_READ.has(q.id) ? { mustRead: true } : {}) } : { ...base };
+    if (SHOW_IF[out.id]) out.showIf = SHOW_IF[out.id];
     if (out.type === 'text' && SUGGESTIONS[out.id]) out.suggestions = SUGGESTIONS[out.id];
     if (out.type === 'multi' && out.opts) out.opts = out.opts.map((o) => (o.id === 'none' || o.id === 'unsure' ? { ...o, exclusive: true } : o));
     if (!out.required && !out.id.startsWith('meta_') && !out.opts?.some((o) => o.id === 'unsure')) out.unsure = true;
@@ -198,6 +200,7 @@ const styleText = (v: unknown): string => {
 export function formatAnswers(i: Intake, lang: L = 'tr') {
   const def = defOf(i);
   const a = i.answers;
+  def.sections = visibleSections(def, a); // hidden questions (answers kept stored) stay out of summaries
   const str = (k: string) => (typeof a[k] === 'string' ? (a[k] as string).trim() : '');
   const sections = def.sections.map((s) => ({
     title: s.title[lang],
@@ -297,7 +300,10 @@ export function registerIntake(app: Express, d: Deps) {
 
   app.get('/api/intake/:token', limiter, async (req, res) => {
     const i = await live(String(req.params.token));
-    if (!i) return res.status(404).json({ error: 'not_found' });
+    if (!i) {
+      const r = /^[A-Za-z0-9_-]{40,60}$/.test(String(req.params.token)) ? await getIntakeByToken(String(req.params.token)) : null;
+      return res.status(r?.cancelledAt ? 410 : 404).json({ error: r?.cancelledAt ? 'revoked' : 'not_found' });
+    }
     if (i.status === 'sent') {
       i.status = 'opened'; i.openedAt = new Date().toISOString(); await saveIntake(i);
     }
@@ -389,6 +395,7 @@ export function registerIntake(app: Express, d: Deps) {
     const i = await getIntakeByToken(String(req.params.token));
     if (!i || i.cancelledAt || expired(i)) return res.status(404).json({ error: 'not_found' });
     const missing = REQUIRED.filter((k) => !str0(i.answers[k]));
+    for (const s of defOf(i).sections) for (const q of s.qs) if (q.required && !REQUIRED.includes(q.id) && isVisible(q, i.answers) && !Object.keys(i.answers).some((k) => (k === q.id || k.startsWith(`${q.id}__`)) && i.answers[k] !== false && i.answers[k] !== '')) missing.push(q.id);
     if (!wantsOf(i.answers).length) missing.push('wants');
     if (i.answers.consent !== true) missing.push('consent');
     if (missing.length) return res.status(422).json({ error: 'missing', missing });
@@ -447,7 +454,7 @@ export function registerIntake(app: Express, d: Deps) {
     const i = await getIntake(String(req.params.id));
     if (!i) return res.status(404).json({ error: 'not_found' });
     if (req.body?.action === 'cancel') i.cancelledAt = new Date().toISOString();
-    else if (req.body?.action === 'renew') { i.token = mkToken(); i.cancelledAt = null; i.expiresAt = new Date(Date.now() + 30 * DAY).toISOString(); }
+    else if (req.body?.action === 'renew') { if (i.cancelledAt) return res.status(409).json({ error: 'revoked' }); i.token = mkToken(); i.cancelledAt = null; i.expiresAt = new Date(Date.now() + 30 * DAY).toISOString(); }
     else return res.status(400).json({ error: 'bad_action' });
     await saveIntake(i);
     return res.json({ intake: brief(i) });

@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { LogoMark } from '../Logo';
 import { INTAKE_UI } from '../intakeUi';
@@ -8,6 +8,7 @@ import type { Lang } from '../../translations';
 import ModeToggle from '../ModeToggle';
 import { StyleCta } from './StylePage';
 import type { Definition, L4, QDef } from '../../data/intakeSectors';
+import { visibleSections } from '../../lib/intakeLogic';
 import { guardFields, prefetchFormToken } from '../../lib/formGuard';
 import { StyleInline, emptyStyle, styleBody, normUrl, URL_RE, type StyleVal } from '../StyleInline';
 
@@ -63,7 +64,7 @@ export default function IntakePage() {
   const u = INTAKE_UI[lang];
 
   const [data, setData] = useState<Payload | null>(null);
-  const [state, setState] = useState<'loading' | 'ok' | 'invalid'>('loading');
+  const [state, setState] = useState<'loading' | 'ok' | 'invalid' | 'revoked'>('loading');
   const [answers, setAnswers] = useState<Answers>({});
   const [def, setDef] = useState<Definition | null>(null);
   const [step, setStep] = useState(0);
@@ -100,7 +101,7 @@ export default function IntakePage() {
     let live = true;
     fetch(`/api/intake/${encodeURIComponent(token)}`).then(async (r) => {
       if (!live) return;
-      if (!r.ok) { setState('invalid'); return; }
+      if (!r.ok) { setState(r.status === 410 ? 'revoked' : 'invalid'); return; }
       const p = (await r.json()) as Payload;
       setData(p); setDef(p.definition); setAnswers(p.answers);
       setSecond(p.secondLang); setShowSecond(!!p.secondLang);
@@ -139,16 +140,20 @@ export default function IntakePage() {
     timer.current = window.setTimeout(() => void flush(), 800);
   };
 
+  // Adaptive form: only sections/questions whose showIf holds for the current answers (hidden answers stay stored)
+  const sections = useMemo(() => (def ? visibleSections(def, answers) : []), [def, answers]);
+  const total = sections.length;
+  const isReview = step >= total;
+  const cur = sections[Math.min(step, total - 1)];
+  // the current page can vanish after an earlier answer changed: jump to the nearest visible page
+  useEffect(() => { if (total && step > total) setStep(total); }, [step, total]);
+
   const pick = (q: QDef, id: string) => {
     const k = `${q.id}__${id}`, o = q.opts?.find((x) => x.id === id);
     const turnOn = answers[k] !== true;
     for (const x of q.opts ?? []) { const kk = `${q.id}__${x.id}`; if (kk !== k && answers[kk] === true && turnOn && (o?.exclusive || x.exclusive)) set(kk, false); }
     set(k, turnOn);
   };
-  const sections = def?.sections ?? [];
-  const total = sections.length;
-  const isReview = step >= total;
-  const cur = sections[Math.min(step, total - 1)];
 
   const startOk = () => {
     if (!str(answers.meta_company) || !str(answers.meta_contact) || !str(answers.meta_email) || !str(answers.biz_type)) return u.needFields;
@@ -228,10 +233,10 @@ export default function IntakePage() {
   );
 
   if (state === 'loading') return shell(<p style={{ color: 'var(--c-ash)' }}>{u.loading}</p>);
-  if (state === 'invalid' || !data || !def) return shell(
+  if (state === 'invalid' || state === 'revoked' || !data || !def) return shell(
     <div className="lq-card" style={{ padding: 32 }}>
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, color: 'var(--c-quartz)', margin: '0 0 12px' }}>{u.invalidTitle}</h1>
-      <p style={{ margin: 0, lineHeight: 1.6 }}>{u.invalidBody}</p>
+      <p style={{ margin: 0, lineHeight: 1.6 }}>{state === 'revoked' ? u.revokedBody : u.invalidBody}</p>
     </div>);
   if (done) return shell(<>
     <div className="lq-card" style={{ padding: 40, textAlign: 'center' }}>
@@ -355,6 +360,7 @@ export default function IntakePage() {
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(28px, 5vw, 40px)', lineHeight: 1.1, color: 'var(--c-quartz)', margin: '0 0 12px', fontWeight: 500 }}>{u.hello(str(answers.meta_contact).split(' ')[0])}</h1>
           <p style={{ margin: '0 0 8px', fontSize: 17, lineHeight: 1.6 }}>{u.intro}</p>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--c-ash)' }}>{u.time}</p>
+          {def.lengthNote && <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--c-ash)' }}>{def.lengthNote[lang] || def.lengthNote.en}{Sub({ x: def.lengthNote })}</p>}
         </div>
       )}
 
@@ -379,7 +385,7 @@ export default function IntakePage() {
       </div>
       <div className="cw-bar" role="progressbar" aria-label={u.stepAria} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><i style={{ transform: `scaleX(${Math.max(pct, 4) / 100})` }} /></div>
 
-      <IntakeProgress lang={lang} token={token} step={step} total={total} def={def} answers={answers} setStep={setStep} />
+      <IntakeProgress lang={lang} token={token} step={step} total={total} sections={sections} answers={answers} setStep={setStep} />
 
       <div key={step} className="cw-page">
       {!isReview && cur && (
@@ -403,7 +409,7 @@ export default function IntakePage() {
             </ol>)}
           {cur.kind === 'style' && <StyleInline lang={lang} v={svLocal ?? parseStyle(answers.style_choice)} set={(nv) => { setSvLocal(nv); set('style_choice', nv.likes.length || nv.pal || nv.pair ? JSON.stringify(styleBody(nv)) : ''); }} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: cur.kind === 'style' && cur.qs.length ? 14 : 0 }}>
-            {cur.qs.map((q) => <Fragment key={q.id}>{Question({ q })}</Fragment>)}
+            {cur.qs.map((q) => <div key={q.id} className="cw-q-in">{Question({ q })}</div>)}
           </div>
         </>
       )}

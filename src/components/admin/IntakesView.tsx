@@ -9,7 +9,7 @@ import { download } from './analysisMd';
 
 interface Detail { intake: IntakeBrief; formatted: { sections: { title: string; items: { no: number | null; q: string; a: string }[] }[]; consent: boolean }; markdown: string; analysis: Analysis | null; preview?: PreviewData | null }
 
-const statusOf = (i: IntakeBrief) => i.cancelledAt ? 'İptal edildi' : i.status === 'submitted' ? 'Teslim edildi' : i.expired ? 'Süresi doldu'
+const statusOf = (i: IntakeBrief) => i.cancelledAt ? 'Geri alındı' : i.status === 'submitted' ? 'Teslim edildi' : i.expired ? 'Süresi doldu'
   : ({ sent: 'Gönderildi', opened: 'Açıldı', in_progress: 'Dolduruluyor' } as const)[i.status as 'sent'];
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
@@ -27,17 +27,25 @@ export default function IntakesView({ go }: { go: (t: Tab, id?: string) => void 
   const [detail, setDetail] = useState<Detail | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [revoke, setRevoke] = useState(false);
+  const [newLang, setNewLang] = useState('');
 
   const load = useCallback(() => { api<{ intakes: IntakeBrief[] }>('/api/admin/intakes').then((r) => setList(r.intakes)).catch(() => { setList([]); setMsg('Liste yüklenemedi.'); }); }, []);
   useEffect(load, [load]);
   const view = useCallback((id: string) => {
-    setOpenId(id); setDetail(null); setConfirm(false); setMsg(null);
+    setOpenId(id); setDetail(null); setConfirm(false); setRevoke(false); setNewLang(''); setMsg(null);
     api<Detail>(`/api/admin/intakes/${id}`).then(setDetail).catch(() => setMsg('Kayıt açılamadı.'));
   }, []);
   const act = async (action: 'renew' | 'cancel') => {
     if (!openId) return;
     try { await api(`/api/admin/intakes/${openId}`, 'PATCH', { action }); view(openId); load(); }
     catch { setMsg('İşlem yapılamadı, tekrar deneyin.'); }
+  };
+  const recreate = async (d: IntakeBrief) => {
+    try {
+      const r = await api<{ intake: IntakeBrief }>('/api/admin/intakes', 'POST', { requestId: d.requestId, lang: newLang, market: d.market, sector: d.sector, prefill: { company: d.company, contact: d.contact, email: d.email } });
+      load(); view(r.intake.id);
+    } catch { setMsg('Yeni bağlantı oluşturulamadı, tekrar deneyin.'); }
   };
   const remove = async () => {
     if (!openId) return;
@@ -61,7 +69,8 @@ export default function IntakesView({ go }: { go: (t: Tab, id?: string) => void 
                 <span className="adm-meta">Oluşturuldu {fmtDate(x.createdAt)}{x.openedAt ? ` · açıldı ${fmtDate(x.openedAt)}` : ''}{x.submittedAt ? ` · teslim ${fmtDate(x.submittedAt)}` : ''}{x.updatedAt ? ` · güncellendi ${fmtDate(x.updatedAt)}` : ''}</span>
               </span>
               <span className="adm-chip tag">{statusOf(x)}</span>
-              <span className="adm-chip">{LANG_NAME[x.lang] ?? x.lang}{x.secondLang ? ` + ${x.secondLang.toUpperCase()}` : ''} · {x.market}</span>
+              <span className="adm-chip tag" style={{ fontWeight: 700 }}>Dil: {LANG_NAME[x.lang] ?? x.lang}{x.secondLang ? ` + ${x.secondLang.toUpperCase()}` : ''}</span>
+              <span className="adm-chip">{x.market}</span>
               {x.updatedAt && <span className="adm-chip tag">Güncellendi</span>}
               {x.hasAnalysis && <span className="adm-chip tag">{x.analysisStale ? 'Analiz eski' : 'Analiz var'}</span>}
             </button>
@@ -80,13 +89,20 @@ export default function IntakesView({ go }: { go: (t: Tab, id?: string) => void 
             <div className="adm-chips" style={{ margin: 0 }}>
               <span className="adm-chip tag">{statusOf(i)}</span>
               <span className="adm-chip">{SECTORS.find(([k]) => k === i.sector)?.[1]}</span>
-              <span className="adm-chip">{LANG_NAME[i.lang]}{i.secondLang ? ` + ${LANG_NAME[i.secondLang]}` : ''} · {i.market}</span>
+              <span className="adm-chip tag" style={{ fontWeight: 700 }}>Dil: {LANG_NAME[i.lang]}{i.secondLang ? ` + ${LANG_NAME[i.secondLang]}` : ''}</span>
+              <span className="adm-chip">{i.market}</span>
               <span className="adm-chip">Geçerlilik: {fmtDate(i.expiresAt)}</span>
             </div>
             {!i.cancelledAt && !i.expired && <IntakeLink b={i} defaultEmail={i.email} />}
+            {i.cancelledAt && <div className="adm-actions">
+              <select className="adm-input" style={{ width: 'auto' }} aria-label="Yeni bağlantı dili" value={newLang} onChange={(e) => setNewLang(e.target.value)}>
+                <option value="">Doğru dili seçin…</option>{Object.entries(LANG_NAME).filter(([k]) => k !== i.lang).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+              <button className="lq-btn-ghost adm-btn sm" disabled={!newLang} onClick={() => recreate(i)}>Doğru dilde yeni bağlantı oluştur</button>
+            </div>}
             <div className="adm-actions">
-              <button className="lq-btn-ghost adm-btn sm" onClick={() => act('renew')}>Linki yenile</button>
-              {!i.cancelledAt && <button className="lq-btn-ghost adm-btn sm" onClick={() => act('cancel')}>İptal et</button>}
+              {!i.cancelledAt && <button className="lq-btn-ghost adm-btn sm" onClick={() => act('renew')}>Linki yenile</button>}
+              {!i.cancelledAt && i.status !== 'submitted' && (!revoke ? <button className="lq-btn-ghost adm-btn sm" onClick={() => setRevoke(true)}>Bağlantıyı geri al</button>
+                : <><button className="lq-btn-ghost adm-btn sm" onClick={() => { setRevoke(false); void act('cancel'); }}>Evet, geri al</button><button className="lq-btn-ghost adm-btn sm" onClick={() => setRevoke(false)}>Vazgeç</button></>)}
               {!confirm ? <button className="lq-btn-ghost adm-btn sm" onClick={() => setConfirm(true)}>Sil</button>
                 : <><button className="lq-btn-ghost adm-btn sm" onClick={remove}>Evet, sil</button><button className="lq-btn-ghost adm-btn sm" onClick={() => setConfirm(false)}>Vazgeç</button></>}
               {i.requestId && <button className="lq-btn-ghost adm-btn sm" onClick={() => go('requests', i.requestId!)}>Talebi aç</button>}

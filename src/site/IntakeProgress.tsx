@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Lang } from '../translations';
-import type { Definition, QDef } from '../data/intakeSectors';
+import type { QDef, SecDef } from '../data/intakeSectors';
 
 // Motivation layer for the intake form (own file, so the form itself keeps its state during edits):
 // 1) a short "✓ page done · next: …" banner on each page change (no waiting, fades by itself),
@@ -45,13 +45,15 @@ const TX: Record<Lang, {
   },
 };
 
-interface Props { lang: Lang; token: string; step: number; total: number; def: Definition; answers: Answers; setStep: (n: number) => void }
+interface Props { lang: Lang; token: string; step: number; total: number; sections: SecDef[]; answers: Answers; setStep: (n: number) => void }
 
-export default function IntakeProgress({ lang, token, step, total, def, answers, setStep }: Props) {
+export default function IntakeProgress({ lang, token, step, total, sections, answers, setStep }: Props) {
   const t = TX[lang];
   const key = `cw-intake-step:${token}`;
   const restored = useRef(false);
   const prev = useRef(step);
+  const live = useRef({ sections, total });   // read inside the banner effect so live page-count changes do not cancel its timer
+  live.current = { sections, total };
   const jump = useRef(false);   // restoring the page after a reload is not "progress": no banner
   const [banner, setBanner] = useState<{ id: number; lines: string[] } | null>(null);
   const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -70,7 +72,8 @@ export default function IntakeProgress({ lang, token, step, total, def, answers,
     if (jump.current) { if (step !== 0) { jump.current = false; prev.current = step; } return; }
     const from = prev.current; prev.current = step;
     if (step <= from || from < 0) return;
-    const title = (i: number) => (i >= total ? t.review2 : def.sections[i]?.title[lang] || def.sections[i]?.title.en || '');
+    const { sections: ss, total } = live.current;
+    const title = (i: number) => (i >= total ? t.review2 : ss[i]?.title[lang] || ss[i]?.title.en || '');
     const lines = [`${t.done(title(from))} · ${t.next(title(step))}`];
     const left = total - step;
     if (step >= total) lines.push(t.review);
@@ -79,13 +82,13 @@ export default function IntakeProgress({ lang, token, step, total, def, answers,
     const id = Date.now(); setBanner({ id, lines });
     const timer = window.setTimeout(() => setBanner((b) => (b?.id === id ? null : b)), 4200);
     return () => window.clearTimeout(timer);
-  }, [step, total, def, lang, t]);
+  }, [step, lang, t]);
 
   // "Your project is taking shape": built only from what the visitor answered
   const items = useMemo(() => {
-    const qs = new Map<string, QDef>(def.sections.flatMap((s) => s.qs.map((q) => [q.id, q] as [string, QDef])));
+    const qs = new Map<string, QDef>(sections.flatMap((s) => s.qs.map((q) => [q.id, q] as [string, QDef])));
     const on = (k: string) => answers[k] === true;
-    const yes = (id: string) => answers[id] === 'yes';
+    const yes = (id: string) => qs.has(id) && answers[id] === 'yes';
     const label = (id: string, opt: string) => { const o = qs.get(id)?.opts?.find((x) => x.id === opt); return o ? (o.t[lang] || o.t.en).replace(/\s*\(.*\)$/, '') : opt; };
     const picked = (id: string) => (qs.get(id)?.opts ?? []).filter((o) => on(`${id}__${o.id}`)).map((o) => label(id, o.id));
     const out: string[] = [];
@@ -99,7 +102,7 @@ export default function IntakeProgress({ lang, token, step, total, def, answers,
     if (yes('quote_form')) out.push(t.quoteForm);
     if (yes('online_payment')) out.push(t.payment);
     if (yes('customer_accounts')) out.push(t.accounts);
-    const ch = ['telegram', 'whatsapp', 'email'].find((c) => on(`messenger_notify__${c}`) || answers.messenger_notify === c) ?? '';
+    const ch = !qs.has('messenger_notify') ? '' : ['telegram', 'whatsapp', 'email'].find((c) => on(`messenger_notify__${c}`) || answers.messenger_notify === c) ?? '';
     if (ch) out.push(t.notify(label('messenger_notify', ch)));
     if (yes('auto_email')) out.push(t.autoEmail);
     if (yes('auto_crm')) out.push(t.autoCrm);
@@ -108,7 +111,7 @@ export default function IntakeProgress({ lang, token, step, total, def, answers,
     const langs = picked('website_languages');
     if (langs.length) out.push(t.langs(langs.join(', ')));
     return out;
-  }, [answers, def, lang, t]);
+  }, [answers, sections, lang, t]);
 
   const seen = useRef<Set<string>>(new Set());
   const fresh = new Set(items.filter((x) => !seen.current.has(x)));

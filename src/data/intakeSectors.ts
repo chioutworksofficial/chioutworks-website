@@ -1,6 +1,7 @@
 // Intake form: sector variants + static strings the original cleaning-company schema did not have.
 // OWNER-REVIEW DRAFT: every sector text below (service lists, quote fields, pricing wording) is authored,
 // not taken from the original schema. Cleaning ("cleaning") keeps the original schema untouched.
+import type { Cond } from '../lib/intakeLogic.js';
 export type L = 'tr' | 'en' | 'de' | 'el';
 export type L4 = Record<L, string>;
 type T = [string, string, string, string]; // tr, en, de, el
@@ -467,7 +468,7 @@ export const CONSENT_AI: L4 = l4([
 // ── Definition shape served by GET /api/intake/:token (shared with the client page) ──
 // Optional additions (UI step): opts[].exclusive (choosing it clears the others), suggestions (clickable example answers for
 // free text), unsure (offer the shared "not sure" choice, label in Definition.unsureLabel), forWho/outcome/skippable per page.
-export interface QDef { id: string; no?: number; type: 'text' | 'single' | 'multi' | 'yn'; t: L4; opts?: { id: string; t: L4; exclusive?: boolean }[]; other?: boolean; detail?: boolean; required?: boolean; help?: L4; costNote?: L4; mustRead?: boolean; suggestions?: L4[]; unsure?: boolean; format?: 'url' }
-export interface SecDef { id: string; title: L4; qs: QDef[]; intro?: L4; flow?: L4[]; forWho?: L4; outcome?: L4; skippable?: boolean; kind?: 'style' }
-export interface Definition { sections: SecDef[]; consent: L4; market: Market; sector: SectorKey; wants: string[]; unsureLabel?: L4 }
+export interface QDef { id: string; no?: number; type: 'text' | 'single' | 'multi' | 'yn'; t: L4; opts?: { id: string; t: L4; exclusive?: boolean }[]; other?: boolean; detail?: boolean; required?: boolean; help?: L4; costNote?: L4; mustRead?: boolean; suggestions?: L4[]; unsure?: boolean; format?: 'url'; showIf?: Cond }
+export interface SecDef { id: string; title: L4; qs: QDef[]; intro?: L4; flow?: L4[]; forWho?: L4; outcome?: L4; skippable?: boolean; kind?: 'style'; showIf?: Cond }
+export interface Definition { sections: SecDef[]; consent: L4; lengthNote?: L4; market: Market; sector: SectorKey; wants: string[]; unsureLabel?: L4 }
 export const UNSURE_LABEL: L4 = l4(['Emin değilim', 'Not sure', 'Weiß ich noch nicht', 'Δεν είμαι σίγουρος/η']);

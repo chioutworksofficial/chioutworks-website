@@ -1,6 +1,7 @@
 // Client intake: friendlier page order, plain-language "What does this mean?" help and short section intros.
 // No question is removed; questions are only moved. Texts in 4 languages (tr, en, de, el), singular voice, no jargon.
 import { l4, type L4, type QDef } from './intakeSectors.js';
+import type { Cond } from '../lib/intakeLogic.js';
 
 /** New page 2: easy, motivating questions first ("your dream"), taken from later sections. */
 export const DREAM_IDS = ['success_definition', 'repetitive_tasks', 'growth_12m', 'new_customers_month', 'target_customer_type', 'website_goals'];
@@ -451,4 +452,34 @@ export const SUGGESTIONS: Record<string, L4[]> = {
   service_list: S(['Müşterilere yerinde hizmet', 'On-site service for customers', 'Leistungen vor Ort beim Kunden', 'Υπηρεσίες στον χώρο του πελάτη'], ['Danışmanlık', 'Consulting', 'Beratung', 'Συμβουλευτική'], ['Ürün satışı', 'Selling products', 'Verkauf von Produkten', 'Πώληση προϊόντων']),
   inv_tools: S(['Henüz bir programım yok', 'I have no program yet', 'Ich habe noch kein Programm', 'Δεν έχω ακόμα πρόγραμμα'], ['Muhasebecim kendi programıyla yapıyor', 'My accountant uses their own program', 'Mein Steuerberater nutzt sein eigenes Programm', 'Ο λογιστής μου χρησιμοποιεί δικό του πρόγραμμα'], ['Excel ile yürütüyorum', 'I handle it in Excel', 'Ich mache es in Excel', 'Τα κάνω σε Excel']),
   ai_topics: S(['Hizmetler ve çalışma saatleri', 'Services and opening hours', 'Leistungen und Öffnungszeiten', 'Υπηρεσίες και ωράριο'], ['Randevu ve fiyat bilgisi isteyenler', 'People asking about appointments and prices', 'Anfragen zu Terminen und Preisen', 'Ερωτήσεις για ραντεβού και τιμές'], ['Adres ve ulaşım', 'Address and directions', 'Adresse und Anfahrt', 'Διεύθυνση και πρόσβαση']),
+};
+
+/** First-page note: the form adapts to the choices made. */
+export const LENGTH_NOTE: L4 = l4([
+  'Formun uzunluğu seçimlerinize göre değişir; yalnızca seçtiğiniz hizmetlerle ilgili sorular gelir.',
+  'The length of the form depends on your choices; only questions about the services you select will appear.',
+  'Die Länge des Formulars richtet sich nach Ihrer Auswahl; es erscheinen nur Fragen zu den Leistungen, die Sie wählen.',
+  'Το μήκος της φόρμας εξαρτάται από τις επιλογές σας· εμφανίζονται μόνο ερωτήσεις για τις υπηρεσίες που επιλέγετε.',
+]);
+
+// ── Adaptive questions: hidden only on an explicit earlier answer (never contact / business / budget questions) ──
+const wantsAuto: Cond = { any: [{ q: 'wants', includes: 'automation' }, { q: 'wants', includes: 'all' }] };
+const wantsAutoCrm: Cond = { any: [{ q: 'wants', includes: 'automation' }, { q: 'wants', includes: 'all' }, { q: 'wants', includes: 'crm' }] };
+const alone: Cond = { q: 'employees', matches: '^(0|1|bir|one|ein|eine|einer|ich|just me|only me|solo|εγώ|μόνος|μόνη)\\b' };
+const noSite: Cond = { q: 'tech_site', in: ['no'] };
+export const SHOW_IF: Record<string, Cond> = {
+  website_satisfaction: { q: 'meta_website', filled: true },        // no current site given -> no satisfaction question
+  tech_hosting: { not: noSite },                                     // no site/domain -> no hosting / who-manages question
+  tech_access: { not: noSite },
+  tech_platform: { not: { q: 'tech_site', in: ['yes'] } },
+  quote_fields: { not: { q: 'quote_form', in: ['no'] } },            // no quote form -> no quote-field question
+  social_media: { not: { all: [{ q: 'contact_channels', filled: true }, { not: { q: 'contact_channels', includes: 'instagram' } }, { not: { q: 'contact_channels', includes: 'facebook' } }] } },
+  staff_scheduling: { not: alone },                                  // works alone -> no team scheduling
+  crm_roles: { not: { any: [alone, { q: 'crm_access', in: ['me'] }] } },
+  crm_login: { not: alone },
+  app_login: { not: alone },
+  booking_system: { not: { q: 'online_booking', in: ['no'] } },      // no online booking wanted
+  // no automation wanted -> automation detail pages stay out
+  form_flow: wantsAuto, auto_crm: wantsAuto, auto_email: wantsAuto, messenger_notify: wantsAuto, auto_quotes: wantsAuto, invoicing: wantsAuto, calendar: wantsAuto,
+  auto_follow_up: wantsAuto, customer_history: wantsAutoCrm,
 };

@@ -14,6 +14,20 @@ const SECTOR_RE: [string, RegExp][] = [
 const guessSector = (r: Req) => { const t = [r.business, r.message, r.roiCalc?.sectorLabel].join(' '); return SECTOR_RE.find(([, re]) => re.test(t))?.[0] ?? 'other'; };
 const guessMarket = (r: Req) => /deutschland|germany|almanya|kelsterbach|\b\d{5}\b/i.test(r.address ?? '') ? 'DE' : ({ de: 'DE', tr: 'TR', el: 'GR' } as Record<string, string>)[r.lang ?? ''] ?? 'other';
 
+const COUNTRY: [string, RegExp, string][] = [
+  ['de', /deutschland|germany|almanya|berlin|münchen|munich|hamburg|frankfurt|köln|kelsterbach|stuttgart|düsseldorf/i, 'Almanya'],
+  ['el', /greece|ελλάδα|ελλαδα|yunanistan|griechenland|athens|αθήνα|thessaloniki|θεσσαλονίκη|cyprus|κύπρος|kıbrıs|zypern|nicosia|λευκωσία|limassol|λεμεσός/i, 'Yunanistan/Kıbrıs'],
+  ['tr', /türkiye|turkiye|turkey|türkei|istanbul|ankara|izmir|antalya|bursa/i, 'Türkiye'],
+];
+/** Expected form language: explicit request/conversation lang first, else country/city; shows which signal decided. */
+export const expectedLang = (r: Req): { lang: string; why: string } => {
+  if (r.lang && LANG_NAME[r.lang]) return { lang: r.lang, why: `${LANG_NAME[r.lang]} yazdı (talep/konuşma dili)` };
+  const loc = [r.city, r.address].join(' ');
+  const hit = COUNTRY.find(([, re]) => re.test(loc)) ?? (/\b\d{5}\b/.test(r.address ?? '') ? ['de', /./, 'Almanya'] as [string, RegExp, string] : undefined);
+  if (hit) return { lang: hit[0], why: `${hit[2]}'dan (adres/şehir)` };
+  return { lang: 'en', why: 'dil ve ülke belli değil, varsayılan İngilizce' };
+};
+
 export const fullUrl = (b: IntakeBrief) => `${location.origin}${b.path}`;
 /** True while the admin runs on this computer / home network: such links cannot be opened by anyone outside (site not live yet). */
 export const isLocalOrigin = () => /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
@@ -55,8 +69,10 @@ export function IntakeLink({ b, defaultEmail }: { b: IntakeBrief; defaultEmail?:
 
 /** "Analiz formu oluştur" inside the request drawer. */
 export default function IntakeCreate({ req, onOpenList }: { req: Req; onOpenList: () => void }) {
+  const exp = expectedLang(req);
   const [open, setOpen] = useState(false);
-  const [lang, setLang] = useState(req.lang && LANG_NAME[req.lang] ? req.lang : 'tr');
+  const [lang, setLang] = useState(exp.lang);
+  const [ack, setAck] = useState(false);
   const [market, setMarket] = useState(guessMarket(req));
   const [second, setSecond] = useState('');
   const [sector, setSector] = useState(guessSector(req));
@@ -83,14 +99,17 @@ export default function IntakeCreate({ req, onOpenList }: { req: Req; onOpenList
     <div className="lq-card adm-card adm-stack" style={{ gap: 12 }}>
       <div className="adm-head" style={{ margin: 0 }}><h2>Analiz formu</h2><button className="lq-btn-ghost adm-btn sm" onClick={() => setOpen(false)}>Kapat</button></div>
       {!made ? <>
-        {sel('Form dili', lang, setLang, Object.entries(LANG_NAME))}
+        <div className="adm-banner" role="status" style={{ margin: 0, fontWeight: 600 }}>⚠ Bu kişi {exp.why} → formu {LANG_NAME[exp.lang].toUpperCase()} gönderin.</div>
+        {sel('Form dili', lang, (x) => { setLang(x); setAck(false); }, Object.entries(LANG_NAME))}
         {sel('Pazar (yasal metin)', market, setMarket, MARKETS)}
         {sel('İkinci dil (isteğe bağlı gösterim)', second, setSecond, [['', 'Yok'], ...Object.entries(LANG_NAME).filter(([k]) => k !== lang)])}
         {sel('Sektör tahmini (değiştirilebilir)', sector, setSector, SECTORS)}
         {err && <div className="adm-banner" role="alert" style={{ margin: 0 }}>{err}</div>}
-        <button className="lq-btn-ghost adm-btn" onClick={create} disabled={busy}>{busy ? 'Oluşturuluyor…' : 'Özel bağlantı oluştur'}</button>
+        {lang !== exp.lang && <div className="adm-banner" role="alert" style={{ margin: 0 }}>Beklenen dil {LANG_NAME[exp.lang]}, siz {LANG_NAME[lang]} seçtiniz.</div>}
+        <button className="lq-btn-ghost adm-btn" onClick={lang !== exp.lang && !ack ? () => setAck(true) : create} disabled={busy}>
+          {busy ? 'Oluşturuluyor…' : lang === exp.lang ? 'Özel bağlantı oluştur' : ack ? `Evet, ${LANG_NAME[lang]} bağlantı oluştur` : `Yine de ${LANG_NAME[lang]} gönder`}</button>
       </> : <>
-        <p className="adm-note" style={{ margin: 0 }}>Bağlantı oluşturuldu (30 gün geçerli). Müşteriye iletin:</p>
+        <p className="adm-note" style={{ margin: 0 }}><span className="adm-chip tag">Dil: {LANG_NAME[made.lang] ?? made.lang}</span> Bağlantı oluşturuldu (30 gün geçerli). Müşteriye iletin:</p>
         <IntakeLink b={made} defaultEmail={req.email} />
         <button className="lq-btn-ghost adm-btn sm" onClick={onOpenList}>Analiz formlarına git</button>
       </>}
