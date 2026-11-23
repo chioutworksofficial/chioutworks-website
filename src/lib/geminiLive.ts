@@ -25,6 +25,7 @@ export async function createAudio(): Promise<AudioContext> {
 /** Subset of the Gemini Live server message this client reads. */
 type LiveServerMessage = {
   setupComplete?: unknown;
+  voiceActivity?: { type?: string };
   serverContent?: {
     interrupted?: boolean;
     modelTurn?: { parts?: { inlineData?: { data?: string } }[] };
@@ -100,6 +101,10 @@ export class LiveCall {
   private audioAfterHeard = false;
   private sources = new Set<AudioBufferSourceNode>();
   private guardTimer: ReturnType<typeof setInterval> | null = null;
+  // Reply watchdog + anonymous call diagnostics (2026-11-23: the assistant sometimes never answered on real devices)
+  private diag = { sent: 0, loud: 0, actStart: 0, actEnd: 0, inTx: 0, turns: 0, nudges: 0 };
+  private lastLoudAt = 0; private spoke = false; private nudge = 0; private nudgeAt = 0;
+  private watch: ReturnType<typeof setInterval> | null = null;
   constructor(private ctx: AudioContext, private stream: MediaStream, private h: LiveHandlers) {}
 
   /** Resolves when setupComplete arrives; rejects on error/close/timeout before that. */
@@ -120,6 +125,8 @@ export class LiveCall {
         let m: LiveServerMessage;
         try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : await (ev.data as Blob).text()); } catch { return; }
         if (m.setupComplete && !this.ready) { this.ready = true; clearTimeout(timer); setTimeout(() => { if (this.greeting) this.openGuard('12 s timer'); }, 12000); this.guardTimer = setInterval(() => this.guardCheck(), 250); this.startMic(); resolve(); return; }
+        if (m.voiceActivity?.type === 'ACTIVITY_START') this.diag.actStart++;
+        else if (m.voiceActivity?.type === 'ACTIVITY_END') this.diag.actEnd++;
         const sc = m.serverContent;
         if (sc) {
           if (sc.interrupted) {
@@ -128,8 +135,8 @@ export class LiveCall {
             if (this.greeting) this.gotAudio = false;
             else if (!this.ending) { this.stopPlayback(); this.h.onInterrupted(); }
           }
-          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) { this.gotAudio = true; this.greetHeard = true; this.generating = true; this.lastAudio = performance.now(); if (this.ending) this.audioAfterEnd = true; if (this.ending || this.grace) this.turnDone = false; if (this.grace && this.graceHeardAt) this.audioAfterHeard = true; if (!this.muteTurn) this.play(p.inlineData.data); }
-          if (sc.inputTranscription?.text) { if (this.grace) this.heardInGrace(); this.h.onInput(sc.inputTranscription.text); }
+          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) { if (!this.generating) this.diag.turns++; this.spoke = false; this.nudge = 0; this.gotAudio = true; this.greetHeard = true; this.generating = true; this.lastAudio = performance.now(); if (this.ending) this.audioAfterEnd = true; if (this.ending || this.grace) this.turnDone = false; if (this.grace && this.graceHeardAt) this.audioAfterHeard = true; if (!this.muteTurn) this.play(p.inlineData.data); }
+          if (sc.inputTranscription?.text) { this.diag.inTx++; if (this.grace) this.heardInGrace(); this.h.onInput(sc.inputTranscription.text); }
           if (sc.outputTranscription?.text) {
             this.turnText += sc.outputTranscription.text;
             // the model sometimes voices placeholders such as "<no speech>{pause}": silence that turn at once
@@ -166,6 +173,29 @@ export class LiveCall {
     this.held = [];
   }
 
+  /** If the visitor spoke and then went quiet but no reply starts, close the audio turn; then nudge once with text. */
+  /** Not started: in the repro it delayed the server end-of-speech. Kept for a later, tested retry. */
+  replyWatch() {
+    if (this.greeting || this.ending || this.grace || !this.spoke || this.generating || this.speaking()) return;
+    const now = performance.now();
+    if (this.nudge === 0 && now - this.lastLoudAt > 1800) {
+      this.nudge = 1; this.nudgeAt = now; this.diag.nudges++;
+      if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
+      dbg('reply watchdog: audioStreamEnd');
+    } else if (this.nudge === 1 && now - this.nudgeAt > 3500) {
+      this.nudge = 2; this.diag.nudges++;
+      this.sendText('(The visitor has finished speaking. Reply now to what they said; if you did not understand it, kindly ask them to repeat.)');
+      dbg('reply watchdog: text nudge');
+    }
+  }
+
+  /** Anonymous counters only (no audio, no text, no device names). */
+  private report() {
+    const d = this.diag;
+    const msg = `frames ${d.sent} loud ${d.loud} act ${d.actStart}/${d.actEnd} tx ${d.inTx} turns ${d.turns} nudges ${d.nudges} ctx ${this.ctx.state} ${Math.round((performance.now() - this.t0) / 1000)}s`;
+    try { void fetch('/api/client-error', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ kind: 'voice-diag', message: msg, path: location.pathname.slice(0, 200) }) }); } catch { /* ignore */ }
+  }
+
   private startMic() {
     const node = new AudioWorkletNode(this.ctx, 'live-capture');
     node.port.onmessage = (e: MessageEvent<{ pcm: ArrayBuffer; rms: number }>) => {
@@ -184,6 +214,8 @@ export class LiveCall {
         else if (now > this.passUntil) pcm = new Uint8Array(pcm.length);
       }
       this.ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(pcm), mimeType: 'audio/pcm;rate=16000' } } }));
+      this.diag.sent++;
+      if (e.data.rms > BARGE_RMS && !this.speaking()) { this.diag.loud++; this.lastLoudAt = performance.now(); this.spoke = true; }
     };
     this.src = this.ctx.createMediaStreamSource(this.stream);
     this.sink = this.ctx.createGain(); this.sink.gain.value = 0;   // keeps the worklet pulling without echoing the mic
@@ -281,7 +313,9 @@ export class LiveCall {
 
   /** Ends the call and releases mic nodes; the caller owns (and stops) the MediaStream and the AudioContext. */
   close() {
+    if (!this.closing && this.ready) this.report();
     this.closing = true;
+    if (this.watch) clearInterval(this.watch); this.watch = null;
     if (this.guardTimer) clearInterval(this.guardTimer); this.guardTimer = null;
     this.stopPlayback();
     try { this.node?.disconnect(); this.src?.disconnect(); this.sink?.disconnect(); } catch { /* ignore */ }
