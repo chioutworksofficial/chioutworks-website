@@ -47,6 +47,15 @@ const writeTrans = async (all: Record<string, Record<string, string>>) => {
   fs.renameSync(tmp, TRANS);
 };
 
+/** English source texts of a definition that the helper translation covers (static question texts only, never answers). */
+export const translatableTexts = (def: ReturnType<typeof buildDefinition>) => {
+  const src = new Set<string>();
+  const add = (x?: L4) => { if (x?.en) src.add(x.en); };
+  for (const s of def.sections) { add(s.title); add(s.intro); add(s.forWho); add(s.outcome); s.flow?.forEach(add); for (const q of s.qs) { add(q.t); add(q.help); add(q.costNote); q.suggestions?.forEach(add); q.opts?.forEach((o) => add(o.t)); } }
+  add(def.consent); add(def.unsureLabel); add(def.lengthNote);
+  return src;
+};
+
 const read = (): Intake[] => { try { return JSON.parse(fs.readFileSync(STORE, 'utf8')); } catch { return []; } };
 /** For the style picker: the intake behind a client link (only once it was submitted). */
 const col = async (filter: string) => (await dbSelect<{ data: Intake }>('intakes', `select=data&${filter}&limit=1`))[0]?.data ?? null;
@@ -331,10 +340,7 @@ export function registerIntake(app: Express, d: Deps) {
     const to = String(req.query.to ?? '');
     if (!/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(to) || LANGS.includes(to as L)) return res.status(400).json({ error: 'bad_lang' });
     const def = defOf(i);
-    const src = new Set<string>();
-    const add = (x?: L4) => { if (x?.en) src.add(x.en); };
-    for (const s of def.sections) { add(s.title); add(s.intro); s.flow?.forEach(add); for (const q of s.qs) { add(q.t); add(q.help); add(q.costNote); q.opts?.forEach((o) => add(o.t)); } }
-    add(def.consent);
+    const src = translatableTexts(def);
     const cache = await readTrans(); const have = (cache[to] ??= {});
     const missing = [...src].filter((x) => !have[x]);
     if (missing.length) {

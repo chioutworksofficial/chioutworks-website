@@ -6,7 +6,6 @@ import IntakeProgress from '../IntakeProgress';
 import { LANGS, intakePath, isLang, pagePath } from '../../lib/routes';
 import type { Lang } from '../../translations';
 import ModeToggle from '../ModeToggle';
-import { StyleCta } from './StylePage';
 import type { Definition, L4, QDef } from '../../data/intakeSectors';
 import { visibleSections } from '../../lib/intakeLogic';
 import { guardFields, prefetchFormToken } from '../../lib/formGuard';
@@ -244,7 +243,6 @@ export default function IntakePage() {
       <p style={{ margin: '0 auto', maxWidth: 520, lineHeight: 1.6, fontSize: 17 }}>{u.doneBody}</p>
       <p style={{ margin: '18px auto 0', maxWidth: 520, lineHeight: 1.6, fontSize: 15, color: 'var(--c-ash)' }}>{u.editNote}</p>
       <button type="button" className="lq-btn-ghost" style={{ marginTop: 22 }} onClick={() => setDone(false)}>{u.editAgain}</button>
-        {(!['website', 'booking', 'qr', 'automation', 'crm', 'invoices', 'app', 'ai', 'all'].some((k) => answers[`wants__${k}`] === true) || ['website', 'qr', 'app', 'all'].some((k) => answers[`wants__${k}`] === true)) && <StyleCta lang={lang} body={{ kind: 'intake', token }} />}
     </div>
     {/* the "your website will look like this" demo preview was removed (owner, 2026-11-19); IntakePreview stays for the admin view */}
   </>);
@@ -308,8 +306,8 @@ export default function IntakePage() {
               <textarea id={`q-${q.id}`} style={{ ...inputStyle, minHeight: 84, resize: 'vertical' }} rows={3} placeholder={u.textPh} value={typeof v === 'string' ? v : ''} onChange={(e) => set(q.id, e.target.value)} />
               {(!!q.suggestions?.length || q.unsure) && (
                 <div className="cw-sugs"><span>{u.suggest}</span>
-                  {q.suggestions?.map((x, i) => { const t = x[lang] || x.en; return <button key={i} type="button" className="cw-sug lq-square" onClick={() => addText(q.id, t)}>{t}</button>; })}
-                  {q.unsure && <button type="button" aria-pressed={unsureOn} className="cw-sug lq-square" onClick={() => set(q.id, unsureOn ? '' : unsureTxt)}>{unsureTxt}</button>}
+                  {q.suggestions?.map((x, i) => { const t = x[lang] || x.en; return <button key={i} type="button" className="cw-sug lq-square" onClick={() => addText(q.id, t)}>{t}{Sub({ x, qid: q.id })}</button>; })}
+                  {q.unsure && <button type="button" aria-pressed={unsureOn} className="cw-sug lq-square" onClick={() => set(q.id, unsureOn ? '' : unsureTxt)}>{unsureTxt}{def.unsureLabel ? Sub({ x: def.unsureLabel, qid: q.id }) : null}</button>}
                 </div>)}
             </>)}
 
