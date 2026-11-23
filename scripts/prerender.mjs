@@ -73,8 +73,8 @@ async function main() {
     for (let path; (path = queue.shift()); ) {
       try {
         await page.goto(origin + path, { waitUntil: 'domcontentloaded', timeout: 15000 });
-        await page.waitForFunction(() => (document.querySelector('h1') || document.querySelector('h2')) && document.querySelector('script#ld-page'), { timeout: 15000 });
-        await new Promise((r) => setTimeout(r, 300));
+        await page.waitForFunction(() => (document.querySelector('h1') || document.querySelector('h2')) && document.querySelector('script#ld-page'), { timeout: 15000, polling: 50 });
+        await new Promise((r) => setTimeout(r, 120));
         const html = await page.evaluate((site, locale, path2) => {
           const set = (sel, attr, v) => document.head.querySelector(sel)?.setAttribute(attr, v);
           const title = document.title;

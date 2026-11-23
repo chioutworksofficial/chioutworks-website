@@ -5,6 +5,7 @@ import Preloader from './site/Preloader';
 import SiteHero, { openAssistant } from './site/SiteHero';
 import { ChatLauncher } from './site/VoiceOrb';
 const VoiceIntake = lazy(() => import('./site/VoiceIntake'));
+const loadAssistantChunks = () => Promise.all([import('./components/AIAssistant'), import('./site/VoiceIntake')]);
 import { SITE_UI } from './site/i18n';
 import StatementReveal from './site/StatementReveal';
 // FaqSection / ProjectsCarousel removed from home (owner request); FAQ lives on its own page
@@ -73,6 +74,52 @@ function Defer({ id, minH, children }: { id?: string; minH: string; children: Re
   // used a pinned sibling as reference and crashed the page with NotFoundError on phones. Inside its own div React only
   // ever appends here, so pinned neighbours are never touched.
   return <div data-defer="">{on ? <Suspense fallback={fb}>{children}<Mounted /></Suspense> : fb}</div>;
+}
+
+/**
+ * Assistant + voice dialog are not needed for the first paint: mount them once the intro is done and the browser is idle,
+ * on the first interaction, or when something asks to open them (that early event is replayed once they are mounted). Both devices; no visible change.
+ */
+function LateAssistants({ lang }: { lang: Lang }) {
+  const [armed, setArmed] = useState(false);
+  const pending = useRef<CustomEvent | null>(null);
+  useEffect(() => {
+    if (armed) return;
+    const w = window as unknown as { requestIdleCallback?: (f: () => void, o: { timeout: number }) => void };
+    const arm = () => { off(); setArmed(true); };
+    const idle = () => (w.requestIdleCallback ? w.requestIdleCallback(arm, { timeout: 2500 }) : void window.setTimeout(arm, 1500));
+    const early = (e: Event) => { pending.current = new CustomEvent(e.type, { detail: (e as CustomEvent).detail }); e.stopImmediatePropagation(); arm(); };
+    const input = ['pointerdown', 'keydown', 'touchstart', 'scroll'] as const;
+    const done = (window as unknown as { __cwPreDone?: boolean }).__cwPreDone;
+    const t = window.setTimeout(arm, 6000);
+    if (done) idle(); else window.addEventListener('cw:preloader-done', idle, { once: true });
+    input.forEach((n) => window.addEventListener(n, arm, { passive: true, once: true }));
+    window.addEventListener('cw:open-assistant', early, true);
+    window.addEventListener('cw:open-voice', early, true);
+    function off() {
+      window.clearTimeout(t);
+      window.removeEventListener('cw:preloader-done', idle);
+      input.forEach((n) => window.removeEventListener(n, arm));
+      window.removeEventListener('cw:open-assistant', early, true);
+      window.removeEventListener('cw:open-voice', early, true);
+    }
+    return off;
+  }, [armed]);
+  useEffect(() => {
+    if (!armed || !pending.current) return;
+    const ev = pending.current;
+    pending.current = null;
+    void loadAssistantChunks().then(() => window.setTimeout(() => window.dispatchEvent(ev), 150));
+  }, [armed]);
+  // Stable wrapper: React never inserts/removes next to a GSAP-pinned node (see Defer)
+  return (
+    <div data-late="">
+      {armed && <Suspense fallback={null}>
+        <AIAssistant lang={lang} hideLauncher />
+        <VoiceIntake lang={lang} />
+      </Suspense>}
+    </div>
+  );
 }
 
 type SitePage = Exclude<PageKey, 'privacy' | 'terms' | 'docs' | 'solutions'>;
@@ -149,10 +196,7 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
       <main id="main" tabIndex={-1} key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter"><Suspense fallback={<div style={{ minHeight: '60vh' }} aria-busy="true" />}>{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} post={post} /> : PAGES[page](lang)}</Suspense></main>
       <Defer id="start" minH="calc(660px + clamp(240px, 30vw, 460px))"><SiteFinale key={mode} lang={lang} /></Defer>
       <SectionDots lang={lang} page={page} />
-      <Suspense fallback={null}>
-        <AIAssistant lang={lang} hideLauncher />
-        <VoiceIntake lang={lang} />
-      </Suspense>
+      <LateAssistants lang={lang} />
       <ChatLauncher label={SITE_UI[lang].openChat} onOpen={() => openAssistant(false)} />
     </div>
   );
