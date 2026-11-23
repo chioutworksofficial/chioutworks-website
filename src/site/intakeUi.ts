@@ -10,7 +10,7 @@ export interface IntakeUi {
   reviewTitle: string; reviewSub: string; empty: string; consentTitle: string; submit: string; submitting: string;
   needFields: string; needConsent: string; badEmail: string; submitErr: string;
   doneTitle: string; doneBody: string; editAgain: string; editNote: string; invalidTitle: string; invalidBody: string; revokedBody: string; loading: string;
-  skip: string; skipped: string; suggest: string; urlPh: string; badUrl: string; stepAria: string;
+  skip: string; skipped: string; suggest: string; urlPh: string; badUrl: string; stepAria: string; quick: string; styleNote: string;
   privacy: string; privacyLink: string; brand: string; tabTitle: string;
 }
 
@@ -29,7 +29,7 @@ export const INTAKE_UI: Record<Lang, IntakeUi> = {
     needFields: 'Lütfen zorunlu alanları doldurun.', needConsent: 'Göndermek için onay kutusunu işaretleyin.', badEmail: 'Geçerli bir e-posta adresi yazın.', submitErr: 'Gönderilemedi, tekrar deneyin.',
     doneTitle: 'Teşekkürler!', doneBody: 'Analiziniz alındı; inceleyip teklif ve fiyatlandırmayı size yazılı olarak ileteceğim.', editAgain: 'Cevaplarımı düzenle', editNote: 'Bir şeyi değiştirmek isterseniz aynı bağlantıdan cevaplarınızı düzenleyebilirsiniz; değişiklikler otomatik kaydedilir ve bana iletilir.',
     invalidTitle: 'Bu bağlantı geçerli değil', invalidBody: 'Bağlantının süresi dolmuş veya iptal edilmiş olabilir. Lütfen bana yazın, yeni bir bağlantı göndereyim.', revokedBody: 'Bu form bağlantısı artık geçerli değil. Yeni bir bağlantı gerekiyorsa lütfen iletişim formundan yazın.', loading: 'Yükleniyor…',
-    skip: 'Bu sayfayı geç', skipped: 'Atlandı', suggest: 'Öneri:', urlPh: 'https://', badUrl: 'Geçerli bir adres yazın (https://…).', stepAria: 'İlerleme',
+    skip: 'Bu sayfayı geç', skipped: 'Atlandı', suggest: 'Öneri:', urlPh: 'https://', badUrl: 'Geçerli bir adres yazın (https://…).', stepAria: 'İlerleme', quick: 'Hızlı sayfa · ~30 sn', styleNote: 'Bu önizleme yalnızca kabaca bir fikir verir; siteniz tam olarak böyle görünmeyecek. Bu adım daha çok klasik tarz siteler için kullanışlıdır, isterseniz geçebilirsiniz; hemen sonraki adımda beğendiğiniz siteleri ekleyebilirsiniz. Kesin tasarımı proje sayfanızda birlikte konuşuruz ve seçilen örneğe benzer şekilde hazırlanır.',
     privacy: 'Cevaplarınız yalnızca teklifinizi hazırlamak için kullanılır ve silinmesini isteyene kadar saklanır.', privacyLink: 'Gizlilik politikası', brand: 'İhtiyaç analizi', tabTitle: 'İhtiyaç analizi · Chioutworks',
   },
   en: {
@@ -46,7 +46,7 @@ export const INTAKE_UI: Record<Lang, IntakeUi> = {
     needFields: 'Please fill in the required fields.', needConsent: 'Tick the consent box to submit.', badEmail: 'Enter a valid e-mail address.', submitErr: 'Could not submit, please try again.',
     doneTitle: 'Thank you!', doneBody: 'Your analysis has been received. I will review it and send you the offer and pricing in writing.', editAgain: 'Edit my answers', editNote: 'If you want to change something, you can edit your answers from this same link; changes are saved automatically and reach me.',
     invalidTitle: 'This link is not valid', invalidBody: 'The link may have expired or been cancelled. Please write to me and I will send you a new one.', revokedBody: 'This form link is no longer valid. If you need a new link, please write via the contact form.', loading: 'Loading…',
-    skip: 'Skip this page', skipped: 'Skipped', suggest: 'Ideas:', urlPh: 'https://', badUrl: 'Enter a valid address (https://…).', stepAria: 'Progress',
+    skip: 'Skip this page', skipped: 'Skipped', suggest: 'Ideas:', urlPh: 'https://', badUrl: 'Enter a valid address (https://…).', stepAria: 'Progress', quick: 'Quick page · ~30 sec', styleNote: 'This preview only gives a rough idea; your site will not look exactly like this. This step is mostly useful for classic-style sites, so you can skip it if you like; in the very next step you can add sites you like. The final design is discussed together on your project page and prepared in a way similar to the example you choose.',
     privacy: 'Your answers are used only to prepare your offer and are kept until you ask me to delete them.', privacyLink: 'Privacy policy', brand: 'Project brief', tabTitle: 'Project brief · Chioutworks',
   },
   de: {
@@ -63,7 +63,7 @@ export const INTAKE_UI: Record<Lang, IntakeUi> = {
     needFields: 'Bitte füllen Sie die Pflichtfelder aus.', needConsent: 'Zum Absenden bitte die Einwilligung ankreuzen.', badEmail: 'Bitte eine gültige E-Mail-Adresse eingeben.', submitErr: 'Senden fehlgeschlagen, bitte erneut versuchen.',
     doneTitle: 'Vielen Dank!', doneBody: 'Ihre Analyse ist eingegangen. Ich prüfe sie und sende Ihnen Angebot und Preise schriftlich zu.', editAgain: 'Antworten bearbeiten', editNote: 'Wenn Sie etwas ändern möchten, können Sie Ihre Antworten über denselben Link bearbeiten; Änderungen werden automatisch gespeichert und erreichen mich.',
     invalidTitle: 'Dieser Link ist ungültig', invalidBody: 'Der Link ist möglicherweise abgelaufen oder wurde zurückgezogen. Schreiben Sie mir bitte, dann sende ich Ihnen einen neuen.', revokedBody: 'Dieser Formularlink ist nicht mehr gültig. Wenn Sie einen neuen Link benötigen, schreiben Sie bitte über das Kontaktformular.', loading: 'Lädt…',
-    skip: 'Diese Seite überspringen', skipped: 'Übersprungen', suggest: 'Vorschläge:', urlPh: 'https://', badUrl: 'Bitte eine gültige Adresse eingeben (https://…).', stepAria: 'Fortschritt',
+    skip: 'Diese Seite überspringen', skipped: 'Übersprungen', suggest: 'Vorschläge:', urlPh: 'https://', badUrl: 'Bitte eine gültige Adresse eingeben (https://…).', stepAria: 'Fortschritt', quick: 'Schnelle Seite · ca. 30 Sek.', styleNote: 'Diese Vorschau gibt nur eine grobe Vorstellung; Ihre Website wird nicht genau so aussehen. Dieser Schritt ist vor allem für klassische Websites nützlich, Sie können ihn gern überspringen; im nächsten Schritt können Sie Websites angeben, die Ihnen gefallen. Das endgültige Design besprechen wir gemeinsam auf Ihrer Projektseite, es wird ähnlich dem gewählten Beispiel vorbereitet.',
     privacy: 'Ihre Angaben werden nur zur Vorbereitung Ihres Angebots verwendet und bis zu Ihrem Löschwunsch gespeichert.', privacyLink: 'Datenschutzerklärung', brand: 'Bedarfsanalyse', tabTitle: 'Bedarfsanalyse · Chioutworks',
   },
   el: {
@@ -80,7 +80,7 @@ export const INTAKE_UI: Record<Lang, IntakeUi> = {
     needFields: 'Συμπληρώστε τα υποχρεωτικά πεδία.', needConsent: 'Για την αποστολή τσεκάρετε το πλαίσιο συγκατάθεσης.', badEmail: 'Γράψτε μια έγκυρη διεύθυνση e-mail.', submitErr: 'Η αποστολή απέτυχε, δοκιμάστε ξανά.',
     doneTitle: 'Ευχαριστώ!', doneBody: 'Η ανάλυσή σας ελήφθη. Θα την εξετάσω και θα σας στείλω γραπτώς την προσφορά και την τιμολόγηση.', editAgain: 'Επεξεργασία απαντήσεων', editNote: 'Αν θέλετε να αλλάξετε κάτι, μπορείτε να επεξεργαστείτε τις απαντήσεις σας από τον ίδιο σύνδεσμο· οι αλλαγές αποθηκεύονται αυτόματα και μου αποστέλλονται.',
     invalidTitle: 'Ο σύνδεσμος δεν είναι έγκυρος', invalidBody: 'Ο σύνδεσμος μπορεί να έχει λήξει ή να έχει ακυρωθεί. Γράψτε μου και θα σας στείλω νέο.', revokedBody: 'Αυτός ο σύνδεσμος της φόρμας δεν ισχύει πλέον. Αν χρειάζεστε νέο σύνδεσμο, γράψτε μας μέσω της φόρμας επικοινωνίας.', loading: 'Φόρτωση…',
-    skip: 'Παράλειψη σελίδας', skipped: 'Παραλείφθηκε', suggest: 'Προτάσεις:', urlPh: 'https://', badUrl: 'Γράψτε μια έγκυρη διεύθυνση (https://…).', stepAria: 'Πρόοδος',
+    skip: 'Παράλειψη σελίδας', skipped: 'Παραλείφθηκε', suggest: 'Προτάσεις:', urlPh: 'https://', badUrl: 'Γράψτε μια έγκυρη διεύθυνση (https://…).', stepAria: 'Πρόοδος', quick: 'Γρήγορη σελίδα · ~30 δλ.', styleNote: 'Αυτή η προεπισκόπηση δίνει μόνο μια πρόχειρη ιδέα· ο ιστότοπός σας δεν θα φαίνεται ακριβώς έτσι. Αυτό το βήμα είναι πιο χρήσιμο για ιστότοπους κλασικού στυλ και μπορείτε να το παραλείψετε· στο αμέσως επόμενο βήμα μπορείτε να προσθέσετε ιστότοπους που σας αρέσουν. Το τελικό σχέδιο συζητιέται μαζί στη σελίδα του έργου σας και ετοιμάζεται παρόμοιο με το παράδειγμα που θα επιλέξετε.',
     privacy: 'Οι απαντήσεις σας χρησιμοποιούνται μόνο για την προετοιμασία της προσφοράς και διατηρούνται μέχρι να ζητήσετε διαγραφή.', privacyLink: 'Πολιτική απορρήτου', brand: 'Ανάλυση αναγκών', tabTitle: 'Ανάλυση αναγκών · Chioutworks',
   },
 };

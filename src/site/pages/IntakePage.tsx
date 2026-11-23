@@ -391,6 +391,7 @@ export default function IntakePage() {
       {!isReview && cur && (
         <>
           <h2 className="cw-title">{cur.title[lang] || cur.title.en}{Sub({ x: cur.title })}</h2>
+          {cur.quick && <p style={{ margin: '-6px 0 14px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--c-lilac)' }}>{u.quick}</p>}
           {(cur.forWho || cur.outcome) && (
             <div className="cw-soft">
               {cur.forWho && <p><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg><span>{cur.forWho[lang] || cur.forWho.en}{Sub({ x: cur.forWho })}</span></p>}
@@ -407,6 +408,7 @@ export default function IntakePage() {
                   {i < cur.flow!.length - 1 && <span aria-hidden="true" style={{ color: 'var(--c-lilac)', fontSize: 18 }}>→</span>}
                 </li>))}
             </ol>)}
+          {cur.kind === 'style' && <p className="cw-soft" style={{ margin: '0 0 16px', fontSize: 14, lineHeight: 1.6, color: 'var(--c-quartz)' }}>{u.styleNote}</p>}
           {cur.kind === 'style' && <StyleInline lang={lang} v={svLocal ?? parseStyle(answers.style_choice)} set={(nv) => { setSvLocal(nv); set('style_choice', nv.likes.length || nv.pal || nv.pair ? JSON.stringify(styleBody(nv)) : ''); }} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: cur.kind === 'style' && cur.qs.length ? 14 : 0 }}>
             {cur.qs.map((q) => <div key={q.id} className="cw-q-in">{Question({ q })}</div>)}
@@ -450,9 +452,9 @@ export default function IntakePage() {
       <div className="cw-actions">
         {step > 0 && <button type="button" className="lq-btn-ghost" onClick={() => go(step - 1)}>{u.back}</button>}
         <span className="cw-spacer" />
-        {!isReview && cur?.skippable && <button type="button" className="lq-btn-ghost" onClick={() => { setSkipped((x) => ({ ...x, [cur.id]: true })); void go(step + 1); }}>{u.skip}</button>}
+        {!isReview && cur?.skippable && <button type="button" className={cur.kind === 'style' ? 'cw-primary' : 'lq-btn-ghost'} onClick={() => { setSkipped((x) => ({ ...x, [cur.id]: true })); void go(step + 1); }}>{u.skip}</button>}
         {!isReview
-          ? <button type="button" className="cw-primary" onClick={() => go(step + 1)}>{step === total - 1 ? u.toReview : u.next}</button>
+          ? <button type="button" className={!isReview && cur?.kind === 'style' && cur.skippable ? 'lq-btn-ghost' : 'cw-primary'} onClick={() => go(step + 1)}>{step === total - 1 ? u.toReview : u.next}</button>
           : <button type="button" className="cw-primary" onClick={submit} disabled={busy}>{busy ? u.submitting : u.submit}</button>}
       </div>
       </div>

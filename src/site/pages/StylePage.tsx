@@ -55,7 +55,7 @@ export function SitePreview({ look, lang }: { look: Look; lang: Lang }) {
     <div aria-hidden="true" style={{ background: c.bg, color: c.text, padding: '18px 26px 0', fontFamily: body }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, borderBottom: `1px solid ${c.surface}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}><span style={{ width: 22, height: 22, borderRadius: r / 2 + 3, background: c.accent }} /><b style={{ fontFamily: head, fontSize: 16 }}>{t.biz}</b></div>
-        <div style={{ display: 'flex', gap: 18, fontSize: 13, color: c.muted }}>{t.nav.map((n) => <span key={n}>{n}</span>)}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 13, color: c.muted }}>{t.nav.map((n) => <span key={n}>{n}</span>)}<span style={{ padding: '5px 12px', borderRadius: r, border: `1px solid ${c.accent}`, color: c.accent, fontWeight: 600 }}>{t.cta}</span></div>
       </div>
       <div style={{ padding: '22px 0' }}>{hero}</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
@@ -66,7 +66,7 @@ export function SitePreview({ look, lang }: { look: Look; lang: Lang }) {
             <div style={{ fontSize: 12.5, color: c.muted, marginTop: 5, lineHeight: 1.45 }}>{t.cardText}</div>
           </div>))}
       </div>
-      <div style={{ marginTop: 22, padding: '14px 0', borderTop: `1px solid ${c.surface}`, fontSize: 12, color: c.muted, display: 'flex', justifyContent: 'space-between' }}><span>{t.foot}</span><span>{t.nav[2]}</span></div>
+      <div style={{ marginTop: 22, padding: '14px 0', borderTop: `1px solid ${c.surface}`, fontSize: 12, color: c.muted, display: 'flex', justifyContent: 'space-between' }}><span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><span style={{ width: 14, height: 14, borderRadius: 4, background: c.accent }} />{t.foot}</span><span style={{ display: 'flex', gap: 14 }}>{t.nav.map((n) => <span key={n}>{n}</span>)}</span></div>
     </div>
   );
 }

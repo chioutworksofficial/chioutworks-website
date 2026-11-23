@@ -469,6 +469,6 @@ export const CONSENT_AI: L4 = l4([
 // Optional additions (UI step): opts[].exclusive (choosing it clears the others), suggestions (clickable example answers for
 // free text), unsure (offer the shared "not sure" choice, label in Definition.unsureLabel), forWho/outcome/skippable per page.
 export interface QDef { id: string; no?: number; type: 'text' | 'single' | 'multi' | 'yn'; t: L4; opts?: { id: string; t: L4; exclusive?: boolean }[]; other?: boolean; detail?: boolean; required?: boolean; help?: L4; costNote?: L4; mustRead?: boolean; suggestions?: L4[]; unsure?: boolean; format?: 'url'; showIf?: Cond }
-export interface SecDef { id: string; title: L4; qs: QDef[]; intro?: L4; flow?: L4[]; forWho?: L4; outcome?: L4; skippable?: boolean; kind?: 'style'; showIf?: Cond }
+export interface SecDef { id: string; title: L4; qs: QDef[]; intro?: L4; flow?: L4[]; forWho?: L4; outcome?: L4; skippable?: boolean; kind?: 'style'; showIf?: Cond; quick?: boolean }
 export interface Definition { sections: SecDef[]; consent: L4; lengthNote?: L4; market: Market; sector: SectorKey; wants: string[]; unsureLabel?: L4 }
 export const UNSURE_LABEL: L4 = l4(['Emin değilim', 'Not sure', 'Weiß ich noch nicht', 'Δεν είμαι σίγουρος/η']);

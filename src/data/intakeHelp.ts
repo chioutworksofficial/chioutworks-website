@@ -8,7 +8,21 @@ export const DREAM_IDS = ['success_definition', 'repetitive_tasks', 'growth_12m'
 export const DREAM_TITLE: L4 = l4(['Hayaliniz', 'Your vision', 'Ihre Vision', 'Το όραμά σας']);
 
 /** Page order after "start" and "dream": the technical and budget pages come last. */
-export const SECTION_ORDER = ['start', 'dream', 'company', 'current', 'website', 'process', 'crm', 'app', 'automation', 'autodetail', 'design', 'marketing', 'tech', 'booking', 'qr', 'invoices', 'ai', 'style', 'examples', 'project', 'additional', 'final'];
+export const SECTION_ORDER = ['start', 'contact', 'dream', 'company', 'process', 'website', 'crm', 'style', 'examples', 'channels', 'design', 'marketing', 'app', 'automation', 'autodetail', 'tech', 'booking', 'qr', 'invoices', 'ai', 'project', 'wrapup', 'additional', 'final'];
+/** Flows without a website page: the style and example pages follow the product pages instead. */
+export const ORDER_NO_WEBSITE = SECTION_ORDER.filter((x) => x !== 'style' && x !== 'examples').flatMap((x) => (x === 'ai' ? [x, 'style', 'examples'] : [x]));
+/** Rhythm: easy pages (few choices, no long text) alternate with normal ones; these get a "quick page" label. */
+export const QUICK_IDS = new Set(['start', 'contact', 'style', 'examples', 'wrapup', 'additional', 'final']);
+/** New small pages cut out of heavy ones (questions are only moved, in this order). */
+export const SPLIT_PAGES: { id: string; title: L4; ids: string[] }[] = [
+  { id: 'contact', title: l4(['İletişim bilgileriniz', 'Your contact details', 'Ihre Kontaktdaten', 'Τα στοιχεία επικοινωνίας σας']), ids: ['meta_company', 'meta_contact', 'meta_email', 'meta_phone'] },
+  { id: 'channels', title: l4(['Müşterileriniz sizi nasıl buluyor', 'How customers reach you', 'Wie Kunden Sie erreichen', 'Πώς σας βρίσκουν οι πελάτες']), ids: ['contact_channels', 'main_channel', 'google_business', 'social_media', 'crm_current', 'customer_data_storage'] },
+  { id: 'wrapup', title: l4(['Son küçük seçimler', 'A few last choices', 'Noch ein paar letzte Angaben', 'Λίγες τελευταίες επιλογές']), ids: ['legal_texts', 'preferred_contact', 'best_time'] },
+];
+/** Questions that sit better on another existing page: id → [page, after question]. */
+export const MOVE_AFTER: Record<string, [string, string]> = {
+  meta_website: ['company', 'employees'], staff_scheduling: ['company', 'employees'], booking_system: ['website', 'online_booking'],
+};
 
 /** Short encouraging text at the top of a page. */
 export const SECTION_INTRO: Record<string, L4> = {
@@ -310,7 +324,6 @@ export const COST_IDS = new Set(['staff_scheduling', 'customer_accounts', 'onlin
 // ── Fewer pages: related pages are merged (no question dropped). from → into ──
 export const MERGE_INTO: Record<string, { into: string; title: L4; front?: boolean }> = {
   current: { into: 'company', title: l4(['İşletmeniz ve bugünkü durum', 'Your business today', 'Ihr Unternehmen heute', 'Η επιχείρησή σας σήμερα']) },
-  marketing: { into: 'design', title: l4(['Tasarım ve bulunabilirlik', 'Design and visibility', 'Gestaltung und Auffindbarkeit', 'Σχεδιασμός και ορατότητα']) },
   autodetail: { into: 'automation', title: l4(['Otomasyon', 'Automation', 'Automatisierung', 'Αυτοματοποίηση']) },
   tech: { into: 'project', front: true, title: l4(['Teknik altyapı, bütçe ve takvim', 'Technology, budget & timeline', 'Technik, Budget & Zeitplan', 'Τεχνολογία, προϋπολογισμός & χρονοδιάγραμμα']) },
 };

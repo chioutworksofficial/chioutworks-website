@@ -14,7 +14,7 @@ import {
   type L, type L4, type Market, type SectorKey, type StaticQ, type QDef, type SecDef, type Definition,
 } from '../src/data/intakeSectors.js';
 import { INTAKE_SLUG } from '../src/lib/routes.js';
-import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, DREAM_IDS, DREAM_TITLE, EXAMPLES_Q, EXAMPLES_TITLE, EXTRA_SYSTEM, LEGAL_Q, LENGTH_NOTE, MERGE_INTO, MESSENGER_Q, QUESTION_HELP, SECTION_INTRO, SECTION_META, SECTION_ORDER, SHOW_IF, STYLE_TITLE, SUGGESTIONS } from '../src/data/intakeHelp.js';
+import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, DREAM_IDS, DREAM_TITLE, EXAMPLES_Q, EXAMPLES_TITLE, EXTRA_SYSTEM, LEGAL_Q, LENGTH_NOTE, MERGE_INTO, MESSENGER_Q, MOVE_AFTER, ORDER_NO_WEBSITE, QUICK_IDS, SPLIT_PAGES, QUESTION_HELP, SECTION_INTRO, SECTION_META, SECTION_ORDER, SHOW_IF, STYLE_TITLE, SUGGESTIONS } from '../src/data/intakeHelp.js';
 import { isVisible, visibleSections } from '../src/lib/intakeLogic.js';
 import { applyChoice, saveChoice, styleSummary, type StyleRec } from './styles.js';
 
@@ -158,8 +158,18 @@ function friendly(secs: SecDef[]): SecDef[] {
   for (const id of DREAM_IDS) for (const s of secs) { const i = s.qs.findIndex((q) => q.id === id); if (i >= 0) { dream.push(s.qs[i]); s.qs.splice(i, 1); break; } }
   const project = secs.find((s) => s.id === 'project');
   if (project && !project.qs.some((q) => q.id === LEGAL_Q.id)) { const at = project.qs.findIndex((q) => q.id === 'budget_onetime'); project.qs.splice(at < 0 ? project.qs.length : at, 0, LEGAL_Q); }
+  for (const [id, [to, after]] of Object.entries(MOVE_AFTER)) {
+    const dst = secs.find((s) => s.id === to); if (!dst) continue;
+    for (const s of secs) { const i = s.qs.findIndex((q) => q.id === id); if (i >= 0) { const [q] = s.qs.splice(i, 1); const at = dst.qs.findIndex((x) => x.id === after); dst.qs.splice(at < 0 ? dst.qs.length : at + 1, 0, q); break; } }
+  }
+  for (const p of SPLIT_PAGES) {
+    const qs: QDef[] = [];
+    for (const id of p.ids) for (const s of secs) { const i = s.qs.findIndex((q) => q.id === id); if (i >= 0) { qs.push(s.qs[i]); s.qs.splice(i, 1); break; } }
+    if (qs.length) secs.push({ id: p.id, title: p.title, qs });
+  }
   const all = [...secs.filter((s) => s.qs.length || s.kind === 'style'), ...(dream.length ? [{ id: 'dream', title: DREAM_TITLE, qs: dream }] : [])];
-  const rank = (id: string) => { const r = SECTION_ORDER.indexOf(id); return r < 0 ? SECTION_ORDER.length : r; };
+  const order = secs.some((s) => s.id === 'website') ? SECTION_ORDER : ORDER_NO_WEBSITE;
+  const rank = (id: string) => { const r = order.indexOf(id); return r < 0 ? order.length : r; };
   const sorted = all.sort((a, b) => rank(a.id) - rank(b.id));
   const decorate = (q: QDef): QDef => {
     const base = q.id === MESSENGER_Q.id ? MESSENGER_Q : q.id === LEGAL_Q.id ? LEGAL_Q : q;
@@ -175,6 +185,7 @@ function friendly(secs: SecDef[]): SecDef[] {
   return sorted.map((s, i) => ({
     ...s, ...(s.id === 'project' && SECTION_INTRO.tech ? { intro: l4(LANGS.map((l) => `${SECTION_INTRO.tech[l]} ${SECTION_INTRO.project[l]}`) as [string, string, string, string]) } : SECTION_INTRO[s.id] ? { intro: SECTION_INTRO[s.id] } : {}),
     ...(s.id === 'automation' ? { flow: AUTOMATION_FLOW } : {}), ...(SECTION_META[s.id] ?? {}),
+    ...(QUICK_IDS.has(s.id) ? { quick: true } : {}),
     skippable: i > 0 && i < sorted.length - 1 && !s.qs.some((q) => q.required),
     qs: s.qs.map(decorate),
   }));
