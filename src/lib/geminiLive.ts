@@ -40,6 +40,9 @@ type LiveServerMessage = {
 const BARGE_RMS = 0.045;       // while the assistant speaks, mic frames below this are replaced by silence (echo gate)
 const GATE_TAIL = 0.25;        // seconds the gate stays closed after playback ends
 const PASS_HOLD = 0.6;         // seconds all frames pass after a loud frame (whole utterance)
+// While the assistant speaks, only a clearly louder voice for ~120 ms counts as the visitor interrupting (2026-11-23: the
+// assistant's own voice from laptop speakers was taken as an interruption and it restarted its sentence mid-way).
+const BARGE_STRONG = 0.1, BARGE_FRAMES = 3;
 const TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const LEAD = TOUCH ? 0.28 : 0.12;   // jitter-buffer lead after silence
 
@@ -57,7 +60,7 @@ export function shouldEnd(o: { turnDone: boolean; playing: boolean; lastAudioAgo
   return o.turnDone && o.lastAudioAgoMs >= END_QUIET_MS;
 }
 
-export const GRACE_MS = 5000, GRACE_REPLY_MS = 1000, GRACE_NOREPLY_MS = 8000, GRACE_CAP_MS = 30000;
+export const GRACE_MS = 9000, GRACE_REPLY_MS = 1000, GRACE_NOREPLY_MS = 8000, GRACE_CAP_MS = 30000;
 /** Grace period after the farewell (mic live): ends after GRACE_MS of silence; if the visitor spoke, after the model's short reply
  *  finished (turnComplete + playback done + GRACE_REPLY_MS). Never a second grace; safety caps when no reply comes. */
 export function graceEnd(o: { inGraceMs: number; heard: boolean; sinceHeardMs: number; playing: boolean; turnDone: boolean; audioAfterHeard: boolean; lastAudioAgoMs: number }): boolean {
@@ -88,6 +91,7 @@ export class LiveCall {
   private playEnd = 0;   // performance.now() when the queued audio ends
   private audioAfterEnd = false;
   private passUntil = 0;
+  private loudRun = 0;
   private greeting = true;   // until the first assistant turn is done: mic muted, interruptions ignored
   private gotAudio = false;
   private turnText = '';   // output transcript of the current model turn
@@ -210,7 +214,8 @@ export class LiveCall {
       if (this.grace && e.data.rms > BARGE_RMS) this.heardInGrace();
       if (this.ending) pcm = new Uint8Array(pcm.length);
       else if (this.next + GATE_TAIL > now) {   // assistant audible (or just ended): echo gate
-        if (e.data.rms > BARGE_RMS) this.passUntil = now + PASS_HOLD;
+        this.loudRun = e.data.rms > BARGE_STRONG ? this.loudRun + 1 : 0;
+        if (this.loudRun >= BARGE_FRAMES) this.passUntil = now + PASS_HOLD;
         else if (now > this.passUntil) pcm = new Uint8Array(pcm.length);
       }
       this.ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(pcm), mimeType: 'audio/pcm;rate=16000' } } }));
