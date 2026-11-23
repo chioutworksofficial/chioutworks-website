@@ -8,10 +8,13 @@ export interface OfferUi {
   accepting: string; acceptErr: string; acceptedTitle: string; acceptedBody: string; paidBody: string; questions: string; questionsIntro: string;
   glossary: string; msgPh: string; send: string;
   cTitle: string; cIntro: string; cCompany: string; cAddress: string; cSigner: string; cRole: string; cBusiness: string; cAgree: string; cSign: string; cSigning: string; cErr: string; cSignedTitle: string; cSignedBody: string; cDownload: string; cOpen: string; payBtn: string; payNow: (a: string) => string; payMonthly: (a: string) => string; payDone: string; payRest: string; payPortal: string; payErr: string; payTestTitle: string; payTestNote: string; payTestBtn: string; payTestDone: string; projectReady: string; projectGo: string; invoice: string; invoiceTest: string; sending: string; sendErr: string; you: string; me: string; noMessages: string; vatNote: string;
+  qSit: string; qSol: string; qPrice: string; qNext: string; qSetup: string; qMonthly: string; qRec: string; qNone: string; qPkg: string; qPrint: string;
+  cPostOpt: string; cDigitalOpt: string; cDelivery: string;
 }
 
 export const OFFER_UI: Record<Lang, OfferUi> = {
   tr: {
+    qSit: 'Durum', qSol: 'Çözüm', qPrice: 'Fiyat', qNext: 'Sonraki adım', qSetup: 'Kurulum (tek sefer)', qMonthly: 'Aylık', qRec: 'Önerilen', qNone: 'Dahil olmayanlar', qPkg: 'Paket', qPrint: 'Tek sayfa olarak yazdır / PDF', cDelivery: 'Kabul şekli', cDigitalOpt: 'Dijital kabul', cPostOpt: 'Basılı kopya posta ile gönderilsin',
     tabTitle: 'Teklif · Chioutworks', brand: 'Teklif', hello: (n) => (n ? `Merhaba ${n},` : 'Merhaba,'), loading: 'Yükleniyor…',
     invalidTitle: 'Bu bağlantı geçerli değil', invalidBody: 'Teklif iptal edilmiş veya bağlantı hatalı olabilir. Lütfen bana yazın.',
     items: 'Kapsam ve fiyat', total: 'Kurulum toplamı', payment: 'Ödeme planı', deposit: 'Peşinat (başlangıçta)',
@@ -28,6 +31,7 @@ export const OFFER_UI: Record<Lang, OfferUi> = {
     noMessages: 'Henüz mesaj yok.', vatNote: 'Küçük işletme düzenlemesi (Alman KDV Kanunu §19) gereği KDV hesaplanmaz.',
   },
   en: {
+    qSit: 'Situation', qSol: 'Solution', qPrice: 'Price', qNext: 'Next step', qSetup: 'Setup (one-time)', qMonthly: 'Monthly', qRec: 'Recommended', qNone: 'Not included', qPkg: 'Package', qPrint: 'Print as one page / PDF', cDelivery: 'Way of acceptance', cDigitalOpt: 'Digital acceptance', cPostOpt: 'Send a printed copy by post',
     tabTitle: 'Offer · Chioutworks', brand: 'Offer', hello: (n) => (n ? `Hello ${n},` : 'Hello,'), loading: 'Loading…',
     invalidTitle: 'This link is not valid', invalidBody: 'The offer may have been withdrawn or the link is wrong. Please write to me.',
     items: 'Scope and price', total: 'Setup total', payment: 'Payment plan', deposit: 'Deposit (at the start)',
@@ -44,6 +48,7 @@ export const OFFER_UI: Record<Lang, OfferUi> = {
     noMessages: 'No messages yet.', vatNote: 'No VAT is charged under the small-business scheme (§19 German VAT Act).',
   },
   de: {
+    qSit: 'Situation', qSol: 'Lösung', qPrice: 'Preis', qNext: 'Nächster Schritt', qSetup: 'Einrichtung (einmalig)', qMonthly: 'Monatlich', qRec: 'Empfohlen', qNone: 'Nicht enthalten', qPkg: 'Paket', qPrint: 'Als eine Seite drucken / PDF', cDelivery: 'Art der Annahme', cDigitalOpt: 'Digitale Annahme', cPostOpt: 'Gedruckte Kopie per Post senden',
     tabTitle: 'Angebot · Chioutworks', brand: 'Angebot', hello: (n) => (n ? `Guten Tag ${n},` : 'Guten Tag,'), loading: 'Wird geladen…',
     invalidTitle: 'Dieser Link ist nicht gültig', invalidBody: 'Das Angebot wurde eventuell zurückgezogen oder der Link ist fehlerhaft. Bitte schreiben Sie mir.',
     items: 'Umfang und Preis', total: 'Einrichtung gesamt', payment: 'Zahlungsplan', deposit: 'Anzahlung (zu Beginn)',
@@ -60,6 +65,7 @@ export const OFFER_UI: Record<Lang, OfferUi> = {
     noMessages: 'Noch keine Nachrichten.', vatNote: 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).',
   },
   el: {
+    qSit: 'Κατάσταση', qSol: 'Λύση', qPrice: 'Τιμή', qNext: 'Επόμενο βήμα', qSetup: 'Εγκατάσταση (εφάπαξ)', qMonthly: 'Μηνιαία', qRec: 'Προτεινόμενο', qNone: 'Δεν περιλαμβάνονται', qPkg: 'Πακέτο', qPrint: 'Εκτύπωση σε μία σελίδα / PDF', cDelivery: 'Τρόπος αποδοχής', cDigitalOpt: 'Ηλεκτρονική αποδοχή', cPostOpt: 'Αποστολή έντυπου αντιγράφου ταχυδρομικώς',
     tabTitle: 'Προσφορά · Chioutworks', brand: 'Προσφορά', hello: (n) => (n ? `Γεια σας ${n},` : 'Γεια σας,'), loading: 'Φόρτωση…',
     invalidTitle: 'Ο σύνδεσμος δεν είναι έγκυρος', invalidBody: 'Η προσφορά μπορεί να έχει ακυρωθεί ή ο σύνδεσμος να είναι λάθος. Γράψτε μου.',
     items: 'Εύρος και τιμή', total: 'Σύνολο εγκατάστασης', payment: 'Πρόγραμμα πληρωμής', deposit: 'Προκαταβολή (στην αρχή)',

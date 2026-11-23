@@ -3,7 +3,7 @@ import { SHOWCASE_UI } from './i18n/showcase';
 import { OFFER_UI } from './offerUi';
 import type { Lang } from '../translations';
 
-interface Doc { lang: Lang; title: string; parties: string[]; sections: { title: string; body: string[] }[]; footer: string }
+interface Doc { lang: Lang; title: string; parties: string[]; sections: { title: string; body: string[] }[]; footer: string; draft?: string; signMode?: 'choice' | 'typed_name' | 'digital'; signNote?: string; copy?: Doc; copyNotice?: string }
 
 /** Contract step on the offer page (after acceptance). The whole step uses the CONTRACT's language (client's country). */
 export interface PayState { ready: boolean; test?: boolean; firstPaid: boolean; now: number; monthly: number; restUrl: string | null; portal: boolean; invoices?: { url: string; number: string; test: boolean }[] }
@@ -12,6 +12,7 @@ export default function ContractStep({ token, lang, signed, onSigned, pay, curre
   const u = OFFER_UI[lang];
   const [doc, setDoc] = useState<Doc | null>(null);
   const [f, setF] = useState({ company: '', address: '', signer: '', role: '' });
+  const [delivery, setDelivery] = useState<'digital' | 'post'>('digital');
   const [business, setBusiness] = useState(false); const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   const [open, setOpen] = useState(!signed);
@@ -40,7 +41,7 @@ export default function ContractStep({ token, lang, signed, onSigned, pay, curre
     if (!f.company.trim() || !f.address.trim() || !f.signer.trim() || !business || !agree) { setErr(u.cErr); return; }
     setBusy(true); setErr('');
     try {
-      const r = await fetch(`/api/offer/${encodeURIComponent(token)}/sign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, business, agree }) });
+      const r = await fetch(`/api/offer/${encodeURIComponent(token)}/sign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, business, agree, delivery }) });
       if (!r.ok) throw new Error(String(r.status));
       onSigned(); setOpen(false);
     } catch { setErr(u.cErr); }
@@ -88,14 +89,8 @@ export default function ContractStep({ token, lang, signed, onSigned, pay, curre
           <button type="button" disabled={busy} onClick={() => setShow(null)} style={{ fontSize: 13, color: 'var(--c-lilac)', textDecoration: 'underline', cursor: 'pointer' }}>{s.change}</button></p>)}
       {doc && open && (
         <div style={{ maxHeight: 420, overflowY: 'auto', padding: '16px 18px', margin: '16px 0', borderRadius: 'var(--r-input)', background: 'var(--c-deep-sea)', border: '1px solid var(--c-hairline)', fontSize: 14, lineHeight: 1.6 }} tabIndex={0}>
-          <h3 style={{ margin: '0 0 10px', color: 'var(--c-quartz)', fontSize: 16 }}>{doc.title}</h3>
-          {doc.parties.map((p) => <p key={p} style={{ margin: '0 0 4px' }}>{p}</p>)}
-          {doc.sections.map((s) => (
-            <div key={s.title} style={{ marginTop: 14 }}>
-              <h4 style={{ margin: '0 0 4px', color: 'var(--c-quartz)', fontSize: 14 }}>{s.title}</h4>
-              {s.body.map((b, i) => <p key={i} style={{ margin: '0 0 4px' }}>{b}</p>)}
-            </div>))}
-          <p style={{ marginTop: 14 }}>{doc.footer}</p>
+          <DocBody doc={doc} />
+          {doc.copy && <div lang={doc.copy.lang} style={{ marginTop: 22, paddingTop: 14, borderTop: '1px solid var(--c-hairline)' }}><p style={{ fontWeight: 600, color: 'var(--c-quartz)' }}>{doc.copyNotice}</p><DocBody doc={doc.copy} /></div>}
         </div>)}
       {!signed && show && doc && (
         <>
@@ -105,6 +100,11 @@ export default function ContractStep({ token, lang, signed, onSigned, pay, curre
             <label style={{ fontSize: 13 }}>{u.cSigner} *<input style={{ ...input, fontFamily: 'var(--font-display)', fontStyle: 'italic' }} value={f.signer} onChange={(e) => setF({ ...f, signer: e.target.value })} autoComplete="name" /></label>
             <label style={{ fontSize: 13 }}>{u.cRole}<input style={input} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })} /></label>
           </div>
+          {doc.signMode === 'choice' && (
+            <fieldset style={{ margin: '14px 0 0', padding: 0, border: 0, fontSize: 14 }}><legend style={{ marginBottom: 6 }}>{u.cDelivery}</legend>
+              {([['digital', u.cDigitalOpt], ['post', u.cPostOpt]] as const).map(([k, t]) => <label key={k} style={{ display: 'flex', gap: 10, marginTop: 4, cursor: 'pointer' }}><input type="radio" name="delivery" checked={delivery === k} onChange={() => setDelivery(k)} />{t}</label>)}
+            </fieldset>)}
+          {doc.signNote && <p style={{ margin: '12px 0 0', fontSize: 13, color: 'var(--c-ash)' }}>{doc.signNote}</p>}
           <label style={{ display: 'flex', gap: 10, marginTop: 14, fontSize: 14, lineHeight: 1.5, cursor: 'pointer' }}><input type="checkbox" checked={business} onChange={(e) => setBusiness(e.target.checked)} style={{ marginTop: 3 }} />{u.cBusiness}</label>
           <label style={{ display: 'flex', gap: 10, marginTop: 8, fontSize: 14, lineHeight: 1.5, cursor: 'pointer' }}><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} style={{ marginTop: 3 }} />{u.cAgree}</label>
           {err && <p role="alert" style={{ color: 'var(--c-lilac)', fontSize: 14, margin: '10px 0 0' }}>{err}</p>}
@@ -112,6 +112,20 @@ export default function ContractStep({ token, lang, signed, onSigned, pay, curre
         </>)}
     </section>
   );
+}
+
+function DocBody({ doc }: { doc: Doc }) {
+  return (<>
+    <h3 style={{ margin: '0 0 10px', color: 'var(--c-quartz)', fontSize: 16 }}>{doc.title}</h3>
+    {doc.parties.map((p) => <p key={p} style={{ margin: '0 0 4px' }}>{p}</p>)}
+    {doc.sections.map((s) => (
+      <div key={s.title} style={{ marginTop: 14 }}>
+        <h4 style={{ margin: '0 0 4px', color: 'var(--c-quartz)', fontSize: 14 }}>{s.title}</h4>
+        {s.body.map((b, i) => <p key={i} style={{ margin: '0 0 4px' }}>{b}</p>)}
+      </div>))}
+    <p style={{ marginTop: 14 }}>{doc.footer}</p>
+    {doc.draft && <p style={{ margin: 0, fontSize: 13, fontStyle: 'italic' }}>{doc.draft}</p>}
+  </>);
 }
 
 function PayBox({ token, lang, pay, currency, onPaid }: { token: string; lang: Lang; pay: PayState; currency: string; onPaid: () => void }) {

@@ -11,6 +11,7 @@ interface Msg { id: string; from: 'client' | 'owner'; text: string; at: string }
 interface Offer {
   lang: Lang; currency: string; company: string; contact: string; title: string; message: string;
   items: { title: string; detail: string; amount: number }[]; total: number; depositPct: number; installments: number;
+  quote?: { situation: string; solution: string; nextStep: string; oneTime: boolean; packages: { name: string; setup: number; monthly: number; includes: string[]; recommended: boolean }[]; exclusions: string[] } | null;
   monthly: number; monthlyIncludes: string; validUntil: string; status: 'sent' | 'accepted' | 'declined'; expired: boolean;
   acceptedAt: string | null; paid: boolean; messages: Msg[]; contractSigned?: boolean; contractAt?: string | null; contractLang?: Lang; pay?: import('../ContractStep').PayState; project?: string | null;
 }
@@ -109,6 +110,27 @@ export default function OfferPage() {
         <p style={{ margin: 0, lineHeight: 1.6 }}>{u.paidBody}</p>
       </div>)}
     {data.expired && data.status === 'sent' && <div className="lq-card" style={card} role="status"><p style={{ margin: 0 }}>{u.expired}</p></div>}
+
+    {data.quote && (
+      <section className="lq-card" style={card} aria-label={u.qPrice}>
+        {([[u.qSit, data.quote.situation], [u.qSol, data.quote.solution]] as const).map(([k, v], i) => (
+          <div key={k} style={{ marginBottom: 14 }}><h2 style={{ ...h2, fontSize: 15, margin: '0 0 4px' }}>{i + 1} · {k}</h2><p style={{ margin: 0, lineHeight: 1.65 }}>{v}</p></div>))}
+        <h2 style={{ ...h2, fontSize: 15, margin: '0 0 6px' }}>3 · {u.qPrice}</h2>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead><tr><th style={{ textAlign: 'start', padding: 8 }}>{u.qPkg}</th>{data.quote.packages.map((x) => <th key={x.name} style={{ textAlign: 'start', padding: 8, color: 'var(--c-quartz)', background: x.recommended ? 'color-mix(in srgb, var(--c-signal) 14%, transparent)' : undefined }}>{x.name}{x.recommended && <span style={{ display: 'block', fontSize: 12, color: 'var(--c-signal)' }}>{u.qRec}</span>}</th>)}</tr></thead>
+            <tbody>
+              <tr><td style={{ padding: 8 }}>{u.qSetup}</td>{data.quote.packages.map((x) => <td key={x.name} style={{ padding: 8, color: 'var(--c-quartz)', background: x.recommended ? 'color-mix(in srgb, var(--c-signal) 14%, transparent)' : undefined }}>{fmt(x.setup)}</td>)}</tr>
+              {!data.quote.oneTime && <tr><td style={{ padding: 8 }}>{u.qMonthly}</td>{data.quote.packages.map((x) => <td key={x.name} style={{ padding: 8, color: 'var(--c-quartz)', background: x.recommended ? 'color-mix(in srgb, var(--c-signal) 14%, transparent)' : undefined }}>{fmt(x.monthly)}</td>)}</tr>}
+              <tr><td />{data.quote.packages.map((x) => <td key={x.name} style={{ padding: 8, verticalAlign: 'top', fontSize: 13, background: x.recommended ? 'color-mix(in srgb, var(--c-signal) 14%, transparent)' : undefined }}><ul style={{ margin: 0, paddingInlineStart: 16 }}>{x.includes.map((i) => <li key={i}>{i}</li>)}</ul></td>)}</tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 style={{ ...h2, fontSize: 15, margin: '16px 0 4px' }}>4 · {u.qNext}</h2><p style={{ margin: 0, lineHeight: 1.65 }}>{data.quote.nextStep}</p>
+        <h2 style={{ ...h2, fontSize: 15, margin: '16px 0 4px' }}>{u.qNone}</h2>
+        <ul style={{ margin: 0, paddingInlineStart: 18, lineHeight: 1.6 }}>{data.quote.exclusions.map((x) => <li key={x}>{x}</li>)}</ul>
+        <a className="lq-btn-ghost" style={{ marginTop: 16, display: 'inline-block' }} href={`/api/offer/${encodeURIComponent(token)}/print`} target="_blank" rel="noreferrer">{u.qPrint}</a>
+      </section>)}
 
     <section className="lq-card" style={card} aria-label={u.items}>
       <h2 style={h2}>{u.items}</h2>

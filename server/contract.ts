@@ -18,10 +18,19 @@ export const marketLang = (market: string | undefined): L | null => {
   if (m && m !== 'OTHER') return 'en';
   return null;
 };
-/** Owner's rule (2026-11-17): EVERYTHING the client gets (offer, contract, payment, invoice, project page) is in ONE language:
- *  the offer's language, which the owner sets in the admin. The country is only used to suggest it. */
-export const contractLangFor = (market: string | undefined, offerLang: string): L =>
-  (['de', 'tr', 'el', 'en'] as const).includes(offerLang as L) ? (offerLang as L) : marketLang(market) ?? 'en';
+/** Owner's rule (2026-11-23, replaces the 2026-11-17 "offer language" rule): the BINDING contract language follows the client's COUNTRY:
+ *  DE/AT/CH/LI/LU → de, TR/AZ → tr, GR/CY → en (binding) + Greek copy, everything else → en. Without a country the offer's language is used. */
+export const contractLangFor = (market: string | undefined, offerLang: string): L => {
+  const m = String(market ?? '').toUpperCase();
+  if (!m || m === 'OTHER') return (['de', 'tr', 'el', 'en'] as const).includes(offerLang as L) ? (offerLang as L) : 'en';
+  const l = marketLang(m);
+  return l === 'el' || !l ? 'en' : l;
+};
+/** GR/CY: a Greek copy (marked "translation only") goes with the English binding text. */
+export const copyLangFor = (market: string | undefined): L | null => (marketLang(market) === 'el' ? 'el' : null);
+/** DE: client chooses digital acceptance or a printed copy by post; GR/CY: typed full name counts as signature; others: online acceptance. */
+export type SignMode = 'choice' | 'typed_name' | 'digital';
+export const signModeFor = (market: string | undefined): SignMode => (marketLang(market) === 'de' ? 'choice' : marketLang(market) === 'el' ? 'typed_name' : 'digital');
 
 export interface ContractInput {
   lang: L; currency: string; items: { title: string; detail: string; amount: number }[]; total: number;
@@ -29,147 +38,143 @@ export interface ContractInput {
   client: { company: string; address: string; signer: string; role: string };
   date: string;   // contract date (ISO)
   showcase?: boolean;   // client allowed the project as a reference (chosen before the contract is shown); clause only when true
+  market?: string; summary?: string;   // summary = one-sentence job description (only passed when it is in the contract language)
+  liveDays?: number;   // working days until live (default 20)
+  extraOut?: string[];   // offer-specific exclusions (already in the contract language)
+  oneTime?: boolean;   // no monthly fee: code handed over on delivery
 }
-export interface ContractDoc { lang: L; title: string; parties: string[]; sections: { title: string; body: string[] }[]; footer: string }
+export interface ContractDoc { lang: L; title: string; parties: string[]; sections: { title: string; body: string[] }[]; footer: string; draft: string; signMode?: SignMode; signNote?: string; copy?: ContractDoc; copyNotice?: string }
 
 const LOCALE: Record<L, string> = { de: 'de-DE', tr: 'tr-TR', el: 'el-GR', en: 'en-GB' };
 const money = (l: L, n: number, c: string) => new Intl.NumberFormat(LOCALE[l], { style: 'currency', currency: c || 'EUR' }).format(n);
-const day = (l: L, iso: string) => new Intl.DateTimeFormat(LOCALE[l], { dateStyle: 'long' }).format(new Date(iso));
+const day = (l: L, iso: string | Date) => new Intl.DateTimeFormat(LOCALE[l], { dateStyle: 'long' }).format(new Date(iso));
+const addDays = (iso: string, n: number) => new Date(new Date(iso).getTime() + n * 86400e3);
+const DRAFT: Record<L, string> = { de: 'Entwurf: von einem Anwalt zu prüfen.', tr: 'Avukata doğrulatılacak taslaktır.', el: 'Προσχέδιο προς έλεγχο από δικηγόρο.', en: 'Draft to be verified by a lawyer.' };
+const SIGN: Record<SignMode, Record<L, string>> = {
+  choice: { de: 'Annahme nach Wahl des Auftraggebers: digital (Name eingeben und bestätigen) oder als gedruckte Kopie per Post.', tr: '', el: '', en: '' },
+  typed_name: { de: '', tr: '', el: 'Το πληκτρολογημένο ονοματεπώνυμο θεωρείται υπογραφή.', en: 'The typed full name counts as the signature.' },
+  digital: { de: 'Digitale Annahme online.', tr: 'Dijital kabul (çevrimiçi).', el: 'Ηλεκτρονική αποδοχή.', en: 'Online acceptance.' },
+};
+const COPY_NOTICE: Record<'el' | 'en', string> = { el: 'Αυτό είναι μόνο η μετάφραση της σύμβασης· το αγγλικό κείμενο είναι το δεσμευτικό.', en: 'A Greek copy follows. It is only a translation; the English text is binding.' };
 
 export function buildContract(c: ContractInput): ContractDoc {
-  const l = c.lang; const m = (n: number) => money(l, n, c.currency);
+  const mode = signModeFor(c.market);
+  const doc = buildOne(c, c.lang, mode);
+  const cl = c.lang === 'en' ? copyLangFor(c.market) : null;
+  if (!cl) return doc;
+  return { ...doc, signNote: [doc.signNote, COPY_NOTICE.en].filter(Boolean).join(' '), copy: { ...buildOne(c, cl, mode), signNote: '' }, copyNotice: COPY_NOTICE.el };
+}
+
+function buildOne(c: ContractInput, l: L, mode: SignMode): ContractDoc {
+  const m = (n: number) => money(l, n, c.currency);
   const p = PROVIDER;
   const dep = Math.round(c.total * c.depositPct) / 100;
   const rest = Math.max(0, c.total - dep);
+  const one = !!c.oneTime || c.monthly <= 0;
+  const live = new Date(addDays(c.date, Math.ceil(((c.liveDays ?? 20) * 7) / 5)));
+  const firstMonthly = new Date(live.getFullYear(), live.getMonth() + 1, 1, 12);
+  const dDep = day(l, c.date), dLive = day(l, live), dMon = day(l, firstMonthly);
   const items = c.items.map((it) => `• ${it.title}${it.detail ? ` (${it.detail})` : ''}: ${m(it.amount)}`);
   const providerLine = `${p.name}, ${l === 'de' ? 'Inhaber' : l === 'tr' ? 'İşletme sahibi' : l === 'el' ? 'Ιδιοκτήτης' : 'Owner'} ${p.owner}, ${p.street}, ${p.city}, ${p.country[l]}`;
   const clientLine = [c.client.company, c.client.address].filter(Boolean).join(', ');
+  const restN = c.installments > 1;
 
   const T = {
     de: {
-      title: 'Dienstleistungsvertrag (Website, Automatisierung, Betreuung)',
-      parties: [`Auftragnehmer: ${providerLine}`, `Auftraggeber: ${clientLine}, vertreten durch ${c.client.signer}${c.client.role ? ` (${c.client.role})` : ''}`],
+      title: 'Vereinbarung über Einrichtung und Betreuung', parties: [`Auftragnehmer: ${providerLine}`, `Auftraggeber: ${clientLine}, vertreten durch ${c.client.signer}${c.client.role ? ` (${c.client.role})` : ''}`],
       s: [
-        ['1. Vertragsgegenstand', ['Der Auftragnehmer erstellt für den Auftraggeber die folgenden Leistungen gemäß dem angenommenen Angebot:', ...items]],
-        ['2. Vergütung und Zahlung', [
-          `Einmalige Einrichtung gesamt: ${m(c.total)}. ${c.depositPct >= 100 ? 'Fällig vollständig bei Vertragsschluss.' : `Anzahlung ${c.depositPct} % (${m(dep)}) bei Vertragsschluss, Rest (${m(rest)}) in ${c.installments} Rate(n).`}`,
-          c.monthly > 0 ? `Monatliche Betreuung: ${m(c.monthly)} pro Monat, erstmals fällig ab dem dritten Monat nach Vertragsschluss, danach monatlich im Voraus per hinterlegter Zahlungsmethode.${c.monthlyIncludes ? ` Enthalten: ${c.monthlyIncludes}.` : ''}` : 'Eine monatliche Betreuung ist nicht vereinbart.',
-          'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung). Rechnungen werden elektronisch übermittelt.',
-          'Rechnungen werden bei jeder Zahlung automatisch über den Zahlungsdienstleister Stripe erstellt, fortlaufend nummeriert und nach Ausstellung nicht mehr verändert. Korrekturen erfolgen ausschließlich durch Stornierung bzw. Gutschrift; die ursprüngliche Rechnung bleibt erhalten.']],
-        ['3. Laufzeit der monatlichen Betreuung und Kündigung', [
-          'Die monatliche Betreuung hat eine Mindestlaufzeit von 6 Monaten. Danach kann sie jeweils zum Monatsende gekündigt werden; die Kündigung ist über den Kundenbereich der Website möglich.',
-          'Nach einer Kündigung bleiben alle Leistungen bis zum Ende des laufenden Monats nutzbar. Ab dem Folgemonat werden die vom Auftragnehmer betriebenen Leistungen (z. B. Automatisierungen, KI-Funktionen, Kundenportal, Wartung und Support) eingestellt.']],
-        ['4. Konten, Zugänge und Rechte', [
-          'Die für das Projekt nötigen Konten (z. B. Hosting, Datenbank, E-Mail-Versand, Domain) werden grundsätzlich auf den Namen des Auftraggebers angelegt und vom Auftragnehmer eingerichtet und verwaltet. Laufende Kosten dieser Dienste trägt der Auftraggeber, sofern nicht im Angebot anders vereinbart.',
-          'Nach vollständiger Zahlung der einmaligen Vergütung erhält der Auftraggeber die Rechte an der für ihn erstellten Website (Code und Inhalte). Allgemeine Bausteine und Werkzeuge des Auftragnehmers bleiben dessen Eigentum.']],
-        ['5. Mitwirkung, Abnahme und Korrekturen', [
-          'Der Auftraggeber stellt Inhalte (Texte, Logos, Bilder) und Zugänge rechtzeitig bereit. Verzögerungen durch fehlende Mitwirkung verlängern die Fristen entsprechend.',
-          'Im Preis sind zwei Korrekturrunden enthalten. Weitere Änderungen werden nach Aufwand abgerechnet.']],
-        ['6. Rücktritt vor Fertigstellung', [
-          'Tritt der Auftraggeber nach Vertragsschluss und begonnener Arbeit zurück, werden die bis dahin erbrachten Leistungen vergütet, mindestens jedoch 10 % der einmaligen Vergütung. Bereits gezahlte Beträge darüber hinaus werden erstattet.']],
-        ['7. Übergabe und Löschung nach Vertragsende', [
-          'Nach einer Kündigung erhält der Auftraggeber per E-Mail und im Kundenbereich einen 30 Tage gültigen Link. Dort entscheidet er, ob Website und Daten übergeben bzw. erneut aktiviert werden sollen oder ob alles gelöscht werden soll.',
-          'Übergabe, Umzug oder Reaktivierung werden mit 65–75 € pro Stunde abgerechnet; der Aufwand liegt in der Regel bei 1–3 Arbeitstagen. Während der Übergabe bleiben Website und E-Mails erreichbar. Eine Garantie, dass Automatisierungen bei einem anderen Entwickler unverändert funktionieren, besteht nicht.',
-          'Geht innerhalb von 30 Tagen keine Rückmeldung ein, werden Website und Daten rechtskonform gelöscht. Rechnungen und Vertragsunterlagen werden während der gesetzlichen Aufbewahrungsfristen aufbewahrt.']],
-        ['8. Unternehmereigenschaft', ['Der Auftraggeber bestätigt, diesen Vertrag als Unternehmer im Sinne von § 14 BGB in Ausübung seiner gewerblichen oder selbständigen beruflichen Tätigkeit zu schließen.']],
-        ['9. Haftung', ['Der Auftragnehmer haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit sowie bei Verletzung von Leben, Körper oder Gesundheit. Im Übrigen ist die Haftung auf den vertragstypischen, vorhersehbaren Schaden begrenzt. KI-gestützte Funktionen können Fehler enthalten; ihre Ergebnisse sind vom Auftraggeber zu prüfen.']],
-        ['10. Datenschutz', ['Soweit der Auftragnehmer personenbezogene Daten im Auftrag verarbeitet, schließen die Parteien einen Auftragsverarbeitungsvertrag nach Art. 28 DSGVO.']],
-        ['11. Schlussbestimmungen', ['Es gilt deutsches Recht. Gerichtsstand ist, soweit zulässig, Frankfurt am Main. Änderungen bedürfen der Textform. Sollte eine Bestimmung unwirksam sein, bleibt der Vertrag im Übrigen wirksam.']],
-      ],
-      footer: `Ort, Datum: Kelsterbach, ${day(l, c.date)}`,
+        ['Arbeitsumfang', [c.summary || 'Der Auftragnehmer setzt die Leistung um, die im angenommenen Angebot beschrieben ist.', ...items]],
+        ['Was nicht dazugehört', ['Nicht enthalten sind:', '• Funktionen, Seiten oder Anbindungen, die im Angebot nicht genannt sind', '• Erstellen von Inhalten (Texte, Fotos, Übersetzungen, Logos), sofern nicht im Angebot', '• Werbung, SEO-Kampagnen und Betreuung von Social Media', '• Rechtsberatung oder rechtliche Prüfung von Texten', '• Gebühren Dritter (Domain, kostenpflichtige Schnittstellen), sofern nicht im Angebot genannt', '• Besprechungen, Telefonate oder Besuche vor Ort', '• Rechnungs-, Angebots- und Buchhaltungsfunktionen werden als Anbindung an die vom Auftraggeber genutzte Buchhaltungssoftware oder an einen zertifizierten Rechnungsdienst eingerichtet. Die Einhaltung von Steuer-, Buchhaltungs- und Archivierungsvorschriften (in Deutschland u. a. GoBD und E-Rechnungspflicht) liegt beim Auftraggeber und seinem Steuerberater; eine Freigabe durch den Steuerberater vor der Einrichtung wird empfohlen.', 'Was nicht schriftlich im Angebot steht, gehört nicht zum Auftrag.']],
+        ['Änderungen (Revision)', ['Zwei Korrekturrunden sind im Preis enthalten. Jede weitere Änderung wird mit 65–75 € pro Stunde berechnet, nach vorheriger Mitteilung des Aufwands.']],
+        ['Zahlung', [
+          `Einrichtung: ${m(c.total)}. ${c.depositPct >= 100 ? `Fällig in voller Höhe am ${dDep}.` : `${c.depositPct} % (${m(dep)}) sind am ${dDep} fällig, der Rest (${m(rest)}) bei Übergabe${restN ? ` (in ${c.installments} Raten)` : ''}, voraussichtlich am ${dLive}.`}`,
+          one ? 'Eine monatliche Gebühr ist nicht vereinbart.' : `Monatlich: ${m(c.monthly)}, im Voraus, erstmals fällig am ${dMon}, danach jeweils am 1. eines Monats.${c.monthlyIncludes ? ` Enthalten: ${c.monthlyIncludes}.` : ''}`,
+          'Der Zahlungslink kommt aus dem eigenen Zahlungssystem des Auftragnehmers. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.',
+          'Bei Zahlungsverzug von mehr als 7 Tagen darf der Auftragnehmer die Arbeit bzw. die monatlichen Leistungen bis zur Zahlung ruhen lassen; es gelten die gesetzlichen Verzugszinsen.']],
+        ['Laufzeit und Ausstieg', one
+          ? ['Die Vereinbarung endet mit der Übergabe und vollständigen Zahlung. Vor der Übergabe kann jede Seite mit 30 Tagen Frist in Textform kündigen; bis dahin erbrachte Arbeit wird bezahlt.']
+          : ['Die monatliche Betreuung hat eine Mindestlaufzeit von 6 Monaten ab der ersten monatlichen Zahlung und läuft danach monatlich weiter.', 'Jede Seite kann mit 30 Tagen Frist in Textform (Kontaktformular genügt) zum Monatsende kündigen. Bis dahin erbrachte Arbeit wird bezahlt.']],
+        ...(one ? [] : [['Support-Zusage', ['Kanal: das Kontaktformular auf der Website (keine Besprechungen, Telefonate oder SMS).', 'Zeiten: Montag bis Freitag, 9–17 Uhr (MEZ). Erste Antwort: innerhalb von 2 Arbeitstagen.', 'Nicht im Support enthalten: neue Funktionen oder Änderungen des Umfangs (nach Stunden berechnet) sowie Probleme durch eigene Änderungen des Auftraggebers oder durch Dienste Dritter.']]]),
+        ['Eigentum, Code und Daten', [
+          one ? 'Bei Übergabe gehen System und Code ohne Aufpreis auf den Auftraggeber über; danach ist der Auftraggeber verantwortlich.'
+            : 'Solange die monatliche Betreuung läuft, bleiben Code und System beim Auftragnehmer; der Auftraggeber nutzt sie per Lizenz. Hosting, Updates, Sicherheit und kleiner Support übernimmt der Auftragnehmer.',
+          ...(one ? [] : ['Endet die monatliche Betreuung, werden System und Code ohne Aufpreis an den Auftraggeber übergeben (die Einrichtung ist bereits bezahlt). Danach sind Hosting, Domain, Updates, Sicherheit, Backups und Probleme allein Sache des Auftraggebers.']),
+          'Später gewünschte Zusatzarbeit: 65–75 € pro Stunde.',
+          'Die Daten gehören immer dem Auftraggeber; der Auftragnehmer verarbeitet sie nur in dessen Auftrag (Auftragsverarbeitungsvertrag nach Art. 28 DSGVO folgt). Allgemeine Vorlagen und Werkzeuge, die der Auftragnehmer in mehreren Projekten nutzt, bleiben bei ihm; der Auftraggeber erhält sein eigenes Projekt. Diese Regeln gelten für alle Kunden gleich.']],
+        ['Allgemeines', ['Der Auftraggeber schließt als Unternehmer (§ 14 BGB). Haftung unbeschränkt bei Vorsatz, grober Fahrlässigkeit und Verletzung von Leben, Körper, Gesundheit; sonst auf den Betrag begrenzt, den der Auftraggeber in den letzten 12 Monaten gezahlt hat, soweit zwingendes Recht nicht entgegensteht. KI-Funktionen können Fehler enthalten und sind vom Auftraggeber zu prüfen.', 'Es gilt deutsches Recht; Gerichtsstand, soweit zulässig, Frankfurt am Main. Änderungen bedürfen der Textform.']],
+      ], footer: `Ort, Datum: Kelsterbach, ${day(l, c.date)}`,
     },
     tr: {
-      title: 'Hizmet Sözleşmesi (Web Sitesi, Otomasyon, Bakım)',
-      parties: [`Hizmet veren: ${providerLine}`, `Müşteri: ${clientLine}, temsilen ${c.client.signer}${c.client.role ? ` (${c.client.role})` : ''}`],
+      title: 'Kurulum ve bakım anlaşması', parties: [`Hizmet veren: ${providerLine}`, `Müşteri: ${clientLine}, temsilen ${c.client.signer}${c.client.role ? ` (${c.client.role})` : ''}`],
       s: [
-        ['1. Sözleşmenin konusu', ['Hizmet veren, kabul edilen teklife göre müşteri için aşağıdaki hizmetleri sunar:', ...items]],
-        ['2. Ücret ve ödeme', [
-          `Tek seferlik kurulum toplamı: ${m(c.total)}. ${c.depositPct >= 100 ? 'Tamamı sözleşme imzalanınca ödenir.' : `Sözleşme imzalanınca %${c.depositPct} peşinat (${m(dep)}), kalan (${m(rest)}) ${c.installments} taksitte.`}`,
-          c.monthly > 0 ? `Aylık bakım: ayda ${m(c.monthly)}; ilk kez sözleşmeden sonraki üçüncü aydan itibaren, sonra her ay peşin olarak kayıtlı ödeme yöntemiyle tahsil edilir.${c.monthlyIncludes ? ` Kapsam: ${c.monthlyIncludes}.` : ''}` : 'Aylık bakım kararlaştırılmamıştır.',
-          'Alman KDV Kanunu §19 (küçük işletme düzenlemesi) gereği KDV hesaplanmaz. Faturalar elektronik olarak gönderilir.',
-          'Faturalar her ödemede ödeme hizmeti sağlayıcısı Stripe üzerinden otomatik olarak oluşturulur, sıra numarası alır ve kesildikten sonra değiştirilmez. Düzeltmeler yalnızca iptal veya düzeltme faturası (alacak dekontu) ile yapılır; asıl fatura kayıtlarda kalır.']],
-        ['3. Aylık bakımın süresi ve feshi', [
-          'Aylık bakımın asgari süresi 6 aydır. Sonrasında her ay sonu itibarıyla feshedilebilir; fesih sitedeki müşteri bölümünden yapılabilir.',
-          'Fesihten sonra tüm hizmetler içinde bulunulan ayın sonuna kadar kullanılabilir. Sonraki aydan itibaren hizmet verenin çalıştırdığı hizmetler (ör. otomasyonlar, yapay zekâ özellikleri, müşteri portalı, bakım ve destek) sona erer.']],
-        ['4. Hesaplar, erişimler ve haklar', [
-          'Proje için gereken hesaplar (ör. barındırma, veritabanı, e-posta gönderimi, alan adı) kural olarak müşterinin adına açılır; hizmet veren kurar ve yönetir. Bu hizmetlerin süregelen maliyetleri, teklifte aksi kararlaştırılmadıkça müşteriye aittir.',
-          'Tek seferlik ücretin tamamı ödendikten sonra müşteri, kendisi için hazırlanan web sitesinin (kod ve içerik) haklarına sahip olur. Hizmet verenin genel yapı taşları ve araçları kendisinde kalır.']],
-        ['5. Katkı, teslim ve düzeltmeler', [
-          'Müşteri içerikleri (metin, logo, görsel) ve erişimleri zamanında sağlar. Eksik katkıdan doğan gecikmeler süreleri aynı ölçüde uzatır.',
-          'Fiyata iki düzeltme turu dahildir. Ek değişiklikler harcanan emeğe göre ücretlendirilir.']],
-        ['6. Tamamlanmadan önce vazgeçme', ['Müşteri sözleşmeden sonra ve iş başladıktan sonra vazgeçerse, o ana kadar yapılan iş ücretlendirilir; ancak bu tutar tek seferlik ücretin en az %10’udur. Bunun üzerinde ödenmiş tutarlar iade edilir.']],
-        ['7. Sözleşme bitiminden sonra devir ve silme', [
-          'Fesihten sonra müşteriye e-postayla ve müşteri bölümünde 30 gün geçerli bir link iletilir. Müşteri orada sitenin ve verilerin devredilmesini / yeniden etkinleştirilmesini mi, yoksa her şeyin silinmesini mi istediğini seçer.',
-          'Devir, taşıma veya yeniden etkinleştirme saat başı 65–75 € olarak ücretlendirilir; iş genellikle 1–3 iş günü sürer. Devir sırasında site ve e-postalar erişilebilir kalır. Otomasyonların başka bir geliştiricide aynı şekilde çalışacağının garantisi yoktur.',
-          '30 gün içinde cevap gelmezse site ve veriler hukuka uygun şekilde silinir. Fatura ve sözleşme belgeleri yasal saklama süreleri boyunca saklanır.']],
-        ['8. Girişimci sıfatı', ['Müşteri, bu sözleşmeyi Alman Medeni Kanunu §14 anlamında girişimci olarak, ticari veya serbest mesleki faaliyeti kapsamında yaptığını onaylar.']],
-        ['9. Sorumluluk', ['Hizmet veren kasıt ve ağır ihmalde, ayrıca hayat, beden veya sağlığın zarar görmesinde sınırsız sorumludur. Diğer durumlarda sorumluluk, sözleşmeye özgü öngörülebilir zararla sınırlıdır. Yapay zekâ destekli özellikler hata içerebilir; sonuçları müşteri tarafından kontrol edilmelidir.']],
-        ['10. Veri koruma', ['Hizmet veren müşteri adına kişisel veri işlerse, taraflar GDPR Madde 28’e göre bir veri işleme sözleşmesi yapar.']],
-        ['11. Son hükümler', ['Alman hukuku geçerlidir. Yasal olarak mümkün olduğu ölçüde yetkili mahkeme Frankfurt am Main’dir. Değişiklikler yazılı (metin) şekilde yapılır. Bir hükmün geçersiz olması sözleşmenin geri kalanını etkilemez.']],
-      ],
-      footer: `Yer, tarih: Kelsterbach, ${day(l, c.date)}`,
+        ['İş tanımı', [c.summary || 'Hizmet veren, kabul edilen teklifte yazan işi yapar.', ...items]],
+        ['Yapmayacaklarım', ['Dahil değildir:', '• Teklifte adı geçmeyen özellik, sayfa veya bağlantılar', '• İçerik üretimi (metin, fotoğraf, çeviri, logo); teklifte yoksa', '• Reklam, SEO kampanyası ve sosyal medya yönetimi', '• Hukuki danışmanlık veya metinlerin hukuki incelemesi', '• Üçüncü tarafların ücretleri (alan adı, ücretli bağlantılar); teklifte yazmıyorsa', '• Toplantı, telefon görüşmesi veya yerinde ziyaret', '• Fatura, teklif ve muhasebeyle ilgili özellikler, müşterinin kullandığı muhasebe yazılımına veya sertifikalı bir fatura hizmetine bağlantı olarak kurulur. Vergi, muhasebe ve yasal arşivleme kurallarına uygunluk (Almanya’da GoBD ve e-fatura yükümlülükleri dahil) müşterinin ve vergi danışmanının sorumluluğundadır; kurulumdan önce müşterinin vergi danışmanına onaylatması önerilir.', 'Teklifte yazılı olmayan iş kapsam dışıdır.']],
+        ['Revizyon', ['Fiyata iki düzeltme turu dahildir. Sonraki her değişiklik, emeği önceden bildirilerek saat başı 65–75 € üzerinden ücretlendirilir.']],
+        ['Ödeme', [
+          `Kurulum: ${m(c.total)}. ${c.depositPct >= 100 ? `Tamamı ${dDep} tarihinde ödenir.` : `%${c.depositPct} (${m(dep)}) ${dDep} tarihinde, kalan (${m(rest)}) teslimde${restN ? ` (${c.installments} taksit)` : ''}, tahminen ${dLive}.`}`,
+          one ? 'Aylık ücret kararlaştırılmamıştır.' : `Aylık: ${m(c.monthly)}, peşin; ilk ödeme ${dMon}, sonra her ayın 1’i.${c.monthlyIncludes ? ` Kapsam: ${c.monthlyIncludes}.` : ''}`,
+          'Ödeme bağlantısı hizmet verenin kendi ödeme sisteminden gelir. Alman KDV Kanunu §19 gereği KDV hesaplanmaz.',
+          'Ödeme 7 günden fazla gecikirse hizmet veren, ödeme yapılana kadar işi veya aylık hizmetleri durdurabilir; yasal gecikme faizi uygulanır.']],
+        ['Süre ve çıkış', one
+          ? ['Anlaşma, teslim ve ödemenin tamamlanmasıyla sona erer. Teslimden önce her iki taraf 30 gün önceden yazılı (metin) bildirimle çıkabilir; o ana kadar yapılan iş ödenir.']
+          : ['Aylık bakımın asgari süresi, ilk aylık ödemeden itibaren 6 aydır; sonrasında ay ay devam eder.', 'Her iki taraf 30 gün önceden yazılı (metin) bildirimle, ay sonu itibarıyla çıkabilir (iletişim formu yeterlidir). O ana kadar yapılan iş ödenir.']],
+        ...(one ? [] : [['Destek sözü', ['Kanal: sitedeki iletişim formu (toplantı, telefon veya SMS yok).', 'Saatler: Pazartesi–Cuma, 09:00–17:00 (Orta Avrupa saati). İlk cevap: en geç 2 iş günü içinde.', 'Destek kapsamında olmayanlar: yeni özellikler veya kapsam değişikliği (saat başı ücretli) ve müşterinin kendi değişikliklerinden ya da üçüncü taraf hizmetlerden doğan sorunlar.']]]),
+        ['Sahiplik, kod ve veri', [
+          one ? 'Teslimde sistem ve kod ek ücret alınmadan müşteriye devredilir; sonrası müşterinin sorumluluğundadır.'
+            : 'Aylık bakım sürdükçe kod ve sistem hizmet verende kalır; müşteri lisansla kullanır. Barındırma, güncelleme, güvenlik ve küçük destek hizmet verendedir.',
+          ...(one ? [] : ['Aylık bakım sona ererse sistem ve kod ek ücret alınmadan müşteriye devredilir (kurulum zaten ödenmiştir). Sonrasında barındırma, alan adı, güncelleme, güvenlik, yedekleme ve sorunlar tamamen müşterinin sorumluluğundadır.']),
+          'Sonradan istenen ek işler saat başı 65–75 €.',
+          'Veriler her zaman müşterinindir; hizmet veren yalnızca onun adına işler (GDPR m. 28 veri işleme sözleşmesi ayrıca yapılır). Hizmet verenin birçok projede kullandığı genel şablon ve araçlar onda kalır; müşteri kendi projesini alır. Bu kurallar herkes için aynıdır.']],
+        ['Genel hükümler', ['Müşteri bu anlaşmayı girişimci olarak yapar (Alman Medeni Kanunu §14). Sorumluluk kasıt, ağır ihmal ve hayat, beden, sağlık zararlarında sınırsızdır; diğer durumlarda, emredici hukuk aksini gerektirmedikçe, müşterinin son 12 ayda ödediği tutarla sınırlıdır. Yapay zekâ özellikleri hata içerebilir; sonuçları müşteri kontrol eder.', 'Alman hukuku geçerlidir; yetkili mahkeme, mümkün olduğu ölçüde, Frankfurt am Main’dir. Değişiklikler yazılı (metin) yapılır.']],
+      ], footer: `Yer, tarih: Kelsterbach, ${day(l, c.date)}`,
     },
     el: {
-      title: 'Σύμβαση Παροχής Υπηρεσιών (Ιστοσελίδα, Αυτοματοποίηση, Υποστήριξη)',
-      parties: [`Πάροχος: ${providerLine}`, `Πελάτης: ${clientLine}, εκπροσωπούμενος από ${c.client.signer}${c.client.role ? ` (${c.client.role})` : ''}`],
+      title: 'Συμφωνία εγκατάστασης και υποστήριξης', parties: [`Πάροχος: ${providerLine}`, `Πελάτης: ${clientLine}, εκπροσωπούμενος από ${c.client.signer}${c.client.role ? ` (${c.client.role})` : ''}`],
       s: [
-        ['1. Αντικείμενο', ['Ο πάροχος παρέχει στον πελάτη τις ακόλουθες υπηρεσίες σύμφωνα με την αποδεκτή προσφορά:', ...items]],
-        ['2. Αμοιβή και πληρωμή', [
-          `Εφάπαξ εγκατάσταση συνολικά: ${m(c.total)}. ${c.depositPct >= 100 ? 'Καταβάλλεται ολόκληρη με την υπογραφή.' : `Προκαταβολή ${c.depositPct}% (${m(dep)}) με την υπογραφή, το υπόλοιπο (${m(rest)}) σε ${c.installments} δόση/-εις.`}`,
-          c.monthly > 0 ? `Μηνιαία υποστήριξη: ${m(c.monthly)} τον μήνα, για πρώτη φορά από τον τρίτο μήνα μετά την υπογραφή, έπειτα μηνιαίως προκαταβολικά μέσω της καταχωρισμένης μεθόδου πληρωμής.${c.monthlyIncludes ? ` Περιλαμβάνει: ${c.monthlyIncludes}.` : ''}` : 'Δεν έχει συμφωνηθεί μηνιαία υποστήριξη.',
-          'Σύμφωνα με την §19 του γερμανικού νόμου ΦΠΑ (καθεστώς μικρών επιχειρήσεων) δεν χρεώνεται ΦΠΑ. Τα τιμολόγια αποστέλλονται ηλεκτρονικά.',
-          'Τα τιμολόγια εκδίδονται αυτόματα σε κάθε πληρωμή μέσω του παρόχου πληρωμών Stripe, φέρουν αύξουσα αρίθμηση και δεν τροποποιούνται μετά την έκδοσή τους. Διορθώσεις γίνονται αποκλειστικά με ακύρωση ή πιστωτικό σημείωμα· το αρχικό τιμολόγιο διατηρείται.']],
-        ['3. Διάρκεια και καταγγελία της μηνιαίας υποστήριξης', [
-          'Η μηνιαία υποστήριξη έχει ελάχιστη διάρκεια 6 μηνών. Στη συνέχεια μπορεί να καταγγελθεί στο τέλος κάθε μήνα, μέσω της περιοχής πελάτη της ιστοσελίδας.',
-          'Μετά την καταγγελία όλες οι υπηρεσίες παραμένουν διαθέσιμες έως το τέλος του τρέχοντος μήνα. Από τον επόμενο μήνα διακόπτονται οι υπηρεσίες που λειτουργεί ο πάροχος (π.χ. αυτοματοποιήσεις, λειτουργίες ΤΝ, πύλη πελάτη, συντήρηση και υποστήριξη).']],
-        ['4. Λογαριασμοί, πρόσβαση και δικαιώματα', [
-          'Οι λογαριασμοί που χρειάζεται το έργο (π.χ. φιλοξενία, βάση δεδομένων, αποστολή e-mail, domain) ανοίγουν κατά κανόνα στο όνομα του πελάτη· τους ρυθμίζει και τους διαχειρίζεται ο πάροχος. Το τρέχον κόστος αυτών των υπηρεσιών βαρύνει τον πελάτη, εκτός αν η προσφορά ορίζει διαφορετικά.',
-          'Μετά την πλήρη εξόφληση της εφάπαξ αμοιβής ο πελάτης αποκτά τα δικαιώματα στην ιστοσελίδα που δημιουργήθηκε για αυτόν (κώδικας και περιεχόμενο). Τα γενικά δομικά στοιχεία και εργαλεία του παρόχου παραμένουν δικά του.']],
-        ['5. Συνεργασία, παράδοση και διορθώσεις', [
-          'Ο πελάτης παρέχει έγκαιρα περιεχόμενο (κείμενα, λογότυπα, εικόνες) και προσβάσεις. Καθυστερήσεις λόγω έλλειψης συνεργασίας παρατείνουν ανάλογα τις προθεσμίες.',
-          'Η τιμή περιλαμβάνει δύο γύρους διορθώσεων. Επιπλέον αλλαγές χρεώνονται ανάλογα με τον χρόνο εργασίας.']],
-        ['6. Υπαναχώρηση πριν από την ολοκλήρωση', ['Αν ο πελάτης υπαναχωρήσει μετά την υπογραφή και την έναρξη της εργασίας, αμείβεται η εργασία που έχει γίνει έως τότε, τουλάχιστον όμως το 10% της εφάπαξ αμοιβής. Ποσά που έχουν καταβληθεί πέραν αυτού επιστρέφονται.']],
-        ['7. Παράδοση και διαγραφή μετά τη λήξη', [
-          'Μετά την καταγγελία ο πελάτης λαμβάνει με e-mail και στην περιοχή πελάτη έναν σύνδεσμο που ισχύει 30 ημέρες. Εκεί επιλέγει αν η ιστοσελίδα και τα δεδομένα θα παραδοθούν / θα επανενεργοποιηθούν ή αν θα διαγραφούν όλα.',
-          'Η παράδοση, μεταφορά ή επανενεργοποίηση χρεώνεται 65–75 € την ώρα· η εργασία διαρκεί συνήθως 1–3 εργάσιμες ημέρες. Κατά την παράδοση η ιστοσελίδα και τα e-mail παραμένουν διαθέσιμα. Δεν υπάρχει εγγύηση ότι οι αυτοματοποιήσεις θα λειτουργούν αμετάβλητες σε άλλον προγραμματιστή.',
-          'Αν δεν υπάρξει απάντηση εντός 30 ημερών, η ιστοσελίδα και τα δεδομένα διαγράφονται νόμιμα. Τα τιμολόγια και τα έγγραφα της σύμβασης διατηρούνται για τις νόμιμες προθεσμίες φύλαξης.']],
-        ['8. Ιδιότητα επιχείρησης', ['Ο πελάτης βεβαιώνει ότι συνάπτει τη σύμβαση ως επιχείρηση κατά την έννοια της §14 του γερμανικού Αστικού Κώδικα, στο πλαίσιο της επαγγελματικής του δραστηριότητας.']],
-        ['9. Ευθύνη', ['Ο πάροχος ευθύνεται απεριόριστα για δόλο και βαριά αμέλεια, καθώς και για βλάβη ζωής, σώματος ή υγείας. Κατά τα λοιπά η ευθύνη περιορίζεται στην τυπική, προβλέψιμη ζημία της σύμβασης. Οι λειτουργίες με ΤΝ μπορεί να περιέχουν λάθη· τα αποτελέσματά τους πρέπει να ελέγχονται από τον πελάτη.']],
-        ['10. Προστασία δεδομένων', ['Εφόσον ο πάροχος επεξεργάζεται προσωπικά δεδομένα για λογαριασμό του πελάτη, τα μέρη συνάπτουν σύμβαση επεξεργασίας κατά το άρθρο 28 GDPR.']],
-        ['11. Τελικές διατάξεις', ['Εφαρμόζεται το γερμανικό δίκαιο. Αρμόδια δικαστήρια, στο μέτρο που επιτρέπεται, είναι της Φρανκφούρτης. Τροποποιήσεις γίνονται γραπτώς (σε μορφή κειμένου). Η ακυρότητα μιας διάταξης δεν θίγει την υπόλοιπη σύμβαση.']],
-      ],
-      footer: `Τόπος, ημερομηνία: Kelsterbach, ${day(l, c.date)}`,
+        ['Αντικείμενο εργασίας', [c.summary || 'Ο πάροχος υλοποιεί την εργασία που περιγράφεται στην αποδεκτή προσφορά.', ...items]],
+        ['Τι δεν περιλαμβάνεται', ['Δεν περιλαμβάνονται:', '• λειτουργίες, σελίδες ή συνδέσεις που δεν αναφέρονται στην προσφορά', '• δημιουργία περιεχομένου (κείμενα, φωτογραφίες, μεταφράσεις, λογότυπα), εκτός αν αναφέρεται στην προσφορά', '• διαφήμιση, καμπάνιες SEO και διαχείριση social media', '• νομική συμβουλή ή νομικός έλεγχος κειμένων', '• χρεώσεις τρίτων (domain, επί πληρωμή συνδέσεις), εκτός αν αναφέρονται στην προσφορά', '• συναντήσεις, τηλεφωνήματα ή επισκέψεις επιτόπου', '• Οι λειτουργίες τιμολόγησης, προσφορών και λογιστικής εγκαθίστανται ως σύνδεση με το λογιστικό λογισμικό που χρησιμοποιεί ο πελάτης ή με πιστοποιημένη υπηρεσία τιμολόγησης. Η συμμόρφωση με τους φορολογικούς, λογιστικούς και αρχειοθέτησης κανόνες (στη Γερμανία μεταξύ άλλων GoBD και υποχρεώσεις ηλεκτρονικού τιμολογίου) αποτελεί ευθύνη του πελάτη και του φοροτεχνικού του· συνιστάται έγκριση από τον φοροτεχνικό πριν την εγκατάσταση.', 'Ό,τι δεν αναγράφεται στην προσφορά δεν ανήκει στην ανάθεση.']],
+        ['Αναθεωρήσεις', ['Δύο γύροι διορθώσεων περιλαμβάνονται στην τιμή. Κάθε επιπλέον αλλαγή χρεώνεται 65–75 € την ώρα, αφού ανακοινωθεί πρώτα ο χρόνος.']],
+        ['Πληρωμή', [
+          `Εγκατάσταση: ${m(c.total)}. ${c.depositPct >= 100 ? `Καταβάλλεται ολόκληρη στις ${dDep}.` : `${c.depositPct}% (${m(dep)}) στις ${dDep}, το υπόλοιπο (${m(rest)}) κατά την παράδοση${restN ? ` (σε ${c.installments} δόσεις)` : ''}, εκτιμώμενα στις ${dLive}.`}`,
+          one ? 'Δεν έχει συμφωνηθεί μηνιαία χρέωση.' : `Μηνιαία: ${m(c.monthly)}, προκαταβολικά, πρώτη πληρωμή στις ${dMon}, έπειτα την 1η κάθε μήνα.${c.monthlyIncludes ? ` Περιλαμβάνει: ${c.monthlyIncludes}.` : ''}`,
+          'Ο σύνδεσμος πληρωμής προέρχεται από το δικό σύστημα πληρωμών του παρόχου. Σύμφωνα με την §19 του γερμανικού νόμου ΦΠΑ δεν χρεώνεται ΦΠΑ.',
+          'Σε καθυστέρηση πληρωμής άνω των 7 ημερών ο πάροχος μπορεί να παγώσει την εργασία ή τις μηνιαίες υπηρεσίες μέχρι την πληρωμή· ισχύουν οι νόμιμοι τόκοι υπερημερίας.']],
+        ['Διάρκεια και έξοδος', one
+          ? ['Η συμφωνία λήγει με την παράδοση και την πλήρη πληρωμή. Πριν από την παράδοση κάθε πλευρά μπορεί να λύσει τη συμφωνία με γραπτή προειδοποίηση 30 ημερών· η εργασία που έγινε μέχρι τότε πληρώνεται.']
+          : ['Η μηνιαία υποστήριξη έχει ελάχιστη διάρκεια 6 μηνών από την πρώτη μηνιαία πληρωμή και συνεχίζεται έπειτα μήνα με μήνα.', 'Κάθε πλευρά μπορεί να αποχωρήσει με γραπτή προειδοποίηση 30 ημερών (αρκεί η φόρμα επικοινωνίας), στο τέλος του μήνα. Η εργασία που έγινε μέχρι τότε πληρώνεται.']],
+        ...(one ? [] : [['Υπόσχεση υποστήριξης', ['Κανάλι: η φόρμα επικοινωνίας της ιστοσελίδας (όχι συναντήσεις, τηλεφωνήματα ή SMS).', 'Ώρες: Δευτέρα–Παρασκευή, 09:00–17:00 (ώρα Κεντρικής Ευρώπης). Πρώτη απάντηση: εντός 2 εργάσιμων ημερών.', 'Εκτός υποστήριξης: νέες λειτουργίες ή αλλαγή του αντικειμένου (χρεώνονται ανά ώρα) και προβλήματα από δικές του αλλαγές του πελάτη ή από υπηρεσίες τρίτων.']]]),
+        ['Κυριότητα, κώδικας και δεδομένα', [
+          one ? 'Κατά την παράδοση το σύστημα και ο κώδικας περνούν στον πελάτη χωρίς επιπλέον χρέωση· έπειτα την ευθύνη έχει ο πελάτης.'
+            : 'Όσο διαρκεί η μηνιαία υποστήριξη, ο κώδικας και το σύστημα παραμένουν στον πάροχο· ο πελάτης τα χρησιμοποιεί με άδεια χρήσης. Φιλοξενία, ενημερώσεις, ασφάλεια και μικρή υποστήριξη αναλαμβάνει ο πάροχος.',
+          ...(one ? [] : ['Αν λήξει η μηνιαία υποστήριξη, το σύστημα και ο κώδικας παραδίδονται στον πελάτη χωρίς επιπλέον χρέωση (η εγκατάσταση έχει ήδη πληρωθεί). Έπειτα φιλοξενία, domain, ενημερώσεις, ασφάλεια, αντίγραφα ασφαλείας και προβλήματα είναι αποκλειστικά ευθύνη του πελάτη.']),
+          'Πρόσθετη εργασία που ζητείται αργότερα: 65–75 € την ώρα.',
+          'Τα δεδομένα ανήκουν πάντα στον πελάτη· ο πάροχος τα επεξεργάζεται μόνο για λογαριασμό του (σύμβαση επεξεργασίας κατά το άρθρο 28 GDPR ακολουθεί). Γενικά πρότυπα και εργαλεία που ο πάροχος χρησιμοποιεί σε πολλά έργα παραμένουν δικά του· ο πελάτης παίρνει το δικό του έργο. Οι κανόνες αυτοί ισχύουν το ίδιο για όλους.']],
+        ['Γενικά', ['Ο πελάτης συμβάλλεται ως επιχείρηση (§14 γερμανικού Αστικού Κώδικα). Η ευθύνη είναι απεριόριστη για δόλο, βαριά αμέλεια και βλάβη ζωής, σώματος ή υγείας· κατά τα λοιπά περιορίζεται στο ποσό που κατέβαλε ο πελάτης τους τελευταίους 12 μήνες, εκτός αν επιβάλλει άλλως το αναγκαστικό δίκαιο. Οι λειτουργίες ΤΝ μπορεί να περιέχουν λάθη· ο πελάτης ελέγχει τα αποτελέσματα.', 'Εφαρμόζεται το γερμανικό δίκαιο· αρμόδια δικαστήρια, στο μέτρο που επιτρέπεται, της Φρανκφούρτης. Οι τροποποιήσεις γίνονται γραπτώς.']],
+      ], footer: `Τόπος, ημερομηνία: Kelsterbach, ${day(l, c.date)}`,
     },
     en: {
-      title: 'Service Agreement (Website, Automation, Support)',
-      parties: [`Provider: ${providerLine}`, `Client: ${clientLine}, represented by ${c.client.signer}${c.client.role ? ` (${c.client.role})` : ''}`],
+      title: 'Agreement for setup and support', parties: [`Provider: ${providerLine}`, `Client: ${clientLine}, represented by ${c.client.signer}${c.client.role ? ` (${c.client.role})` : ''}`],
       s: [
-        ['1. Subject matter', ['The provider delivers the following services to the client according to the accepted offer:', ...items]],
-        ['2. Fees and payment', [
-          `One-time setup in total: ${m(c.total)}. ${c.depositPct >= 100 ? 'Due in full when the agreement is signed.' : `Deposit ${c.depositPct}% (${m(dep)}) when the agreement is signed, the rest (${m(rest)}) in ${c.installments} instalment(s).`}`,
-          c.monthly > 0 ? `Monthly support: ${m(c.monthly)} per month, first due from the third month after signing, then monthly in advance via the stored payment method.${c.monthlyIncludes ? ` Included: ${c.monthlyIncludes}.` : ''}` : 'No monthly support has been agreed.',
-          'No VAT is charged under the German small-business scheme (§19 UStG). Invoices are sent electronically.',
-          'Invoices are created automatically with every payment through the payment provider Stripe, numbered sequentially and not altered after issue. Corrections are made only by cancellation or credit note; the original invoice is kept.']],
-        ['3. Term and cancellation of monthly support', [
-          'Monthly support has a minimum term of 6 months. After that it can be cancelled at the end of any month, via the client area of the website.',
-          'After cancellation all services remain usable until the end of the current month. From the following month, the services operated by the provider (e.g. automations, AI features, client portal, maintenance and support) end.']],
-        ['4. Accounts, access and rights', [
-          'The accounts the project needs (e.g. hosting, database, e-mail sending, domain) are in principle opened in the client’s name and set up and managed by the provider. Ongoing costs of these services are borne by the client unless the offer states otherwise.',
-          'Once the one-time fee has been paid in full, the client obtains the rights to the website created for it (code and content). The provider’s general building blocks and tools remain the provider’s property.']],
-        ['5. Cooperation, delivery and corrections', [
-          'The client provides content (texts, logos, images) and access in good time. Delays caused by missing cooperation extend deadlines accordingly.',
-          'Two rounds of corrections are included in the price. Further changes are charged by effort.']],
-        ['6. Withdrawal before completion', ['If the client withdraws after signing and after work has started, the work done up to that point is paid, but at least 10% of the one-time fee. Amounts paid beyond that are refunded.']],
-        ['7. Handover and deletion after the end of the agreement', [
-          'After cancellation the client receives, by e-mail and in the client area, a link valid for 30 days. There the client chooses whether the website and data are to be handed over / reactivated or whether everything is to be deleted.',
-          'Handover, migration or reactivation are charged at €65–75 per hour; the work usually takes 1–3 working days. The website and e-mails remain available during the handover. There is no guarantee that automations will work unchanged with another developer.',
-          'If no reply is received within 30 days, the website and data are deleted lawfully. Invoices and contract documents are kept for the statutory retention periods.']],
-        ['8. Business customer', ['The client confirms that it enters into this agreement as a business (entrepreneur within the meaning of §14 of the German Civil Code) in the course of its commercial or professional activity.']],
-        ['9. Liability', ['The provider is liable without limitation for intent and gross negligence and for injury to life, body or health. Otherwise liability is limited to the typical, foreseeable damage of the agreement. AI-supported features may contain errors; their results must be checked by the client.']],
-        ['10. Data protection', ['Where the provider processes personal data on the client’s behalf, the parties conclude a data processing agreement under Art. 28 GDPR.']],
-        ['11. Final provisions', ['German law applies. Place of jurisdiction, where permitted, is Frankfurt am Main. Changes require text form. If a provision is invalid, the rest of the agreement remains valid.']],
-      ],
-      footer: `Place, date: Kelsterbach, ${day(l, c.date)}`,
+        ['Scope of work', [c.summary || 'The provider carries out the work described in the accepted offer.', ...items]],
+        ['What is not included', ['Not included:', '• features, pages or integrations not named in the offer', '• creating content (texts, photos, translations, logos) unless the offer says so', '• advertising, SEO campaigns and social media management', '• legal advice or legal review of texts', '• third-party fees (domain, paid interfaces) unless the offer names them', '• meetings, calls or on-site visits', '• invoicing, quote and bookkeeping features are set up as a connection to the accounting software the client uses or to a certified invoicing service. Compliance with tax, accounting and archiving rules (in Germany including GoBD and e-invoicing obligations) is the responsibility of the client and the client’s tax adviser; approval by the tax adviser before setup is recommended.', 'Work that is not written in the offer is not part of the job.']],
+        ['Revisions', ['Two rounds of corrections are included in the price. Every further change is charged at €65–75 per hour, with the effort announced first.']],
+        ['Payment', [
+          `Setup: ${m(c.total)}. ${c.depositPct >= 100 ? `Due in full on ${dDep}.` : `${c.depositPct}% (${m(dep)}) is due on ${dDep}, the rest (${m(rest)}) on delivery${restN ? ` (in ${c.installments} instalments)` : ''}, expected on ${dLive}.`}`,
+          one ? 'No monthly fee has been agreed.' : `Monthly: ${m(c.monthly)}, in advance, first due on ${dMon}, then on the 1st of each month.${c.monthlyIncludes ? ` Included: ${c.monthlyIncludes}.` : ''}`,
+          'The payment link comes from the provider’s own payment system. No VAT is charged under §19 UStG (German small-business scheme).',
+          'If a payment is more than 7 days late, the provider may pause the work or the monthly services until it is paid; statutory default interest applies.']],
+        ['Term and exit', one
+          ? ['The agreement ends on delivery and full payment. Before delivery either side may end it with 30 days’ written notice (text form); work done up to then is paid.']
+          : ['Monthly support has a minimum term of 6 months from the first monthly payment and then continues month to month.', 'Either side may end it with 30 days’ written notice (text form; the contact form is enough) to the end of a month. Work done up to then is paid.']],
+        ...(one ? [] : [['Support promise', ['Channel: the contact form on the website (no meetings, calls or SMS).', 'Hours: Monday to Friday, 09:00–17:00 (Central European Time). First reply: within 2 working days.', 'Not part of support: new features or changes of scope (charged hourly) and problems caused by the client’s own changes or by third-party services.']]]),
+        ['Ownership, code and data', [
+          one ? 'On delivery the system and code are handed over to the client at no extra charge; afterwards the client is responsible.'
+            : 'While the monthly service runs, the code and system stay with the provider; the client uses them under a licence. Hosting, updates, security and small support are the provider’s job.',
+          ...(one ? [] : ['When the monthly service ends, the system and code are handed over to the client at no extra charge (the setup is already paid). After that, hosting, domain, updates, security, backups and problems are solely the client’s responsibility.']),
+          'Extra work requested later: €65–75 per hour.',
+          'The data always belongs to the client; the provider only processes it on the client’s behalf (a data processing agreement under Art. 28 GDPR follows). General templates and tools the provider uses across many projects stay with the provider; the client receives its own project. These rules are the same for every client.']],
+        ['General', ['The client contracts as a business (§14 German Civil Code). Liability is unlimited for intent, gross negligence and injury to life, body or health; otherwise it is limited to the amount the client paid in the last 12 months, unless mandatory law requires otherwise. AI features may contain errors; the client checks the results.', 'German law applies; place of jurisdiction, where permitted, is Frankfurt am Main. Changes are made in text form.']],
+      ], footer: `Place, date: Kelsterbach, ${day(l, c.date)}`,
     },
   }[l];
 
@@ -192,11 +197,12 @@ export function buildContract(c: ContractInput): ContractDoc {
       'This permission is voluntary, does not affect the fees and can be withdrawn at any time in text form (via the project page or the contact form); the reference is then removed from the provider’s own channels within 14 days. For content already published outside the provider’s control (e.g. shared posts), removal is only possible to a limited extent.']],
   };
   const secs = T.s.map(([title, body]) => ({ title: title as string, body: body as string[] }));
+  if (c.extraOut?.length) secs[1].body.splice(secs[1].body.length - 1, 0, ...c.extraOut.map((x) => `• ${x}`));
   // Owner (2026-11-17): the reference clause is only part of the contract when the client agreed to it beforehand
   if (c.showcase) secs.splice(secs.length - 1, 0, { title: SHOW[l][0], body: SHOW[l][1] });
   const numbered = secs.map((x, i) => ({ ...x, title: `${i + 1}. ${x.title.replace(/^\d+\.\s*/, '')}` }));
-  return { lang: l, title: T.title, parties: T.parties, sections: numbered, footer: T.footer };
+  return { lang: l, title: T.title, parties: T.parties, sections: numbered, footer: T.footer, draft: DRAFT[l], signMode: mode, signNote: SIGN[mode][l] };
 }
 
 /** Plain text used for the integrity hash (what exactly was signed). */
-export const contractPlain = (d: ContractDoc) => [d.title, ...d.parties, ...d.sections.flatMap((s) => [s.title, ...s.body]), d.footer].join('\n');
+export const contractPlain = (d: ContractDoc): string => [d.title, ...d.parties, ...d.sections.flatMap((s) => [s.title, ...s.body]), d.footer, d.draft, d.signNote ?? '', ...(d.copy ? [d.copyNotice ?? '', contractPlain(d.copy)] : [])].join('\n');

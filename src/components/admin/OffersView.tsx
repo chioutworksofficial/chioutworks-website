@@ -17,11 +17,15 @@ export interface OfferBrief {
   status: 'draft' | 'sent' | 'accepted' | 'declined'; total: number; monthly: number; createdAt: string; sentAt: string | null; viewedAt: string | null;
   acceptedAt: string | null; paidAt: string | null; cancelledAt: string | null; unreadOwner: number; hasPlan: boolean; expired: boolean; path: string; contractAt?: string | null;
 }
+interface QuotePkg { name: string; setup: number; monthly: number; includes: string[]; recommended: boolean }
+interface Quote { situation: string; solution: string; nextStep: string; liveDays: number; startDate: string; oneTime: boolean; packages: QuotePkg[]; exclusions: string[] }
+interface OwnerPlan { customerMonthlyLoss: number | null; costs: { label: string; monthly: number; estimated: boolean }[]; missing: string[]; checks: string[] }
 interface OfferFull extends OfferBrief {
+  quote?: Quote | null; ownerPlan?: OwnerPlan | null;
   ownerNotes: string; plan: { at: string; model: string; data: Plan } | null; planChat: { role: 'owner' | 'ai'; text: string; at: string }[];
   message: string; items: Item[]; depositPct: number; installments: number; monthlyIncludes: string; validUntil: string;
   messages: { id: string; from: 'client' | 'owner'; text: string; at: string }[]; acceptedName: string | null;
-  contract: { signedAt: string; signer: string; role: string; company: string; hash: string; lang: Lang } | null; contractLang: Lang;
+  contract: { signedAt: string; signer: string; role: string; company: string; hash: string; lang: Lang; delivery?: 'digital' | 'post' | null } | null; contractLang: Lang;
   project?: string | null; market?: string | null; marketLang?: Lang | null; portal?: boolean | null; portalAuto?: boolean; showcase?: { allow: boolean; at: string } | null;
   billing: { on: boolean; test?: boolean; payRequestedAt?: string | null; testPaid?: boolean; invoices?: never; due: number; rest: number; customer?: boolean; subStatus?: string | null; firstPaidAt?: string | null; restUrl?: string | null; restPaidAt?: string | null; paymentFailedAt?: string | null; lastInvoiceAt?: string | null };
 }
@@ -82,7 +86,8 @@ export default function OffersView({ openId, setOpenId, onUnread }: Props) {
     finally { setBusy(null); }
   };
   const draft = () => o && ({ ownerNotes: o.ownerNotes, title: o.title, message: o.message, items: o.items, depositPct: o.depositPct, installments: o.installments,
-    monthly: o.monthly, monthlyIncludes: o.monthlyIncludes, validUntil: o.validUntil, currency: o.currency, lang: o.lang, portal: o.portal ?? null });
+    monthly: o.monthly, monthlyIncludes: o.monthlyIncludes, validUntil: o.validUntil, currency: o.currency, lang: o.lang, portal: o.portal ?? null,
+    ...(o.quote ? { quote: o.quote } : {}), ...(o.ownerPlan ? { ownerPlan: o.ownerPlan } : {}) });
   const save = (action?: string, okText = 'Kaydedildi') => o && call(action ?? 'save', `/api/admin/offers/${o.id}`, 'PATCH', { ...draft(), ...(action ? { action } : {}) }, okText);
   const applyPlan = () => {
     const p = o?.plan?.data; if (!o || !p) return;
@@ -103,6 +108,10 @@ export default function OffersView({ openId, setOpenId, onUnread }: Props) {
   };
   const editable = o && (o.status === 'draft' || o.status === 'sent') && !o.cancelledAt;
   const p = o?.plan?.data;
+  const setQ2 = (patch: Partial<Quote>) => setO((x) => (x && x.quote ? { ...x, quote: { ...x.quote, ...patch } } : x));
+  const setPk = (i: number, patch: Partial<QuotePkg>) => setQ2({ packages: (o?.quote?.packages ?? []).map((k, j) => (j === i ? { ...k, ...patch } : k)) });
+  const setPl = (patch: Partial<OwnerPlan>) => setO((x) => (x && x.ownerPlan ? { ...x, ownerPlan: { ...x.ownerPlan, ...patch } } : x));
+  const lines = (v: string) => v.split('\n').map((x) => x.trim()).filter(Boolean);
 
   return (
     <>
@@ -148,8 +157,48 @@ export default function OffersView({ openId, setOpenId, onUnread }: Props) {
               <div className="adm-actions">
                 <button className="lq-btn-ghost adm-btn" disabled={!!busy} onClick={() => call('plan', `/api/admin/offers/${o.id}/plan`, 'POST', { ownerNotes: o.ownerNotes })}>
                   {busy === 'plan' ? 'Planlanıyor…' : o.plan ? 'Planı yeniden oluştur' : 'Yapay zekâ ile planla'}</button>
+                {editable && <button className="lq-btn-ghost adm-btn" disabled={!!busy} onClick={() => call('draft', `/api/admin/offers/${o.id}/draft`, 'POST', { ownerNotes: o.ownerNotes }, 'Taslak hazırlandı. Kontrol edip düzenleyin; hiçbir şey otomatik gönderilmez.')}>
+                  {busy === 'draft' ? 'Taslak hazırlanıyor…' : 'Taslağı yapay zekâyla hazırla'}</button>}
                 {p && editable && <button className="lq-btn-ghost adm-btn" onClick={applyPlan}>Önerilen kalemleri teklife aktar</button>}
               </div>
+              {o.quote && o.ownerPlan && <>
+                <div className="adm-head" style={{ margin: '8px 0 0' }}><h3>Tek sayfalık teklif taslağı (düzenle, sonra gönder)</h3>
+                  <a className="lq-btn-ghost adm-btn sm" href={`/api/admin/offers/${o.id}/print`} target="_blank" rel="noreferrer">Yazdır / PDF</a></div>
+                {(o.ownerPlan.missing.length > 0) && <div className="adm-field" role="alert"><span className="adm-label">Açık sorular (tamamlanmadan gönderilemez)</span>
+                  <ul style={{ margin: 0, paddingLeft: 18, listStyle: 'disc', color: 'var(--c-lilac)' }}>{o.ownerPlan.missing.map((m, i) => <li key={i}>{m}</li>)}</ul></div>}
+                {([['Durum (müşterinin rakamıyla)', 'situation'], ['Çözüm (tek cümle)', 'solution'], ['Sonraki adım', 'nextStep']] as const).map(([lab, k]) => (
+                  <div className="adm-field" key={k}><label className="adm-label" htmlFor={`q-${k}`}>{lab}</label>
+                    <textarea id={`q-${k}`} className="adm-input" style={{ minHeight: 60 }} disabled={!editable} value={o.quote![k]} onChange={(e) => setQ2({ [k]: e.target.value })} /></div>))}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
+                  {o.quote.packages.map((pk, i) => (
+                    <div key={i} className="lq-card adm-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, borderColor: pk.recommended ? 'var(--c-signal)' : undefined }}>
+                      <input className="adm-input" aria-label="Paket adı" disabled={!editable} value={pk.name} onChange={(e) => setPk(i, { name: e.target.value })} />
+                      <label className="adm-label">Kurulum<input className="adm-input" type="number" min={0} disabled={!editable} value={pk.setup} onChange={(e) => setPk(i, { setup: Number(e.target.value) })} /></label>
+                      {!o.quote!.oneTime && <label className="adm-label">Aylık<input className="adm-input" type="number" min={0} disabled={!editable} value={pk.monthly} onChange={(e) => setPk(i, { monthly: Number(e.target.value) })} /></label>}
+                      <textarea className="adm-input" aria-label="Kapsam" style={{ minHeight: 70 }} disabled={!editable} value={pk.includes.join('\n')} onChange={(e) => setPk(i, { includes: lines(e.target.value) })} />
+                      <label style={{ fontSize: 13 }}><input type="radio" name="of-rec" disabled={!editable} checked={pk.recommended} onChange={() => setQ2({ packages: o.quote!.packages.map((k, j) => ({ ...k, recommended: j === i })) })} /> Önerilen</label>
+                    </div>))}
+                </div>
+                <div className="adm-field"><label className="adm-label" htmlFor="q-excl">Dahil olmayanlar (satır başına bir madde, en az 3)</label>
+                  <textarea id="q-excl" className="adm-input" style={{ minHeight: 70 }} disabled={!editable} value={o.quote.exclusions.join('\n')} onChange={(e) => setQ2({ exclusions: lines(e.target.value) })} /></div>
+                {editable && <div className="adm-actions"><button className="lq-btn-ghost adm-btn" disabled={!!busy} onClick={() => {
+                  const rec = o.quote!.packages.find((k) => k.recommended) ?? o.quote!.packages[0];
+                  if (rec) setO({ ...o, items: [{ title: rec.name, detail: rec.includes.join(' · ').slice(0, 400), amount: rec.setup }], monthly: rec.monthly, monthlyIncludes: rec.monthly > 0 ? rec.includes.join(', ').slice(0, 600) : '' });
+                  setMsg({ ok: true, text: 'Önerilen paket fiyatı teklif kalemlerine aktarıldı. "Kaydet" deyin.' });
+                }}>Önerilen paketi fiyat kalemlerine aktar</button></div>}
+                <div className="adm-field" style={{ borderTop: '1px dashed var(--c-hairline)', paddingTop: 10 }}><span className="adm-label">Fiyat kuralı ve maliyet tablosu (YALNIZCA SEN GÖRÜRSÜN, müşteriye gitmez)</span>
+                  <label className="adm-label">Müşterinin aylık kaybı ({o.currency})<input className="adm-input" type="number" min={0} disabled={!editable} value={o.ownerPlan.customerMonthlyLoss ?? ''} onChange={(e) => setPl({ customerMonthlyLoss: e.target.value === '' ? null : Number(e.target.value) })} /></label>
+                  {o.ownerPlan.costs.map((c, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input className="adm-input" aria-label="Maliyet kalemi" disabled={!editable} value={c.label} onChange={(e) => setPl({ costs: o.ownerPlan!.costs.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />
+                      <input className="adm-input" style={{ maxWidth: 110 }} type="number" min={0} aria-label="Aylık maliyet" disabled={!editable} value={c.monthly} onChange={(e) => setPl({ costs: o.ownerPlan!.costs.map((x, j) => (j === i ? { ...x, monthly: Number(e.target.value), estimated: false } : x)) })} />
+                      <span className="adm-meta">{c.estimated ? 'tahmin' : 'girildi'}</span>
+                    </div>))}
+                  {editable && <button className="lq-btn-ghost adm-btn sm" onClick={() => setPl({ costs: [...o.ownerPlan!.costs, { label: '', monthly: 0, estimated: false }] })}>+ Maliyet kalemi</button>}
+                  <span className="adm-meta">Toplam aylık maliyet: {money(o.ownerPlan.costs.reduce((a, c) => a + (Number(c.monthly) || 0), 0), o.currency)} · Kural: aylık &lt; müşteri kaybı, aylık ≥ 5 × maliyet, kurulum = 3–5 × aylık</span>
+                  {o.ownerPlan.checks.length > 0 && <ul style={{ margin: 0, paddingLeft: 18, listStyle: 'disc', color: 'var(--c-lilac)', fontSize: 14 }}>{o.ownerPlan.checks.map((m, i) => <li key={i}>{m}</li>)}</ul>}
+                </div>
+              </>}
               {p && <>
                 <div className="adm-field"><span className="adm-label">Özet</span><div>{p.summary}</div></div>
                 <div className="adm-field"><span className="adm-label">Bütçe</span>
