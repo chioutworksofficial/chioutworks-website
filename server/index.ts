@@ -28,6 +28,7 @@ import { registerPreview } from './preview.js';
 import { languageOk, SAFE_FALLBACK } from './languageGuard.js';
 import { ids as abuseIds, recordAbuse, voiceBlocked, chatState, recordStrike, blockedMsg, adminList, adminUnlock, rateOk, globalOk, textMsgAllowed, TEXT_SESSION_MAX, insult, abuseExempt, MSG as ABUSE_MSG } from './abuse.js';
 import { validate as v, z, s, idP, idp, LANG, email, emailOpt, bool, anyObj } from './validate.js';
+import { llmStatus } from './llm.js';
 import { recordError, sendErrorMail, ERR_MAIL_KEY } from './errors.js';
 import { shapeReply, tooLong, truncateReply } from './shapeGuard.js';
 import { pool, capReached, markQuota, quotaRecently, isQuotaError, livePressure, countSession, mintToken, buildLiveInstruction, liveConfigured, type LiveTurn } from './geminiLive.js';
@@ -605,6 +606,10 @@ app.post('/api/admin/logout', async (req, res) => {
 app.get('/api/admin/me', async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   return res.json({ ok: true });
+});
+app.get('/api/admin/llm/status', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  return res.json(llmStatus());
 });
 
 // ── Availability (owner-managed busy days) ─────────────────────────────────
