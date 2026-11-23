@@ -673,16 +673,24 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     const ctx = gsap.context(() => {
       const vh = window.innerHeight;
       const dist = () => track.current!.scrollWidth - window.innerWidth;
+      // Card centres are measured once per refresh (relative to the track at x = 0); per frame only the track's x is read.
+      // The old version called getBoundingClientRect on every card on every scroll frame, which made the run stutter.
+      let base: number[] = [];
+      const measure = () => {
+        const x0 = Number(gsap.getProperty(track.current!, 'x')) || 0;
+        base = tilts.current.map((t) => { if (!t) return 0; const r = t.parentElement!.getBoundingClientRect(); return r.left + r.width / 2 - x0; });
+      };
       const tilt = () => {
         const vw = window.innerWidth;
+        const x = Number(gsap.getProperty(track.current!, 'x')) || 0;
         tilts.current.forEach((t, i) => {
           if (!t) return;
-          const r = t.parentElement!.getBoundingClientRect();
-          const raw = Math.max(-1.4, Math.min(1.4, (r.left + r.width / 2 - vw / 2) / (vw * 0.5)));
+          const raw = Math.max(-1.4, Math.min(1.4, (base[i] + x - vw / 2) / (vw * 0.5)));
           const a = Math.min(1, Math.abs(raw));
-          gsap.set(t, { rotateZ: raw * 7, rotateY: raw * -3, rotateX: a * 3, scale: 1 - a * 0.05 });
+          gsap.set(t, { rotateZ: raw * 7, rotateY: raw * -3, rotateX: a * 3, scale: 1 - a * 0.05, force3D: true });
           t.style.setProperty('--tx', raw.toFixed(3));
-          t.dataset.act = Math.abs(raw) < 1.15 ? '1' : '0';
+          const act = Math.abs(raw) < 1.15 ? '1' : '0';
+          if (t.dataset.act !== act) t.dataset.act = act;
           const cap = caps.current[i];
           if (cap) gsap.set(cap, { opacity: Math.max(0.3, Math.min(1, 1.25 - a * 1.1)) });
         });
@@ -691,20 +699,14 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         defaults: { ease: 'none' },
         onUpdate: tilt,
         scrollTrigger: {
-          trigger: root.current, start: 'top top', end: () => { const l = (i: number) => tilts.current[i]!.parentElement!.parentElement as HTMLElement; return `+=${Math.round((dist() * CARD_PACE * vh) / (l(1).offsetLeft - l(0).offsetLeft))}`; }, pin: true, scrub: SCRUB * 1.25, invalidateOnRefresh: true, onRefresh: tilt,
-          snap: DEV && location.search.includes('nosnap') ? undefined : {
-            snapTo: (v: number) => {
-              const d = dist();
-              const ps = tilts.current.map((t) => { const l = t!.parentElement!.parentElement as HTMLElement; return (l.offsetLeft + l.offsetWidth / 2 - window.innerWidth / 2) / d; }).filter((p) => p >= 0 && p <= 1);
-              return ps.reduce((b, p) => (Math.abs(p - v) < Math.abs(b - v) ? p : b), ps[0] ?? v);
-            },
-            inertia: false, duration: { min: 0.4, max: 0.9 }, delay: 0.18, ease: 'power2.inOut',
-          },
+          trigger: root.current, start: 'top top', end: () => { const l = (i: number) => tilts.current[i]!.parentElement!.parentElement as HTMLElement; return `+=${Math.round((dist() * CARD_PACE * vh) / (l(1).offsetLeft - l(0).offsetLeft))}`; }, pin: true, scrub: SCRUB, invalidateOnRefresh: true, onRefresh: () => { measure(); tilt(); },
+          // No snap (owner, 2026-11-23): snapping stopped and re-settled the scroll at each card, which felt like stuttering.
         },
       });
       tl.fromTo(track.current, { x: 0 }, { x: () => -dist() }, 0)
         .fromTo(rows.current[0], { x: 0 }, { x: -2600 }, 0)
         .fromTo(rows.current[1], { x: -2600 }, { x: 0 }, 0);
+      measure();
       tilt();
       if (DEV) {
         (window as unknown as { __cwFeatures: unknown }).__cwFeatures = { goto: (i: number) => {
