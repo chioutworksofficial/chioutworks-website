@@ -14,7 +14,7 @@ import {
   type L, type L4, type Market, type SectorKey, type StaticQ, type QDef, type SecDef, type Definition,
 } from '../src/data/intakeSectors.js';
 import { INTAKE_SLUG } from '../src/lib/routes.js';
-import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, DREAM_IDS, DREAM_TITLE, EXAMPLES_Q, EXAMPLES_TITLE, EXTRA_SYSTEM, LEGAL_Q, LENGTH_NOTE, MERGE_INTO, MESSENGER_Q, MOVE_AFTER, ORDER_NO_WEBSITE, QUICK_IDS, SPLIT_PAGES, QUESTION_HELP, SECTION_INTRO, SECTION_META, SECTION_ORDER, SHOW_IF, STYLE_TITLE, SUGGESTIONS } from '../src/data/intakeHelp.js';
+import { AUTOMATION_FLOW, COST_IDS, COST_NOTE, DREAM_IDS, DREAM_TITLE, EXAMPLES_Q, EXAMPLES_TITLE, EXTRA_SYSTEM, LEGAL_Q, ONETIME_ACK_Q, SUPPORT_Q, LENGTH_NOTE, MERGE_INTO, MESSENGER_Q, MOVE_AFTER, ORDER_NO_WEBSITE, QUICK_IDS, SPLIT_PAGES, QUESTION_HELP, SECTION_INTRO, SECTION_META, SECTION_ORDER, SHOW_IF, STYLE_TITLE, SUGGESTIONS } from '../src/data/intakeHelp.js';
 import { isVisible, visibleSections } from '../src/lib/intakeLogic.js';
 import { applyChoice, saveChoice, styleSummary, type StyleRec } from './styles.js';
 
@@ -167,6 +167,7 @@ function friendly(secs: SecDef[]): SecDef[] {
   for (const id of DREAM_IDS) for (const s of secs) { const i = s.qs.findIndex((q) => q.id === id); if (i >= 0) { dream.push(s.qs[i]); s.qs.splice(i, 1); break; } }
   const project = secs.find((s) => s.id === 'project');
   if (project && !project.qs.some((q) => q.id === LEGAL_Q.id)) { const at = project.qs.findIndex((q) => q.id === 'budget_onetime'); project.qs.splice(at < 0 ? project.qs.length : at, 0, LEGAL_Q); }
+  for (const s of secs) { const at = s.qs.findIndex((q) => q.id === 'budget_monthly'); if (at >= 0 && !s.qs.some((q) => q.id === SUPPORT_Q.id)) s.qs.splice(at, 0, SUPPORT_Q, ONETIME_ACK_Q); }
   for (const [id, [to, after]] of Object.entries(MOVE_AFTER)) {
     const dst = secs.find((s) => s.id === to); if (!dst) continue;
     for (const s of secs) { const i = s.qs.findIndex((q) => q.id === id); if (i >= 0) { const [q] = s.qs.splice(i, 1); const at = dst.qs.findIndex((x) => x.id === after); dst.qs.splice(at < 0 ? dst.qs.length : at + 1, 0, q); break; } }
@@ -237,10 +238,17 @@ export function formatAnswers(i: Intake, lang: L = 'tr') {
   return { sections, consent: a.consent === true };
 }
 
+const SUPPORT_LINE = (i: Intake, lang: L): string => {
+  const m = i.answers.support_model; if (typeof m !== 'string' || !m) return '';
+  const o = SUPPORT_Q.opts?.find((x) => x.id === m); if (!o) return '';
+  const ack = m === 'onetime' ? (i.answers.onetime_ack === 'ack' ? ' (acknowledged)' : ' (NOT acknowledged)') : '';
+  return `${lang === 'tr' ? 'DESTEK MODELİ' : 'SUPPORT MODEL'}: ${o.t[lang]}${ack}`;
+};
 export function answersMarkdown(i: Intake, lang: L = 'tr'): string {
   const f = formatAnswers(i, lang);
   const md = [`# Chioutworks intake – ${str0(i.answers.meta_company) || 'unknown'}`, '',
     `- Dil: ${i.lang}${i.secondLang ? ' + ' + i.secondLang : ''} · Pazar: ${i.market} · Sektör: ${SECTOR_LABEL[defOf(i).sector][lang]}`,
+    ...(SUPPORT_LINE(i, 'tr') ? [`- ${SUPPORT_LINE(i, 'tr')}`] : []),
     `- Durum: ${i.status}${i.submittedAt ? ' · gönderildi ' + i.submittedAt : ''}`, ''];
   for (const s of f.sections) {
     md.push(`## ${s.title}`, '');
@@ -262,6 +270,7 @@ export function answersForAi(i: Intake): string {
   }
   const budget = f.sections.flatMap((s) => s.items).find((it) => it.id === 'budget_range')?.a;
   if (budget) out.splice(1, 0, `CLIENT BUDGET RANGE (stated first; size the scope to it): ${budget}`);
+  const sup = SUPPORT_LINE(i, 'en'); if (sup) out.splice(1, 0, sup);
   const company = str0(i.answers.meta_company);
   if (company) out.splice(1, 0, `Company: ${company}`);
   return out.join('\n');

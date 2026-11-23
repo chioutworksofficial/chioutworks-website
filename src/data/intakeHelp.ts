@@ -260,6 +260,33 @@ export const LEGAL_Q: QDef = {
   ]),
 };
 
+/** One-time build only: model choice before budget_monthly, plus a must-read notice with a required acknowledgement (single option = checkbox). */
+export const SUPPORT_Q: QDef = {
+  id: 'support_model', type: 'single', required: true,
+  t: l4([
+    'Kurulumdan sonra nasıl devam etmek istersiniz?',
+    'How would you like to continue after the setup?',
+    'Wie möchten Sie nach der Einrichtung weitermachen?',
+    'Πώς θα θέλατε να συνεχίσετε μετά την εγκατάσταση;',
+  ]),
+  opts: [
+    { id: 'monthly', t: l4(['Aylık bakım ve destekle', 'With monthly care and support', 'Mit monatlicher Betreuung und Support', 'Με μηνιαία συντήρηση και υποστήριξη']) },
+    { id: 'onetime', t: l4(['Yalnızca tek seferlik kurulum (aylık ödeme yok)', 'One-time setup only (no monthly payment)', 'Nur einmalige Einrichtung (keine monatliche Zahlung)', 'Μόνο εφάπαξ εγκατάσταση (χωρίς μηνιαία πληρωμή)']) },
+    { id: 'unsure', t: l4(['Henüz emin değilim', 'I am not sure yet', 'Ich bin noch nicht sicher', 'Δεν είμαι ακόμα σίγουρος/η']) },
+  ],
+};
+export const ONETIME_ACK_Q: QDef = {
+  id: 'onetime_ack', type: 'single', required: true,
+  t: l4(['Tek seferlik kurulum bilgilendirmesi', 'One-time setup notice', 'Hinweis zur einmaligen Einrichtung', 'Ενημέρωση για την εφάπαξ εγκατάσταση']),
+  notice: l4([
+    'Tek seferlik kurulumda teslimden sonra barındırma, alan adı, güncellemeler, güvenlik, yedekleme ve olası sorunlarla tamamen siz ilgilenirsiniz. Daha sonra değişiklik veya destek isterseniz bu iş saat ücretiyle yapılır: saat başı 65–75 € (işin türüne göre).',
+    'With a one-time setup, after delivery you take care of hosting, the domain, updates, security, backups and any problems entirely yourself. If you later want changes or support, that work is billed hourly: €65–75 per hour (depending on the type of work).',
+    'Bei einer einmaligen Einrichtung kümmern Sie sich nach der Übergabe vollständig selbst um Hosting, Domain, Updates, Sicherheit, Backups und mögliche Probleme. Wünschen Sie später Änderungen oder Support, wird diese Arbeit nach Stundensatz berechnet: 65–75 € pro Stunde (je nach Art der Arbeit).',
+    'Στην εφάπαξ εγκατάσταση, μετά την παράδοση φροντίζετε εσείς πλήρως το hosting, το domain, τις ενημερώσεις, την ασφάλεια, τα αντίγραφα ασφαλείας και τυχόν προβλήματα. Αν αργότερα θελήσετε αλλαγές ή υποστήριξη, η εργασία χρεώνεται ανά ώρα: 65–75 € ανά ώρα (ανάλογα με το είδος της εργασίας).',
+  ]),
+  opts: [{ id: 'ack', t: l4(['Okudum ve kabul ediyorum.', 'I have read and accept this.', 'Ich habe es gelesen und akzeptiere es.', 'Το διάβασα και το αποδέχομαι.']) }],
+};
+
 /** Replaces the old yes/no "WhatsApp notifications?" question: which channel, with Telegram recommended. No SMS (not offered). */
 export const MESSENGER_Q: QDef = {
   id: 'messenger_notify', type: 'multi', detail: true,
@@ -481,6 +508,8 @@ const wantsAutoCrm: Cond = { any: [{ q: 'wants', includes: 'automation' }, { q: 
 const alone: Cond = { q: 'employees', matches: '^(0|1|bir|one|ein|eine|einer|ich|just me|only me|solo|εγώ|μόνος|μόνη)\\b' };
 const noSite: Cond = { q: 'tech_site', in: ['no'] };
 export const SHOW_IF: Record<string, Cond> = {
+  budget_monthly: { not: { q: 'support_model', in: ['onetime'] } },   // one-time only -> no monthly budget question
+  onetime_ack: { q: 'support_model', in: ['onetime'] },
   website_satisfaction: { q: 'meta_website', filled: true },        // no current site given -> no satisfaction question
   tech_hosting: { not: noSite },                                     // no site/domain -> no hosting / who-manages question
   tech_access: { not: noSite },

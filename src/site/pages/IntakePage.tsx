@@ -293,6 +293,10 @@ export default function IntakePage() {
           {trans === 'loading' && (sec || qOpen[q.id]) && <span style={{ fontSize: 12, color: 'var(--c-ash)' }}>{u.translating}</span>}
           {trans === 'error' && (sec || qOpen[q.id]) && <span role="alert" style={{ fontSize: 12, color: 'var(--c-lilac)' }}>{u.transErr}</span>}
         </div>
+        {q.notice && (
+          <p role="note" style={{ margin: '0 0 12px', padding: '12px 14px', fontSize: 14, lineHeight: 1.55, background: 'var(--c-cobalt)', border: '1px solid var(--c-lilac)', borderRadius: 'var(--r-input)', color: 'var(--c-quartz)' }}>
+            <span aria-hidden="true" style={{ color: 'var(--c-lilac)', marginRight: 6 }}>★</span>{q.notice[lang] || q.notice.en}{Sub({ x: q.notice, qid: q.id })}
+          </p>)}
         {q.costNote && helpOpen[q.id] && (
           <p role="note" style={{ margin: '0 0 8px', padding: '12px 14px', fontSize: 14, lineHeight: 1.55, background: 'var(--c-cobalt)', border: '1px solid var(--c-lilac)', borderRadius: 'var(--r-input)', color: 'var(--c-quartz)' }}>
             <span aria-hidden="true" style={{ color: 'var(--c-lilac)', marginRight: 6 }}>★</span>{q.costNote[lang] || q.costNote.en}{Sub({ x: q.costNote, qid: q.id })}
