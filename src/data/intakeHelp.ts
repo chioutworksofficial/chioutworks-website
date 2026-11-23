@@ -287,6 +287,31 @@ export const ONETIME_ACK_Q: QDef = {
   opts: [{ id: 'ack', t: l4(['Okudum ve kabul ediyorum.', 'I have read and accept this.', 'Ich habe es gelesen und akzeptiere es.', 'Το διάβασα και το αποδέχομαι.']) }],
 };
 
+/** Invoicing features: which accounting software + must-read legal split with a required acknowledgement. */
+export const ACCOUNTING_Q: QDef = {
+  id: 'accounting_software', type: 'single',
+  t: l4(['Hangi muhasebe programını kullanıyorsunuz?', 'Which accounting software do you use?', 'Welche Buchhaltungssoftware nutzen Sie?', 'Ποιο λογιστικό πρόγραμμα χρησιμοποιείτε;']),
+  opts: [
+    { id: 'lexoffice', t: l4(['lexoffice', 'lexoffice', 'lexoffice', 'lexoffice']) },
+    { id: 'sevdesk', t: l4(['sevDesk', 'sevDesk', 'sevDesk', 'sevDesk']) },
+    { id: 'datev', t: l4(['DATEV', 'DATEV', 'DATEV', 'DATEV']) },
+    { id: 'other', t: l4(['Başka bir program', 'Another program', 'Ein anderes Programm', 'Άλλο πρόγραμμα']) },
+    { id: 'none', t: l4(['Henüz yok', 'None yet', 'Noch keine', 'Δεν έχω ακόμα']) },
+    { id: 'unknown', t: l4(['Bilmiyorum', 'I do not know', 'Weiß ich nicht', 'Δεν γνωρίζω']) },
+  ],
+};
+export const INVOICING_ACK_Q: QDef = {
+  id: 'invoicing_ack', type: 'single', required: true,
+  t: l4(['Fatura özellikleri hakkında bilgilendirme', 'Notice about invoicing features', 'Hinweis zu den Rechnungsfunktionen', 'Ενημέρωση για τις λειτουργίες τιμολόγησης']),
+  notice: l4([
+    'Fatura özellikleri, kullandığınız muhasebe programına veya sertifikalı bir fatura hizmetine bağlanarak kurulur; ekran ve otomasyon benden, fatura numaralandırma, değiştirilemez arşiv ve resmî e-fatura/bildirim o program veya hizmet üzerinden çalışır. Vergi, muhasebe ve yasal arşivleme kurallarına uygunluk (Almanya’da GoBD ve e-fatura, Yunanistan’da myDATA, Türkiye’de e-Fatura/e-Arşiv dahil) sizin ve vergi danışmanınızın sorumluluğundadır. Kurulumdan önce vergi danışmanınıza onaylatmanızı öneririm.',
+    'Invoicing features are set up by connecting to your accounting software or a certified invoicing service; the screens and automation come from me, while invoice numbering, the tamper-proof archive and official e-invoicing/reporting run through that software or service. Compliance with tax, accounting and legal archiving rules (including GoBD and e-invoicing in Germany, myDATA in Greece, e-Fatura/e-Arşiv in Turkey) is the responsibility of you and your tax adviser. I recommend having your tax adviser approve the setup before it goes live.',
+    'Rechnungsfunktionen werden durch die Anbindung an Ihre Buchhaltungssoftware oder einen zertifizierten Rechnungsdienst eingerichtet; Oberfläche und Automatisierung kommen von mir, Rechnungsnummern, unveränderbares Archiv und offizielle E-Rechnung/Meldung laufen über diese Software bzw. diesen Dienst. Die Einhaltung der steuer-, buchhaltungs- und archivierungsrechtlichen Vorgaben (u. a. GoBD und E-Rechnung in Deutschland, myDATA in Griechenland, e-Fatura/e-Arşiv in der Türkei) liegt bei Ihnen und Ihrem Steuerberater. Ich empfehle, die Einrichtung vor dem Start von Ihrem Steuerberater freigeben zu lassen.',
+    'Οι λειτουργίες τιμολόγησης στήνονται με σύνδεση στο λογιστικό σας πρόγραμμα ή σε πιστοποιημένη υπηρεσία τιμολόγησης· οι οθόνες και ο αυτοματισμός προέρχονται από εμένα, ενώ η αρίθμηση τιμολογίων, το αναλλοίωτο αρχείο και η επίσημη ηλεκτρονική τιμολόγηση/διαβίβαση λειτουργούν μέσω αυτού του προγράμματος ή της υπηρεσίας. Η συμμόρφωση με τους φορολογικούς, λογιστικούς και νομικούς κανόνες αρχειοθέτησης (μεταξύ άλλων GoBD και ηλεκτρονικό τιμολόγιο στη Γερμανία, myDATA στην Ελλάδα, e-Fatura/e-Arşiv στην Τουρκία) αποτελεί ευθύνη δική σας και του λογιστή σας. Συνιστώ να εγκρίνει ο λογιστής σας την εγκατάσταση πριν τεθεί σε λειτουργία.',
+  ]),
+  opts: [{ id: 'ack', t: l4(['Okudum ve kabul ediyorum.', 'I have read and accept this.', 'Ich habe es gelesen und akzeptiere es.', 'Το διάβασα και το αποδέχομαι.']) }],
+};
+
 /** Replaces the old yes/no "WhatsApp notifications?" question: which channel, with Telegram recommended. No SMS (not offered). */
 export const MESSENGER_Q: QDef = {
   id: 'messenger_notify', type: 'multi', detail: true,
@@ -507,9 +532,12 @@ const wantsAuto: Cond = { any: [{ q: 'wants', includes: 'automation' }, { q: 'wa
 const wantsAutoCrm: Cond = { any: [{ q: 'wants', includes: 'automation' }, { q: 'wants', includes: 'all' }, { q: 'wants', includes: 'crm' }] };
 const alone: Cond = { q: 'employees', matches: '^(0|1|bir|one|ein|eine|einer|ich|just me|only me|solo|εγώ|μόνος|μόνη)\\b' };
 const noSite: Cond = { q: 'tech_site', in: ['no'] };
+const invoicingOn: Cond = { any: [{ q: 'wants', includes: 'invoices' }, { q: 'invoicing', in: ['yes'] }] };
 export const SHOW_IF: Record<string, Cond> = {
   budget_monthly: { not: { q: 'support_model', in: ['onetime'] } },   // one-time only -> no monthly budget question
   onetime_ack: { q: 'support_model', in: ['onetime'] },
+  inv_tools: { q: 'accounting_software', in: ['other'] },
+  accounting_software: invoicingOn, invoicing_ack: invoicingOn,
   website_satisfaction: { q: 'meta_website', filled: true },        // no current site given -> no satisfaction question
   tech_hosting: { not: noSite },                                     // no site/domain -> no hosting / who-manages question
   tech_access: { not: noSite },

@@ -399,7 +399,7 @@ export const INV_Q: StaticQ[] = [
       o('einvoice', ['E-fatura uyumu', 'E-invoicing compliance', 'Konformität mit der E-Rechnung', 'Συμμόρφωση με το ηλεκτρονικό τιμολόγιο']),
       o('export', ['Muhasebeciye aktarım', 'Export for my accountant', 'Export für meinen Steuerberater', 'Εξαγωγή για τον λογιστή μου']),
     ] },
-  { id: 'inv_tools', type: 'text', t: l4(['Hangi muhasebe programıyla veya muhasebeciyle çalışıyorsunuz?', 'Which accounting software or accountant do you work with?', 'Mit welcher Buchhaltungssoftware oder welchem Steuerberater arbeiten Sie?', 'Με ποιο λογιστικό πρόγραμμα ή λογιστή συνεργάζεστε;']) },
+  { id: 'inv_tools', type: 'text', t: l4(['Hangi program?', 'Which program?', 'Welches Programm?', 'Ποιο πρόγραμμα;']) },
 ];
 
 export const AI_Q: StaticQ[] = [
