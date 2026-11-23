@@ -90,7 +90,7 @@ export function registerAffiliates(app: Express, d: Deps) {
       tools: tally(human.map((c) => c.id)),
       sources: tally(human.map((c) => c.src)),
       languages: tally(human.map((c) => c.lang)),
-      countries: tally(human.map((c) => c.cc.toUpperCase())),
+      countries: tally(human.map((c) => c.cc.toUpperCase()), 250),
       devices: tally(human.map((c) => c.dev)),
       daily,
     });

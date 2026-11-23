@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { api } from './api';
 
 // Real visitor statistics from the server (cookieless, bots filtered). Source: server/analytics.ts
@@ -22,6 +22,17 @@ function HBars({ rows, map }: { rows: Row[]; map?: (s: string) => string }) {
     const l = map ? map(r.label) : r.label;
     return <div className="adm-hbar" key={r.label}><span title={l}>{l}</span><div className="adm-bar"><i style={{ width: `${(r.value / max) * 100}%` }} /></div><b>{r.value}</b></div>;
   })}</>;
+}
+const CountryMap = lazy(() => import('./CountryMap'));
+function Countries({ rows }: { rows: Row[] }) {
+  if (!rows.length) return <HBars rows={rows} />;
+  const total = rows.reduce((a, r) => a + r.value, 0) || 1;
+  const top = rows.filter((r) => r.label !== '—').slice(0, 5).map((r) => `${country(r.label)} %${Math.round((r.value / total) * 100)}`).join(' · ');
+  return <>
+    <Suspense fallback={<div className="adm-skel" style={{ height: 180 }} />}><CountryMap rows={rows} name={country} /></Suspense>
+    {top && <p className="adm-meta adm-maptop">{top}</p>}
+    <HBars rows={rows} map={country} />
+  </>;
 }
 const Card = ({ title, children }: { title: string; children: React.ReactNode }) => <section className="lq-card adm-card"><div className="adm-head"><h2>{title}</h2></div>{children}</section>;
 const Stat = ({ label, value, hint }: { label: string; value: string | number; hint?: string }) => <div className="lq-card adm-stat"><span className="adm-label">{label}</span><b>{value}</b>{hint && <span className="adm-meta">{hint}</span>}</div>;
@@ -49,7 +60,7 @@ function AffiliateClicks({ days }: { days: number }) {
           <Card title="Ortağa göre"><HBars rows={a.tools} map={(t) => TOOL[t] ?? t} /></Card>
           <Card title="Hangi butondan"><HBars rows={a.sources} map={(x) => SRC[x] ?? x} /></Card>
           <Card title="Sayfa dili"><HBars rows={a.languages} map={(l) => LANGS[l] ?? l} /></Card>
-          <Card title="Ülke"><HBars rows={a.countries} map={country} /></Card>
+          <Card title="Ülke"><Countries rows={a.countries} /></Card>
           <Card title="Cihaz"><HBars rows={a.devices} map={(d) => DEV[d] ?? d} /></Card>
         </div>
       </>}
@@ -127,7 +138,7 @@ export default function AnalyticsView() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
           <Card title="En çok görülen sayfalar"><HBars rows={s.pages} /></Card>
           <Card title="Nereden geldiler"><HBars rows={s.referrers} /></Card>
-          <Card title="Ülke"><HBars rows={s.countries} map={country} /></Card>
+          <Card title="Ülke"><Countries rows={s.countries} /></Card>
           <Card title="Site dili"><HBars rows={s.languages} map={(l) => LANGS[l] ?? l} /></Card>
           <Card title="Cihaz"><HBars rows={s.devices} map={(d) => DEV[d] ?? d} /></Card>
           <Card title="Tarayıcı"><HBars rows={s.browsers} /></Card>

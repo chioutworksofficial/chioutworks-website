@@ -121,7 +121,7 @@ export function registerAnalytics(app: Express, d: Deps) {
       days, pageviews: human.length, visitors, bots: pvs.length - human.length,
       avgSeconds: durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length / 1000) : 0,
       daily: [...pvByDay.keys()].map((k2) => ({ day: k2, pageviews: pvByDay.get(k2)!, visitors: visitorsByDay.get(k2)!.size, bots: botByDay.get(k2)! })),
-      pages: tally(human.map((e) => e.path)), referrers: tally(human.map((e) => e.ref || '(doğrudan)')), countries: tally(human.map((e) => e.cc?.toUpperCase())),
+      pages: tally(human.map((e) => e.path)), referrers: tally(human.map((e) => e.ref || '(doğrudan)')), countries: tally(human.map((e) => e.cc?.toUpperCase()), 250),
       languages: tally(human.map((e) => e.lang)), devices: tally(human.map((e) => e.dev)), browsers: tally(human.map((e) => e.br)), systems: tally(human.map((e) => e.os)),
       clicks: tally(evs.filter((e) => e.k === 'click' && humanIds.has(e.id)).map((e) => e.label), 12),
       botReasons: tally(pvs.filter((e) => e.bot).map((e) => e.bot), 6),
