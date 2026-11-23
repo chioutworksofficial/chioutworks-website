@@ -687,66 +687,60 @@ function QrMock({ s, lang, x }: P) {
 const MOCK_BY: ((p: P) => ReactNode)[] = [VoiceMock, CalMock, CrmMock, QueueMock, PriceMock, PropMock, ChatMock, DashMock, ReviewsMock, QuoteMock, LoyaltyMock, QrMock];
 
 
-// Coverflow carousel (owner, 2026-11-23). Desktop: 3D tilt of the neighbours; phone (<768px or coarse pointer): 2D scale/opacity only.
+// Orbit carousel (owner, 2026-11-24: "exactly like smartbodrum.tech/#vitrin"): cards sit on a 3D ring, the ring eases to the target
+// angle every frame; hovering a card pops it to the front with a glow while the rest dim and a starry blue backdrop fades in.
+// Phone / no-hover devices: no hover, the centre card is permanently "lit" (lighter glow). 12 cards share a 6-slot look (|d|>3 fades out).
 const CF_CSS = `
 .cf-marq{animation:cf-marq 70s linear infinite}
 @keyframes cf-marq{from{transform:translateX(0)}to{transform:translateX(-33.3333%)}}
 #features[data-vis="0"] .cf-marq{animation-play-state:paused}
-.cf-stage{--cw:min(860px,60vw,calc((100svh - 290px)*1.6));position:relative;perspective:1900px;z-index:1;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;height:calc(var(--cw)*.625 + 44px);outline:none}
-.cf-card{position:absolute;left:50%;top:22px;width:var(--cw);margin-left:calc(var(--cw)/-2);aspect-ratio:16/10;container-type:inline-size;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .45s cubic-bezier(.2,.8,.2,1),translate .45s cubic-bezier(.2,.8,.2,1);will-change:transform,opacity;border-radius:20px;translate:var(--dx,0px) 0}
-.cf-stage[data-drag="1"]{cursor:grabbing}.cf-stage[data-drag="1"] *{cursor:grabbing!important}.cf-stage[data-drag="1"] .cf-card{transition:none}
-.cf-card[data-d="0"]{transform:none}
-.cf-card[data-d="1"]{transform:translateX(57%) translateZ(-120px) rotateY(24deg) scale(.82);opacity:.95}
-.cf-card[data-d="-1"]{transform:translateX(-57%) translateZ(-120px) rotateY(-24deg) scale(.82);opacity:.95}
-.cf-card[data-d="2"]{transform:translateX(76%) translateY(-5%) translateZ(-300px) scale(.66);opacity:.42}
-.cf-card[data-d="-2"]{transform:translateX(-76%) translateY(-5%) translateZ(-300px) scale(.66);opacity:.42}
-.cf-card[data-d="3"]{transform:translateX(88%) translateY(-9%) translateZ(-460px) scale(.52);opacity:.2}
-.cf-card[data-d="-3"]{transform:translateX(-88%) translateY(-9%) translateZ(-460px) scale(.52);opacity:.2}
-.cf-card[data-d="4"],.cf-card[data-d="-4"]{transform:translateX(0) translateY(-9%) translateZ(-460px) scale(.5);opacity:0;pointer-events:none}
-.cf-card[data-d="4"] .cf-hit,.cf-card[data-d="-4"] .cf-hit{display:none}
-.cf-frame{position:absolute;inset:0;border-radius:20px;overflow:hidden;background:linear-gradient(160deg,var(--c-cobalt,#12244f) 0%,var(--c-deep-sea,#0d172b) 55%,var(--c-abyss,#0e111b) 100%);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 22%,var(--c-hairline,#24375a));box-shadow:0 30px 70px -28px color-mix(in srgb,var(--c-void,#0b0c0e) 90%,transparent),0 4px 12px -4px color-mix(in srgb,var(--c-void,#0b0c0e) 60%,transparent)}
-.cf-hit{position:absolute;inset:0;z-index:5;cursor:pointer;border-radius:20px;background:transparent;border:0}
-.cf-over{position:absolute;left:0;right:0;bottom:0;height:52%;z-index:3;pointer-events:none;background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--c-void,#0b0c0e) 82%,transparent) 50%,color-mix(in srgb,var(--c-void,#0b0c0e) 94%,transparent))}
-.cf-cap{position:absolute;left:0;right:0;bottom:0;z-index:4;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:0 5cqw 4.2cqw;transition:opacity .4s}
-.cf-card:not([data-d="0"]) .cf-cap{opacity:.85}
-.cf-t{font-family:var(--font-display,Figtree,sans-serif);font-size:clamp(18px,3.4cqw,34px);font-weight:700;letter-spacing:-.02em;line-height:1.1;color:var(--c-quartz,#fff)}
-.cf-s{margin-top:.5em;font-size:clamp(12px,1.75cqw,16px);line-height:1.4;color:var(--c-mist,#c7c9d1);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.cf-cta{flex:none;display:inline-flex;align-items:center;white-space:nowrap;border-radius:9999px;background:var(--c-signal,#2862d7);color:var(--c-quartz,#fff);font-weight:600;font-size:clamp(12px,1.8cqw,16px);padding:.8em 1.5em;box-shadow:0 10px 24px -10px var(--c-signal,#2862d7);transition:transform .2s,filter .2s}
-.cf-cta:hover{transform:translateY(-1px);filter:brightness(1.12)}
-.cf-cta:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
-.cf-tag{position:absolute;top:3.2cqw;left:3.2cqw;z-index:4;border-radius:9999px;padding:.45em 1.1em;font-size:clamp(11px,1.5cqw,14px);font-weight:600;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-void,#0b0c0e) 62%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 18%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cf-glow{z-index:0;position:absolute;left:50%;top:50%;width:min(1100px,96vw);height:min(640px,70%);transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(50% 50% at 50% 50%,color-mix(in srgb,var(--c-signal,#2862d7) 34%,transparent),color-mix(in srgb,var(--c-cobalt,#12244f) 20%,transparent) 55%,transparent 80%);filter:blur(30px)}
-html[data-mode="light"] .cf-glow{background:radial-gradient(50% 50% at 50% 50%,color-mix(in srgb,var(--c-signal,#2862d7) 16%,transparent),transparent 75%)}
-.cf-arrow{position:absolute;top:50%;z-index:200;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:9999px;cursor:pointer;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-quartz,#fff) 10%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 22%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 10px 24px -14px color-mix(in srgb,var(--c-void,#0b0c0e) 70%,transparent);opacity:.75;transition:transform .2s,opacity .2s,background .2s}
-.cf-arrow:hover{opacity:1;background:color-mix(in srgb,var(--c-quartz,#fff) 18%,transparent)}
-.cf-arrow:hover{transform:translateY(-50%) scale(1.07)}
-.cf-arrow:focus-visible,.cf-btn:focus-visible,.cf-dot:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
-.cf-prev{left:max(12px,2.5vw)}.cf-next{right:max(12px,2.5vw)}
+@keyframes cf-star{to{background-position:320px 220px}}
+.cf-stage{--w:min(520px,36vw,calc((100svh - 330px)*1.6));--h:calc(var(--w)/1.6);--rx:1.08;--rz:.91;--ty:.17;--top:calc(var(--h)*.87);position:relative;height:calc(var(--h)*1.9);perspective:1800px;perspective-origin:50% 30%;z-index:1;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;outline:none}
+.cf-stage[data-drag="1"],.cf-stage[data-drag="1"] *{cursor:grabbing!important}
+.cf-space{position:absolute;inset:0;z-index:0;opacity:0;transition:opacity .7s ease;pointer-events:none;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);background:radial-gradient(ellipse 60% 70% at 50% 55%,color-mix(in srgb,var(--c-signal,#2862d7) 45%,var(--c-deep-sea,#0d172b)) 0%,var(--c-deep-sea,#0d172b) 45%,var(--c-void,#0b0c0e) 80%)}
+.cf-space::before,.cf-space::after{content:"";position:absolute;inset:0;background-repeat:repeat}
+.cf-space::before{background-image:radial-gradient(1.2px 1.2px at 20px 30px,var(--c-quartz,#fff),transparent),radial-gradient(1px 1px at 90px 140px,var(--c-mist,#c7c9d1),transparent),radial-gradient(1.4px 1.4px at 160px 60px,var(--c-quartz,#fff),transparent),radial-gradient(1px 1px at 230px 190px,var(--c-lilac,#85a6e9),transparent),radial-gradient(1.1px 1.1px at 300px 100px,var(--c-quartz,#fff),transparent);background-size:320px 220px;opacity:.75;animation:cf-star 60s linear infinite}
+.cf-space::after{background-image:radial-gradient(.9px .9px at 50px 80px,var(--c-quartz,#fff),transparent),radial-gradient(1.3px 1.3px at 180px 20px,var(--c-mist,#c7c9d1),transparent),radial-gradient(.8px .8px at 260px 150px,var(--c-quartz,#fff),transparent);background-size:280px 200px;opacity:.5;animation:cf-star 110s linear infinite reverse}
+#features[data-vis="0"] .cf-space::before,#features[data-vis="0"] .cf-space::after{animation-play-state:paused}
+.cf-stage[data-hov="1"] .cf-space{opacity:1}
+.cf-ring{position:absolute;left:50%;top:var(--top);width:0;height:0;transform-style:preserve-3d}
+.cf-card{position:absolute;left:calc(var(--w)/-2);top:calc(var(--h)/-2);width:var(--w);height:var(--h);container-type:inline-size;border-radius:18px;transition:filter .45s,box-shadow .45s;will-change:transform}
+.cf-frame{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:linear-gradient(160deg,var(--c-cobalt,#12244f) 0%,var(--c-deep-sea,#0d172b) 55%,var(--c-abyss,#0e111b) 100%);border:1px solid color-mix(in srgb,var(--c-signal,#2862d7) 32%,var(--c-hairline,#24375a));box-shadow:0 20px 44px color-mix(in srgb,var(--c-void,#0b0c0e) 55%,transparent);transition:box-shadow .45s}
+.cf-stage[data-hov="1"] .cf-card{filter:brightness(.45) saturate(.6)}
+.cf-stage[data-hov="1"] .cf-card.lit{filter:none}
+.cf-stage[data-hov="1"] .cf-card.lit .cf-frame{box-shadow:0 0 0 1px color-mix(in srgb,var(--c-lilac,#85a6e9) 55%,transparent),0 30px 90px color-mix(in srgb,var(--c-signal,#2862d7) 55%,transparent)}
+.cf-hit{position:absolute;inset:0;z-index:5;border-radius:18px;outline-offset:4px}
+.cf-over{position:absolute;left:0;right:0;bottom:0;height:56%;z-index:3;pointer-events:none;background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--c-void,#0b0c0e) 82%,transparent) 50%,color-mix(in srgb,var(--c-void,#0b0c0e) 94%,transparent))}
+.cf-cap{position:absolute;left:0;right:0;bottom:0;z-index:4;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:0 5cqw 4.2cqw;pointer-events:none}
+.cf-t{font-family:var(--font-display,Figtree,sans-serif);font-size:clamp(16px,3.6cqw,34px);font-weight:700;letter-spacing:-.02em;line-height:1.15;color:var(--c-quartz,#fff)}
+.cf-s{margin-top:.4em;font-size:clamp(11.5px,2.3cqw,16px);line-height:1.35;color:var(--c-mist,#c7c9d1);opacity:.9;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.cf-cta{flex:none;display:inline-flex;align-items:center;white-space:nowrap;border-radius:10px;background:var(--c-signal,#2862d7);color:var(--c-quartz,#fff);font-weight:700;font-size:clamp(12px,2.6cqw,16px);padding:.6em 1em;opacity:0;transform:translateY(6px);transition:all .35s}
+.cf-card.lit .cf-cta{opacity:1;transform:none}
+.cf-tag{position:absolute;top:3cqw;left:50%;transform:translateX(-50%);z-index:4;border-radius:9999px;padding:.5em 1.35em;font-size:clamp(12.5px,2.4cqw,18px);font-weight:700;letter-spacing:.02em;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-void,#0b0c0e) 78%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 14%,transparent);max-width:84%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.cf-arrow{position:absolute;top:var(--top);z-index:3000;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:9999px;cursor:pointer;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-quartz,#fff) 10%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 22%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 10px 24px -14px color-mix(in srgb,var(--c-void,#0b0c0e) 70%,transparent);opacity:.75;transition:transform .2s,opacity .2s,background .2s}
+.cf-arrow:hover{opacity:1;background:color-mix(in srgb,var(--c-quartz,#fff) 18%,transparent);transform:translateY(-50%) scale(1.08)}
+.cf-arrow:focus-visible,.cf-btn:focus-visible,.cf-dot:focus-visible,.cf-hit:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
+.cf-prev{left:max(16px,calc(50% - 640px))}.cf-next{right:max(16px,calc(50% - 640px))}
 .cf-btn{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:9999px;cursor:pointer;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-quartz,#fff) 10%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 22%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);opacity:.8;transition:opacity .2s,background .2s}
 .cf-btn:hover{opacity:1;background:color-mix(in srgb,var(--c-quartz,#fff) 18%,transparent)}
 html[data-mode='light'] .cf-btn{color:var(--c-void,#0b0c0e);background:color-mix(in srgb,var(--c-void,#0b0c0e) 6%,transparent);border-color:color-mix(in srgb,var(--c-void,#0b0c0e) 18%,transparent)}
-.cf-dot{height:8px;width:8px;border-radius:9999px;border:0;padding:0;cursor:pointer;background:var(--c-hairline,#24375a);transition:width .35s,background .35s}
-.cf-dot[aria-current="true"]{width:28px;background:var(--c-signal,#2862d7)}
+.cf-dot{height:8px;width:8px;border-radius:9999px;border:0;padding:0;cursor:pointer;background:var(--c-hairline,#24375a);transition:width .3s,background .3s}
+.cf-dot[aria-current="true"]{width:22px;background:var(--c-signal,#2862d7)}
 .cf-dotw{display:flex;align-items:center;justify-content:center;min-width:14px;height:32px}
 .cf-card[data-act="0"] .fx,.cf-card[data-act="0"] .fx-dots i{animation-play-state:paused}
 @media (max-width:767px),(pointer:coarse){
-  .cf-stage{--cw:min(86vw,520px,calc((100svh - 250px)*.86));perspective:none;height:calc(var(--cw)*1.14 + 28px)}
-  .cf-card{aspect-ratio:5/6;top:14px;border-radius:18px}
-  .cf-frame,.cf-hit{border-radius:18px}
-  .cf-card[data-d="1"]{transform:translateX(97%) scale(.86);opacity:.55}
-  .cf-card[data-d="-1"]{transform:translateX(-97%) scale(.86);opacity:.55}
-  .cf-card[data-d="2"],.cf-card[data-d="-2"],.cf-card[data-d="3"],.cf-card[data-d="-3"],.cf-card[data-d="4"],.cf-card[data-d="-4"]{transform:scale(.8);opacity:0;pointer-events:none}
-  .cf-card[data-d="2"] .cf-hit,.cf-card[data-d="-2"] .cf-hit,.cf-card[data-d="3"] .cf-hit,.cf-card[data-d="-3"] .cf-hit{display:none}
-  .cf-cap{flex-direction:column;align-items:flex-start;gap:12px;padding:0 5.5cqw 5.5cqw}
-  .cf-t{font-size:clamp(19px,6.2cqw,26px)}
-  .cf-s{font-size:clamp(12.5px,3.7cqw,15px)}
-  .cf-cta{font-size:13.5px;padding:.7em 1.3em}
-  .cf-tag{top:12px;left:12px;font-size:11.5px;max-width:70%}
-  .cf-arrow{display:none}
+  .cf-stage{--w:clamp(236px,66vw,320px);--h:calc(var(--w)*1.2);--rx:.56;--rz:.89;--ty:.16;--top:calc(var(--h)/2 + 78px);perspective:1000px;height:calc(var(--h) + 120px)}
+  .cf-card,.cf-frame,.cf-hit{border-radius:16px}
+  .cf-space,.cf-arrow{display:none}
+  .cf-card.lit .cf-frame{box-shadow:0 0 0 1px color-mix(in srgb,var(--c-lilac,#85a6e9) 30%,transparent),0 14px 34px -8px color-mix(in srgb,var(--c-signal,#2862d7) 45%,transparent)}
+  .cf-cap{flex-direction:column;align-items:flex-start;gap:10px;padding:0 5.5cqw 5.5cqw}
+  .cf-t{font-size:clamp(17px,6.2cqw,24px)}
+  .cf-s{font-size:clamp(12px,3.9cqw,14px)}
+  .cf-cta{font-size:13px;padding:.55em 1em}
+  .cf-tag{top:12px;font-size:12.5px;max-width:86%}
   .cf-btn{width:32px;height:32px}
-  .cf-glow{height:60%}
 }
-@media (prefers-reduced-motion: reduce){.cf-card{transition:none}.cf-marq{animation:none}.cf-dot{transition:none}}
+@media (prefers-reduced-motion: reduce){.cf-space{transition:none}.cf-space::before,.cf-space::after,.cf-marq{animation:none}.cf-dot{transition:none}}
 `;
 
 const Chev = ({ r }: { r?: boolean }) => (
@@ -754,28 +748,41 @@ const Chev = ({ r }: { r?: boolean }) => (
 );
 
 const N = ORDER.length;
+const DRAG_K = 0.22 / 60; // ring slots per dragged pixel (reference: 0.22 deg per px on a 60 deg slot)
 
 export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const ui = FEATURES_UI[lang];
   const root = useRef<HTMLElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const cardEl = useRef<(HTMLDivElement | null)[]>([]);
   const [idx, setIdx] = useState(0);
   const [vis, setVis] = useState(true);
   const paused = useRef(false);
-  const drag = useRef<{ x: number; moved: boolean; t: number; lx: number; lt: number } | null>(null);
   const reduce = useRef(false);
+  const touch = useRef(false);
+  const suppress = useRef(false);
+  const wheelT = useRef(0);
+  // pos: current ring position in card slots; target: where it eases to; pop: per-card hover pop 0..1
+  const S = useRef({ pos: 0, target: 0, hov: -1, pop: new Array<number>(N).fill(0), dx: null as number | null, start: 0, moved: false, cur: 0 });
 
-  const go = useCallback((to: number) => setIdx(((to % N) + N) % N), []);
-  const step = useCallback((d: number) => setIdx((i) => (((i + d) % N) + N) % N), []);
+  const go = useCallback((i: number) => {
+    const s = S.current; let t = i;
+    while (t - s.pos > N / 2) t -= N;
+    while (s.pos - t > N / 2) t += N;
+    s.target = t;
+  }, []);
+  const step = useCallback((d: number) => { S.current.target = Math.round(S.current.target) + d; }, []);
 
   useLayoutEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     reduce.current = mq.matches;
+    touch.current = window.matchMedia('(hover: none)').matches;
     const on = () => { reduce.current = mq.matches; };
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
 
-  // Off-screen: pause animations and auto-advance. Later pinned sections are measured once the layout is final.
+  // Off-screen: pause animations, the frame loop and auto-advance. Later pinned sections are measured once the layout is final.
   useEffect(() => {
     const el = root.current;
     if (!el) return;
@@ -787,42 +794,73 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
 
   useEffect(() => {
     if (!vis) return;
-    const id = window.setInterval(() => { if (!paused.current && !reduce.current && !document.hidden) step(1); }, 5000);
+    const id = window.setInterval(() => { if (!paused.current && S.current.hov < 0 && S.current.dx === null && !reduce.current && !document.hidden) step(1); }, 6000);
     return () => window.clearInterval(id);
-  }, [vis, idx, step]);
+  }, [vis, step]);
 
-  const stage = useRef<HTMLDivElement>(null);
-  const suppress = useRef(false);
-  const wheelT = useRef(0);
-  const live = (v: number) => stage.current?.style.setProperty('--dx', `${v}px`);
+  // Frame loop: ease the ring, place every card on the orbit (same maths as the reference), toggle the lit state.
+  useEffect(() => {
+    if (!vis) return;
+    let raf = 0, last = 0;
+    const tick = (ts: number) => {
+      raf = requestAnimationFrame(tick);
+      const st = stage.current, s = S.current;
+      if (!st) return;
+      const dt = Math.min(64, ts - (last || ts)); last = ts;
+      if (s.dx === null) {
+        const diff = s.target - s.pos;
+        s.pos += reduce.current || Math.abs(diff) < 0.001 ? diff : diff * Math.min(1, dt / 200);
+      }
+      const cs = getComputedStyle(st);
+      const w = cardEl.current[0]?.offsetWidth || 400;
+      const RX = (parseFloat(cs.getPropertyValue('--rx')) || 1) * w, RZ = (parseFloat(cs.getPropertyValue('--rz')) || 0.9) * w, TY = (parseFloat(cs.getPropertyValue('--ty')) || 0.17) * w;
+      const cur = ((Math.round(s.pos) % N) + N) % N;
+      const settled = Math.abs(s.target - s.pos) < 0.01;
+      for (let i = 0; i < N; i++) {
+        const c = cardEl.current[i]; if (!c) continue;
+        let d = i - s.pos; d -= Math.round(d / N) * N;
+        const ad = Math.abs(d), dd = Math.max(-3, Math.min(3, d));
+        const th = (dd * 60 * Math.PI) / 180, sn = Math.sin(th), co = Math.cos(th);
+        const want = i === s.hov ? 1 : 0; s.pop[i] += (want - s.pop[i]) * Math.min(1, dt / 120);
+        const p = s.pop[i];
+        const x = RX * sn * (1 - p * 0.25), z = RZ * co - RZ + p * 260, y = -TY * (1 - co) * (1 - p) + p * 10;
+        const sc = (0.6 + 0.4 * (1 + co) / 2) * (1 - p) + 1.16 * p;
+        const fade = ad > 3 ? Math.max(0, 1 - (ad - 3)) : 1;
+        c.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,${z.toFixed(1)}px) rotateY(${(-sn * 22 * (1 - p)).toFixed(2)}deg) scale(${sc.toFixed(3)})`;
+        c.style.zIndex = String(Math.round(1000 + z));
+        c.style.opacity = String(Math.min(1, Math.max(0.35, 0.55 + 0.45 * co + p)) * fade);
+        c.style.visibility = fade === 0 ? 'hidden' : 'visible';
+        c.style.pointerEvents = fade < 0.5 ? 'none' : '';
+        const lit = s.hov >= 0 ? i === s.hov : i === cur && settled;
+        if (c.classList.contains('lit') !== lit) c.classList.toggle('lit', lit);
+        const act = i === cur || i === s.hov ? '1' : '0';
+        if (c.dataset.act !== act) c.dataset.act = act;
+      }
+      if (cur !== s.cur) { s.cur = cur; setIdx(cur); }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [vis]);
+
+  const setHov = (i: number) => { S.current.hov = i; if (i >= 0) stage.current?.setAttribute('data-hov', '1'); else stage.current?.removeAttribute('data-hov'); };
   const onDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && (e.button !== 0 || (e.target as HTMLElement).closest('.cf-arrow'))) return;
-    drag.current = { x: e.clientX, moved: false, t: e.timeStamp, lx: e.clientX, lt: e.timeStamp };
+    const s = S.current; s.dx = e.clientX; s.start = s.pos; s.moved = false;
     if (e.pointerType === 'touch') paused.current = true;
   };
   const onMoveP = (e: React.PointerEvent) => {
-    const d = drag.current; if (!d) return;
-    const dx = e.clientX - d.x;
-    if (e.pointerType !== 'mouse') { if (Math.abs(dx) > 8) d.moved = true; return; }
-    if (!d.moved && Math.abs(dx) > 6) { d.moved = true; stage.current?.setPointerCapture(e.pointerId); stage.current?.setAttribute('data-drag', '1'); }
-    if (d.moved) { d.lx = e.clientX; d.lt = e.timeStamp; live(dx * 0.6); }
+    const s = S.current; if (s.dx === null) return;
+    const dx = e.clientX - s.dx;
+    if (!s.moved && Math.abs(dx) > 6) { s.moved = true; stage.current?.setPointerCapture(e.pointerId); stage.current?.setAttribute('data-drag', '1'); setHov(-1); }
+    if (s.moved) { s.pos = s.start - dx * DRAG_K; s.target = s.pos; }
   };
   const onUp = (e: React.PointerEvent) => {
-    const d = drag.current; drag.current = null;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    if (e.pointerType === 'mouse') {
-      if (!d.moved) return;
-      stage.current?.removeAttribute('data-drag'); live(0);
-      suppress.current = true; window.setTimeout(() => { suppress.current = false; }, 60);
-      const v = Math.abs(dx) / Math.max(1, e.timeStamp - d.t);
-      if (Math.abs(dx) > 60 || (Math.abs(dx) > 20 && v > 0.5)) step(dx < 0 ? 1 : -1);
-      return;
-    }
-    if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1);
+    const s = S.current; if (s.dx === null) return;
+    s.dx = null; stage.current?.removeAttribute('data-drag');
+    if (s.moved) { s.target = Math.round(s.pos); suppress.current = true; window.setTimeout(() => { suppress.current = false; }, 60); }
     if (e.pointerType === 'touch') window.setTimeout(() => { paused.current = false; }, 4000);
   };
-  const onCancel = () => { drag.current = null; stage.current?.removeAttribute('data-drag'); live(0); };
+  const onCancel = () => { const s = S.current; if (s.dx === null) return; s.dx = null; stage.current?.removeAttribute('data-drag'); s.target = Math.round(s.pos); };
   const onWheel = (e: React.WheelEvent) => {
     const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
     if (Math.abs(dx) < 4 || (!e.shiftKey && Math.abs(e.deltaX) <= Math.abs(e.deltaY))) return;
@@ -842,48 +880,49 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         <Row text={ui.rowA} />
         <Row text={ui.rowB} rev />
       </div>
-      <div aria-hidden="true" className="cf-glow" />
 
       <div ref={stage} className="cf-stage" role="region" aria-roledescription="carousel" aria-label={ui.heading} tabIndex={0}
         onKeyDown={onKey} onPointerDown={onDown} onPointerMove={onMoveP} onPointerUp={onUp} onPointerCancel={onCancel} onWheel={onWheel} onDragStart={(e) => e.preventDefault()} onClickCapture={(e) => { if (suppress.current) { e.preventDefault(); e.stopPropagation(); } }}
-        onMouseEnter={hold(true)} onMouseLeave={hold(false)} onFocus={hold(true)} onBlur={hold(false)}>
-        {ORDER.map((o, i) => {
-          const it = ui.items[o];
-          const slug = SHOTS[o];
-          const to = slug ? demoPath(lang, slug) + (slug === 'demokafe' ? '?view=qr' : '') : pagePath(lang, 'services');
-          const M = MOCK_BY[o];
-          let d = i - idx;
-          if (d > N / 2) d -= N; else if (d < -N / 2) d += N;
-          const dd = Math.max(-4, Math.min(4, d));
-          const near = Math.abs(d) <= 0;
-          const tag = it.title.split(/\s+[&·]\s+|,\s*/)[0];
-          return (
-            <div key={i} className="cf-card cw-keep-dark" data-d={dd} data-act={near ? '1' : '0'} aria-hidden={d === 0 ? undefined : true} style={{ zIndex: 100 - Math.abs(dd) * 10 }}>
-              <div className="cf-frame">
-                <span className="cf-tag">{tag}</span>
-                <FitBox>
-                  <div className="absolute inset-0 pt-2 px-5 pb-5 flex">
-                    <M m={ui.mock} s={ui.sim} x={ui.x} lang={lang} />
+        onFocus={hold(true)} onBlur={hold(false)}>
+        <div aria-hidden="true" className="cf-space cw-keep-dark" />
+        <div className="cf-ring">
+          {ORDER.map((o, i) => {
+            const it = ui.items[o];
+            const slug = SHOTS[o];
+            const to = slug ? demoPath(lang, slug) + (slug === 'demokafe' ? '?view=qr' : '') : pagePath(lang, 'services');
+            const M = MOCK_BY[o];
+            const tag = it.title.split(/\s+[&·]\s+|,\s*/)[0];
+            const cur = i === idx;
+            return (
+              <div key={i} ref={(el) => { cardEl.current[i] = el; }} className="cf-card cw-keep-dark" data-act={cur ? '1' : '0'} aria-hidden={cur ? undefined : true}
+                onMouseEnter={() => { if (!touch.current && S.current.dx === null) setHov(i); }} onMouseLeave={() => { if (S.current.hov === i) setHov(-1); }}>
+                <div className="cf-frame">
+                  <span className="cf-tag">{tag}</span>
+                  <FitBox>
+                    <div className="absolute inset-0 pt-2 px-5 pb-5 flex">
+                      <M m={ui.mock} s={ui.sim} x={ui.x} lang={lang} />
+                    </div>
+                  </FitBox>
+                  <div aria-hidden="true" className="cf-over" />
+                  <div className="cf-cap">
+                    <div className="min-w-0">
+                      <h3 className="cf-t">{it.title}</h3>
+                      <p className="cf-s">{it.text}</p>
+                    </div>
+                    <span className="cf-cta">{slug ? ui.cta.demo : ui.cta.more}</span>
                   </div>
-                </FitBox>
-                <div aria-hidden="true" className="cf-over" />
-                <div className="cf-cap">
-                  <div className="min-w-0">
-                    <h3 className="cf-t">{it.title}</h3>
-                    <p className="cf-s">{it.text}</p>
-                  </div>
-                  {d === 0 && <Link to={to} draggable={false} className="cf-cta">{slug ? ui.cta.demo : ui.cta.more}</Link>}
                 </div>
+                <Link to={to} draggable={false} tabIndex={cur ? 0 : -1} aria-label={it.title} className="cf-hit"
+                  onFocus={() => go(i)} onClick={(e) => { if (touch.current && !cur) { e.preventDefault(); go(i); } }} />
               </div>
-              {d !== 0 && <button type="button" tabIndex={-1} aria-label={it.title} className="cf-hit" onClick={() => go(i)} />}
-            </div>
-          );
-        })}
-        <button type="button" className="cf-arrow cf-prev cw-keep-dark" aria-label="←" onClick={() => step(-1)}><Chev /></button>
-        <button type="button" className="cf-arrow cf-next cw-keep-dark" aria-label="→" onClick={() => step(1)}><Chev r /></button>
+            );
+          })}
+        </div>
+        <button type="button" className="cf-arrow cf-prev cw-keep-dark" aria-label="←" onPointerDown={(e) => e.stopPropagation()} onClick={() => step(-1)}><Chev /></button>
+        <button type="button" className="cf-arrow cf-next cw-keep-dark" aria-label="→" onPointerDown={(e) => e.stopPropagation()} onClick={() => step(1)}><Chev r /></button>
       </div>
 
-      <div className="relative z-10 flex items-center justify-center gap-3 mt-6 md:mt-7 px-4" onMouseEnter={hold(true)} onMouseLeave={hold(false)}>
+      <div className="relative z-10 flex items-center justify-center gap-3 mt-4 md:mt-5 px-4" onMouseEnter={hold(true)} onMouseLeave={hold(false)}>
         <button type="button" className="cf-btn cw-keep-dark" aria-label="←" onClick={() => step(-1)}><Chev /></button>
         <div className="flex items-center justify-center flex-wrap" style={{ maxWidth: 'calc(100vw - 150px)' }}>
           {ORDER.map((o, i) => (
