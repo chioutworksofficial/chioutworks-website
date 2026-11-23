@@ -242,9 +242,8 @@ export async function mintToken(lang: string, instruction: string): Promise<{ to
           responseModalities: ['AUDIO'] as never,
           systemInstruction: instruction,
           speechConfig: { languageCode: LIVE_LOCALE[lang] ?? 'en-GB', voiceConfig: { prebuiltVoiceConfig: { voiceName: LIVE_VOICE() } } },
-          // calmer turn detection on phones (owner 2026-11-19): less likely to treat echo/noise as the visitor and
-          // to cut the visitor off mid-word
-          realtimeInputConfig: { automaticActivityDetection: { startOfSpeechSensitivity: 'START_SENSITIVITY_LOW', endOfSpeechSensitivity: 'END_SENSITIVITY_LOW', prefixPaddingMs: 200, silenceDurationMs: 1300 } } as never,
+          // No custom realtimeInputConfig (2026-11-23, reproduced): any explicit automaticActivityDetection block made the server
+          // start the visitor's activity but never end it, so the assistant never answered. Server defaults work.
           // Transcription in the call language + business vocabulary (owner 2026-11-19: "kuaför" was written as
           // "coiffure"; automatic language detection picked look-alike foreign words). Applies to every language.
           inputAudioTranscription: { languageCodes: [LIVE_LOCALE[lang] ?? 'en-GB'], customVocabulary: VOCAB[lang] ?? VOCAB.en } as never,
