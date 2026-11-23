@@ -1,3 +1,4 @@
+import ModeToggle from '../site/ModeToggle';
 import { useCallback, useEffect, useState } from 'react';
 import '../components/admin/admin.css';
 import { api, ApiError, DEMO, type Req, type Usage, type VoiceSession } from '../components/admin/api';
@@ -111,8 +112,8 @@ export default function Admin() {
 
   const logout = async () => { try { await api('/api/admin/logout', 'POST'); } catch { /* ignore */ } if (DEMO) return; setReqs(null); setSessions(null); setAuth('out'); };
 
-  if (auth === 'checking') return <div data-site-theme="liquid" data-mode-lock="" className="adm-login" />;
-  if (auth !== 'in') return <div data-site-theme="liquid" data-mode-lock=""><Login unset={auth === 'unset'} onDone={() => setAuth('in')} /></div>;
+  if (auth === 'checking') return <div data-site-theme="liquid" className="adm-login" />;
+  if (auth !== 'in') return <div data-site-theme="liquid"><Login unset={auth === 'unset'} onDone={() => setAuth('in')} /></div>;
 
   const unread = (reqs ?? []).filter((r) => !r.read).length;
   const go = (t: Tab, id?: string) => { setTab(t); if (t === 'requests') setOpenReq(id ?? null); if (t === 'voice') setOpenVoice(id ?? null); if (t === 'offers') setOpenOffer(id ?? null); window.scrollTo(0, 0); };
@@ -123,15 +124,16 @@ export default function Admin() {
   ));
 
   return (
-    <div data-site-theme="liquid" data-mode-lock="" className="adm">
+    <div data-site-theme="liquid" className="adm">
       <aside className="adm-side">
         <div className="adm-logo">Chioutworks<small>Yönetim</small></div>
         {nav()}
         <div className="adm-spacer" />
+        <div style={{ padding: '0 12px 8px' }}><ModeToggle lang="tr" /></div>
         <button className="adm-nav" onClick={logout}>Çıkış</button>
       </aside>
       <header className="adm-topbar">
-        <div className="adm-logo">Chioutworks <button className="lq-btn-ghost adm-btn sm" onClick={logout}>Çıkış</button></div>
+        <div className="adm-logo">Chioutworks <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><ModeToggle lang="tr" /><button className="lq-btn-ghost adm-btn sm" onClick={logout}>Çıkış</button></span></div>
         <div className="adm-tabs">{nav()}</div>
       </header>
       <main className="adm-main">

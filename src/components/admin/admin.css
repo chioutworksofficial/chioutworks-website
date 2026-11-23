@@ -148,3 +148,14 @@ button.adm-chip { cursor: pointer; }
 [data-state='viewed'], [data-state='sent'] { --c: var(--adm-warn); }
 [data-state='draft'] { --c: var(--adm-src-manual); }
 button.adm-chip[data-src][aria-pressed='true'] { background: color-mix(in srgb, var(--c) 34%, transparent); color: white; }
+
+/* ── Light mode: tokens come from theme.css (admin no longer carries data-mode-lock); only status colours and on-accent text need care. ── */
+html[data-mode='light'] [data-site-theme='liquid'].adm {
+  --adm-src-form: #1f55c7; --adm-src-voice: #b45309; --adm-src-chat: #0e7490; --adm-src-calculator: #8a6a00;
+  --adm-src-resources: #475f8a; --adm-src-demo: #1d6a9e; --adm-src-package: #8a5a2b; --adm-src-manual: #566074;
+  --adm-ok: #15803d; --adm-bad: #c42b22; --adm-warn: #a15c07;
+}
+html[data-mode='light'] .adm-chip[data-src], html[data-mode='light'] .adm-chip[data-state] { color: color-mix(in srgb, var(--c) 78%, black); background: color-mix(in srgb, var(--c) 12%, white); }
+html[data-mode='light'] button.adm-chip[data-src][aria-pressed='true'] { background: var(--c); color: #fff; }
+html[data-mode='light'] .adm-badge { color: #fff; }
+html[data-mode='light'] .adm-bar i, html[data-mode='light'] .adm-cols i { background: var(--c-signal); }
