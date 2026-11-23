@@ -693,7 +693,7 @@ const CF_CSS = `
 @keyframes cf-marq{from{transform:translateX(0)}to{transform:translateX(-33.3333%)}}
 #features[data-vis="0"] .cf-marq{animation-play-state:paused}
 .cf-stage{--cw:min(860px,60vw,calc((100svh - 290px)*1.6));position:relative;perspective:1900px;z-index:1;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;height:calc(var(--cw)*.625 + 44px);outline:none}
-.cf-card{position:absolute;left:50%;top:22px;width:var(--cw);margin-left:calc(var(--cw)/-2);aspect-ratio:16/10;container-type:inline-size;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.8,.2,1),opacity .65s cubic-bezier(.2,.8,.2,1),translate .45s cubic-bezier(.2,.8,.2,1);will-change:transform,opacity;border-radius:20px;translate:var(--dx,0px) 0}
+.cf-card{position:absolute;left:50%;top:22px;width:var(--cw);margin-left:calc(var(--cw)/-2);aspect-ratio:16/10;container-type:inline-size;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .45s cubic-bezier(.2,.8,.2,1),translate .45s cubic-bezier(.2,.8,.2,1);will-change:transform,opacity;border-radius:20px;translate:var(--dx,0px) 0}
 .cf-stage[data-drag="1"]{cursor:grabbing}.cf-stage[data-drag="1"] *{cursor:grabbing!important}.cf-stage[data-drag="1"] .cf-card{transition:none}
 .cf-card[data-d="0"]{transform:none}
 .cf-card[data-d="1"]{transform:translateX(57%) translateZ(-120px) rotateY(24deg) scale(.82);opacity:.95}
@@ -717,11 +717,14 @@ const CF_CSS = `
 .cf-tag{position:absolute;top:3.2cqw;left:3.2cqw;z-index:4;border-radius:9999px;padding:.45em 1.1em;font-size:clamp(11px,1.5cqw,14px);font-weight:600;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-void,#0b0c0e) 62%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 18%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cf-glow{z-index:0;position:absolute;left:50%;top:50%;width:min(1100px,96vw);height:min(640px,70%);transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(50% 50% at 50% 50%,color-mix(in srgb,var(--c-signal,#2862d7) 34%,transparent),color-mix(in srgb,var(--c-cobalt,#12244f) 20%,transparent) 55%,transparent 80%);filter:blur(30px)}
 html[data-mode="light"] .cf-glow{background:radial-gradient(50% 50% at 50% 50%,color-mix(in srgb,var(--c-signal,#2862d7) 16%,transparent),transparent 75%)}
-.cf-arrow{position:absolute;top:50%;z-index:200;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:58px;height:58px;border-radius:9999px;border:0;cursor:pointer;color:var(--c-void,#0b0c0e);background:var(--c-quartz,#fff);box-shadow:0 14px 30px -12px color-mix(in srgb,var(--c-void,#0b0c0e) 70%,transparent);transition:transform .2s,box-shadow .2s}
+.cf-arrow{position:absolute;top:50%;z-index:200;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:9999px;cursor:pointer;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-quartz,#fff) 10%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 22%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 10px 24px -14px color-mix(in srgb,var(--c-void,#0b0c0e) 70%,transparent);opacity:.75;transition:transform .2s,opacity .2s,background .2s}
+.cf-arrow:hover{opacity:1;background:color-mix(in srgb,var(--c-quartz,#fff) 18%,transparent)}
 .cf-arrow:hover{transform:translateY(-50%) scale(1.07)}
 .cf-arrow:focus-visible,.cf-btn:focus-visible,.cf-dot:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
 .cf-prev{left:max(12px,2.5vw)}.cf-next{right:max(12px,2.5vw)}
-.cf-btn{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:9999px;border:0;cursor:pointer;color:var(--c-void,#0b0c0e);background:var(--c-quartz,#fff);box-shadow:0 8px 20px -10px color-mix(in srgb,var(--c-void,#0b0c0e) 70%,transparent)}
+.cf-btn{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:9999px;cursor:pointer;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-quartz,#fff) 10%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 22%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);opacity:.8;transition:opacity .2s,background .2s}
+.cf-btn:hover{opacity:1;background:color-mix(in srgb,var(--c-quartz,#fff) 18%,transparent)}
+html[data-mode='light'] .cf-btn{color:var(--c-void,#0b0c0e);background:color-mix(in srgb,var(--c-void,#0b0c0e) 6%,transparent);border-color:color-mix(in srgb,var(--c-void,#0b0c0e) 18%,transparent)}
 .cf-dot{height:8px;width:8px;border-radius:9999px;border:0;padding:0;cursor:pointer;background:var(--c-hairline,#24375a);transition:width .35s,background .35s}
 .cf-dot[aria-current="true"]{width:28px;background:var(--c-signal,#2862d7)}
 .cf-dotw{display:flex;align-items:center;justify-content:center;min-width:14px;height:32px}
@@ -740,13 +743,14 @@ html[data-mode="light"] .cf-glow{background:radial-gradient(50% 50% at 50% 50%,c
   .cf-cta{font-size:13.5px;padding:.7em 1.3em}
   .cf-tag{top:12px;left:12px;font-size:11.5px;max-width:70%}
   .cf-arrow{display:none}
+  .cf-btn{width:32px;height:32px}
   .cf-glow{height:60%}
 }
 @media (prefers-reduced-motion: reduce){.cf-card{transition:none}.cf-marq{animation:none}.cf-dot{transition:none}}
 `;
 
 const Chev = ({ r }: { r?: boolean }) => (
-  <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={r ? { transform: 'scaleX(-1)' } : undefined}><path d="M15 5l-7 7 7 7" /></svg>
+  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={r ? { transform: 'scaleX(-1)' } : undefined}><path d="M15 5l-7 7 7 7" /></svg>
 );
 
 const N = ORDER.length;
@@ -783,7 +787,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
 
   useEffect(() => {
     if (!vis) return;
-    const id = window.setInterval(() => { if (!paused.current && !reduce.current && !document.hidden) step(1); }, 6000);
+    const id = window.setInterval(() => { if (!paused.current && !reduce.current && !document.hidden) step(1); }, 5000);
     return () => window.clearInterval(id);
   }, [vis, idx, step]);
 
