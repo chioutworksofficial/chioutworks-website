@@ -63,6 +63,7 @@ export default function ProjectsView({ onUnread }: { onUnread?: (n: number) => v
   const fileRef = useRef<HTMLInputElement>(null); const asShot = useRef(false);
   const [sec, setSec] = useState<'steps' | 'messages' | 'files' | 'requests'>('steps');
   const [trBusy, setTrBusy] = useState(false);
+  const [delOpen, setDelOpen] = useState(false); const [delTxt, setDelTxt] = useState('');
   const translateReply = async () => {
     if (!p || !reply.trim()) return; setTrBusy(true);
     try { const r = await api<{ texts: string[] }>(`/api/admin/projects/${p.id}/translate`, 'POST', { texts: [reply] }); if (r.texts[0]) setReply(r.texts[0]); }
@@ -82,6 +83,13 @@ export default function ProjectsView({ onUnread }: { onUnread?: (n: number) => v
     if (!p || !window.confirm(`${what} kalıcı olarak silinsin mi? Müşteri de artık göremez.`)) return;
     try { await api(`/api/admin/projects/${p.id}/${kind}/${id}`, 'DELETE'); setMsg({ ok: true, text: `${what} silindi` }); loadOne(p.id); }
     catch { setMsg({ ok: false, text: 'Silinemedi.' }); }
+  };
+  const delName = p ? (p.company || p.contact || 'İsimsiz') : '';
+  const delOk = delTxt.trim() === 'SİL' || (!!delName && delTxt.trim() === delName);
+  const delProject = async () => {
+    if (!p || !delOk) return; setBusy('del');
+    try { const r = await api<{ files: number; failed: number }>(`/api/admin/projects/${p.id}`, 'DELETE'); setDelOpen(false); setDelTxt(''); setOpenId(null); loadList(); setMsg({ ok: !r.failed, text: `Proje silindi (${r.files} dosya${r.failed ? `, ${r.failed} dosya silinemedi` : ''}).` }); }
+    catch { setMsg({ ok: false, text: 'Proje silinemedi.' }); setDelOpen(false); } finally { setBusy(null); }
   };
   const patch = async (body: object, ok: string) => {
     if (!p) return; setBusy('patch'); setMsg(null);
@@ -134,9 +142,19 @@ export default function ProjectsView({ onUnread }: { onUnread?: (n: number) => v
                 <span className="adm-actions">
                   <a className="lq-btn-ghost adm-btn sm" href={p.path} target="_blank" rel="noreferrer">Müşterinin gördüğü sayfa ↗</a>
                   {p.viewName && <span className="adm-meta">🌐 Müşteri sayfayı <b>{p.viewName}</b> okuyor ({p.viewBy === 'client' ? 'kendisi seçti' : p.viewBy === 'auto' ? 'ülkesine/tarayıcısına göre otomatik' : 'henüz açmadı'}). Sen Türkçe yaz, otomatik çevrilir.</span>}
+                  <button className="adm-chip" data-state="bad" onClick={() => { setDelTxt(''); setDelOpen(true); }}>🗑 Projeyi sil</button>
                   <button className="lq-btn-ghost adm-btn sm" onClick={() => setOpenId(null)}>Kapat</button>
                 </span>
               </div>
+              {delOpen && <div role="alertdialog" aria-modal="true" aria-label="Projeyi sil" className="adm-field" style={{ border: '1px solid var(--adm-bad)', borderRadius: 12, padding: 14, marginTop: 10 }}>
+                <p style={{ margin: '0 0 6px' }}><b>{delName}</b> projesi kalıcı olarak silinsin mi?</p>
+                <p className="adm-meta" style={{ margin: '0 0 8px' }}>Tüm mesajlar, dosyalar, istekler ve müşterinin proje sayfası gider; müşteri linki artık açılmaz. Son gece yedeğinde kopyası durur. Onaylamak için <b>SİL</b> veya proje adını yaz.</p>
+                <input className="adm-input" value={delTxt} autoFocus onChange={(e) => setDelTxt(e.target.value)} aria-label="Onay metni" placeholder="SİL" onKeyDown={(e) => { if (e.key === 'Enter') void delProject(); if (e.key === 'Escape') setDelOpen(false); }} />
+                <div className="adm-actions" style={{ marginTop: 8 }}>
+                  <button className="lq-btn-ghost adm-btn sm" disabled={busy === 'del'} onClick={() => setDelOpen(false)}>Vazgeç</button>
+                  <button className="adm-chip" data-state="bad" disabled={!delOk || busy === 'del'} onClick={delProject}>{busy === 'del' ? 'Siliniyor…' : 'Kalıcı olarak sil'}</button>
+                </div>
+              </div>}
               {msg && <p className="adm-meta" role="status" style={{ color: msg.ok ? 'var(--adm-ok)' : 'var(--adm-bad)' }}>{msg.text}</p>}
               <div className="adm-chips" role="tablist" style={{ marginTop: 12 }}>
                 {([['steps', 'Adımlar ve planlama'], ['messages', `Mesajlar${p.messages.length ? ` (${p.messages.length})` : ''}`], ['files', `Dosyalar ve test sitesi${p.files.length ? ` (${p.files.length})` : ''}`], ['requests', `Değişiklik istekleri${p.requests.filter((r) => !r.done).length ? ` (${p.requests.filter((r) => !r.done).length} açık)` : ''}`]] as const).map(([k, l]) => (

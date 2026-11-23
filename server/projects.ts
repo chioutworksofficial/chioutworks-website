@@ -95,6 +95,15 @@ export async function storageDel(p: string): Promise<void> {
   const r = await fetch(sUrl(), { method: 'DELETE', headers: { ...sAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [p] }) });
   if (!r.ok) throw new Error(`[storage] delete → ${r.status}`);
 }
+/** All storage files under a project prefix: list, then delete each one (a failure never stops the rest). Returns counts only. */
+async function storageWipe(prefix: string): Promise<{ ok: number; failed: number }> {
+  const r = await fetch(sUrl().replace('/object/', '/object/list/'), { method: 'POST', headers: { ...sAuth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix, limit: 1000 }) });
+  if (!r.ok) throw new Error(`[storage] list → ${r.status}`);
+  const names = ((await r.json()) as { name: string }[]).map((x) => x.name);
+  let ok = 0, failed = 0;
+  for (const n of names) { try { await storageDel(`${prefix}/${n}`); ok++; } catch { failed++; } }
+  return { ok, failed };
+}
 const clean = (v: unknown, n: number) => String(v ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim().slice(0, n);
 const newId = () => crypto.randomBytes(8).toString('hex');
 
@@ -142,6 +151,8 @@ const prjDelP = z.object({ id: idP.shape.id, kind: z.enum(['messages', 'files', 
 import { recordError } from './errors.js';
 export function registerProjects(app: Express, d: Deps) {
   const limiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
+  // Customer page polls every 30 s (20 per 10 min per visitor); own bucket so images / messages never eat into it
+  const pollLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
   const uploadLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false, skip: d.rateSkip });
   const raw = express.raw({ type: 'application/octet-stream', limit: MAX_BYTES });
   const LANG_NAME: Record<string, string> = Object.fromEntries(Object.entries(VIEW_LANGS).map(([k, v]) => [k, v.en]));
@@ -156,8 +167,8 @@ export function registerProjects(app: Express, d: Deps) {
   const hash = (t: string) => crypto.createHash('sha1').update(t).digest('hex').slice(0, 16);
   /** Translates texts into `lang` (owner may write Turkish; the client always reads their own language). Cached per project,
    *  so every text is translated once. If the AI is down, the original text is shown. */
-  const localize = async (projectId: string, lang: string, texts: string[]): Promise<string[]> => {
-    const cache = (await getProject(projectId))?.tr?.[lang] ?? {};
+  const localize = async (projectId: string, lang: string, texts: string[], known?: Project): Promise<string[]> => {
+    const cache = (known ?? await getProject(projectId))?.tr?.[lang] ?? {};   // known: skips a second database read on the polled customer GET
     const need = [...new Set(texts.filter((t) => t && !cache[hash(t)]))].slice(0, 60);
     const groq = d.getGroq?.();
     if (need.length && groq) {
@@ -184,7 +195,7 @@ export function registerProjects(app: Express, d: Deps) {
     const src: string[] = [];
     out.messages.forEach((m) => { if (m.from === 'owner' && m.text) src.push(m.text); });
     out.stages.forEach((s) => { if (s.note) src.push(s.note); (s.items ?? []).forEach((i) => src.push(i.text)); });
-    const tr = await localize(p.id, viewOf(p), src); let k = 0;
+    const tr = await localize(p.id, viewOf(p), src, p); let k = 0;
     return { ...out,
       messages: out.messages.map((m) => (m.from === 'owner' && m.text ? { ...m, text: tr[k++] } : m)),
       stages: out.stages.map((s) => { const note = s.note ? tr[k++] : s.note; return { ...s, note, items: (s.items ?? []).map((i) => ({ ...i, text: tr[k++] })) }; }) };
@@ -230,7 +241,7 @@ export function registerProjects(app: Express, d: Deps) {
   };
 
   // ── Client (token link) ──
-  app.get('/api/project/:token', limiter, async (req, res) => {
+  app.get('/api/project/:token', pollLimiter, async (req, res) => {
     const p = await getProjectByToken(String(req.params.token));
     if (!p) return res.status(404).json({ error: 'not_found' });
     let dirty = false;
@@ -389,6 +400,20 @@ export function registerProjects(app: Express, d: Deps) {
     else if (req.params.kind === 'requests') { if (!p.requests.some((r) => r.id === id)) return res.status(404).json({ error: 'not_found' }); p.requests = p.requests.filter((r) => r.id !== id); }
     else return res.status(400).json({ error: 'bad_kind' });
     await saveProject(p); return res.json({ ok: true });
+  });
+  // Owner only: delete the whole project (row with messages / file list / requests, all storage files). The customer link then answers not_found.
+  app.delete('/api/admin/projects/:id', limiter, v(undefined, idP), async (req, res) => {
+    if (!(await d.requireAdmin(req, res))) return;
+    const p = await getProject(String(req.params.id)); if (!p) return res.status(404).json({ error: 'not_found' });
+    let files = { ok: 0, failed: 0 };
+    try {
+      if (dbOn()) files = await storageWipe(p.id);
+      else { const dir = path.join(FILES, p.id); try { files.ok = fs.readdirSync(dir).length; fs.rmSync(dir, { recursive: true, force: true }); } catch { /* no folder */ } }
+    } catch (e) { files.failed = -1; void recordError('projects/wipe-failed', e); console.error('[projects] wipe failed', (e as Error).message); }
+    if (dbOn()) await dbDelete('projects', `id=eq.${encodeURIComponent(p.id)}`);
+    else write(read().filter((x) => x.id !== p.id));
+    console.log(`[projects] deleted project: files ${files.ok} ok / ${files.failed} failed, messages ${p.messages.length}, requests ${p.requests.length}`);
+    return res.json({ ok: true, files: files.ok, failed: files.failed });
   });
   app.get('/api/admin/projects/:id/files/:fileId', async (req, res) => {
     if (!(await d.requireAdmin(req, res))) return;

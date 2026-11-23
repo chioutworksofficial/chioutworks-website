@@ -16,7 +16,7 @@ const TX: Record<Lang, {
   kicker: string; hello: (n: string) => string; intro: string; stages: Record<StageKey, string>; status: { todo: string; doing: string; done: string };
   now: string; preview: string; open: string; shots: string; noPreview: string; messages: string; you: string; me: string; ph: string; send: string;
   attach: string; uploading: string; tooLarge: string; badType: string; uploadErr: string; files: string; noFiles: string;
-  reqTitle: string; reqIntro: string; reqPh: string; reqSend: string; reqOpen: string; reqDone: string; notFound: string; loading: string; fileHint: string; panelEmpty: string; tooSoon: string; limit: string; langLabel: string;
+  reqTitle: string; reqIntro: string; reqPh: string; reqSend: string; reqOpen: string; reqDone: string; notFound: string; updated: string; loading: string; fileHint: string; panelEmpty: string; tooSoon: string; limit: string; langLabel: string;
 }> = {
   tr: {
     kicker: 'Proje sayfanız', hello: (n) => `Merhaba ${n}`, intro: 'Projenizin her adımını burada görebilir, mesaj yazabilir, dosya ve görsel ekleyebilir, değişiklik isteyebilirsiniz.',
@@ -25,7 +25,7 @@ const TX: Record<Lang, {
     messages: 'Mesajlar', you: 'Siz', me: 'Chioutworks', ph: 'Mesajınızı yazın…', send: 'Gönder', attach: 'Logo / fotoğraf ekle', uploading: 'Yükleniyor…',
     tooLarge: 'Görsel 5 MB\'tan büyük. Daha küçük bir görsel seçin.', badType: 'Buraya yalnızca logo veya fotoğraf (JPG, PNG, WEBP, GIF, HEIC) eklenebilir. Büyük dosyalar için bir link yazabilirsiniz.', uploadErr: 'Dosya yüklenemedi. Lütfen tekrar deneyin.',
     files: 'Dosyalar', noFiles: 'Henüz dosya yok.', reqTitle: 'Değişiklik isteği', reqIntro: 'Bir şeyin farklı olmasını isterseniz kısaca yazın; listeye eklenir ve tamamlandığında işaretlenir.',
-    reqPh: 'Örn. Ana sayfadaki başlık daha kısa olsun', reqSend: 'İsteği gönder', reqOpen: 'Açık', reqDone: 'Yapıldı', notFound: 'Bu proje bağlantısı geçerli değil.', loading: 'Yükleniyor…',
+    reqPh: 'Örn. Ana sayfadaki başlık daha kısa olsun', reqSend: 'İsteği gönder', reqOpen: 'Açık', reqDone: 'Yapıldı', notFound: 'Bu proje sayfası artık mevcut değil.', updated: 'Güncellendi', loading: 'Yükleniyor…',
     fileHint: 'Yalnızca logo veya fotoğraf · en fazla 5 MB · tek tek ekleyin. Büyük dosyalar için link paylaşın.', tooSoon: 'Lütfen bir sonraki görseli eklemeden önce bir dakika bekleyin.', limit: 'Görsel sınırına ulaşıldı. Diğerleri için bir link paylaşın.', langLabel: 'Dil', panelEmpty: 'Bu adımın maddeleri burada görünecek.',
   },
   en: {
@@ -35,7 +35,7 @@ const TX: Record<Lang, {
     messages: 'Messages', you: 'You', me: 'Chioutworks', ph: 'Write your message…', send: 'Send', attach: 'Add logo / photo', uploading: 'Uploading…',
     tooLarge: 'The image is larger than 5 MB. Please pick a smaller one.', badType: 'Only a logo or photo (JPG, PNG, WEBP, GIF, HEIC) can be added here. For large files, please share a link.', uploadErr: 'The file could not be uploaded. Please try again.',
     files: 'Files', noFiles: 'No files yet.', reqTitle: 'Change request', reqIntro: 'If you would like something to be different, describe it briefly; it is added to the list and ticked off when done.',
-    reqPh: 'e.g. Make the headline on the home page shorter', reqSend: 'Send request', reqOpen: 'Open', reqDone: 'Done', notFound: 'This project link is not valid.', loading: 'Loading…',
+    reqPh: 'e.g. Make the headline on the home page shorter', reqSend: 'Send request', reqOpen: 'Open', reqDone: 'Done', notFound: 'This project page no longer exists.', updated: 'Updated', loading: 'Loading…',
     fileHint: 'Logo or photo only · max. 5 MB · one at a time. Share a link for large files.', tooSoon: 'Please wait a minute before adding the next image.', limit: 'Image limit reached. Please share a link for the rest.', langLabel: 'Language', panelEmpty: 'The points of this step will appear here.',
   },
   de: {
@@ -45,7 +45,7 @@ const TX: Record<Lang, {
     messages: 'Nachrichten', you: 'Sie', me: 'Chioutworks', ph: 'Ihre Nachricht…', send: 'Senden', attach: 'Logo / Foto hinzufügen', uploading: 'Wird hochgeladen…',
     tooLarge: 'Das Bild ist größer als 5 MB. Bitte ein kleineres wählen.', badType: 'Hier kann nur ein Logo oder Foto (JPG, PNG, WEBP, GIF, HEIC) hinzugefügt werden. Für große Dateien bitte einen Link teilen.', uploadErr: 'Die Datei konnte nicht hochgeladen werden. Bitte erneut versuchen.',
     files: 'Dateien', noFiles: 'Noch keine Dateien.', reqTitle: 'Änderungswunsch', reqIntro: 'Wenn etwas anders sein soll, beschreiben Sie es kurz; es kommt auf die Liste und wird abgehakt, sobald es erledigt ist.',
-    reqPh: 'z. B. Die Überschrift auf der Startseite kürzer', reqSend: 'Wunsch senden', reqOpen: 'Offen', reqDone: 'Erledigt', notFound: 'Dieser Projektlink ist nicht gültig.', loading: 'Wird geladen…',
+    reqPh: 'z. B. Die Überschrift auf der Startseite kürzer', reqSend: 'Wunsch senden', reqOpen: 'Offen', reqDone: 'Erledigt', notFound: 'Diese Projektseite existiert nicht mehr.', updated: 'Aktualisiert', loading: 'Wird geladen…',
     fileHint: 'Nur Logo oder Foto · max. 5 MB · einzeln hinzufügen. Für große Dateien einen Link teilen.', tooSoon: 'Bitte eine Minute warten, bevor Sie das nächste Bild hinzufügen.', limit: 'Bildlimit erreicht. Für weitere bitte einen Link teilen.', langLabel: 'Sprache', panelEmpty: 'Die Punkte dieses Schritts erscheinen hier.',
   },
   el: {
@@ -55,7 +55,7 @@ const TX: Record<Lang, {
     messages: 'Μηνύματα', you: 'Εσείς', me: 'Chioutworks', ph: 'Γράψτε το μήνυμά σας…', send: 'Αποστολή', attach: 'Προσθήκη λογότυπου / φωτογραφίας', uploading: 'Μεταφόρτωση…',
     tooLarge: 'Η εικόνα είναι μεγαλύτερη από 5 MB. Επιλέξτε μικρότερη.', badType: 'Εδώ μπορεί να προστεθεί μόνο λογότυπο ή φωτογραφία (JPG, PNG, WEBP, GIF, HEIC). Για μεγάλα αρχεία, μοιραστείτε έναν σύνδεσμο.', uploadErr: 'Το αρχείο δεν μεταφορτώθηκε. Δοκιμάστε ξανά.',
     files: 'Αρχεία', noFiles: 'Δεν υπάρχουν ακόμη αρχεία.', reqTitle: 'Αίτημα αλλαγής', reqIntro: 'Αν θέλετε κάτι διαφορετικό, γράψτε το σύντομα· μπαίνει στη λίστα και σημειώνεται όταν ολοκληρωθεί.',
-    reqPh: 'π.χ. Ο τίτλος στην αρχική σελίδα πιο σύντομος', reqSend: 'Αποστολή αιτήματος', reqOpen: 'Ανοιχτό', reqDone: 'Έγινε', notFound: 'Αυτός ο σύνδεσμος έργου δεν είναι έγκυρος.', loading: 'Φόρτωση…',
+    reqPh: 'π.χ. Ο τίτλος στην αρχική σελίδα πιο σύντομος', reqSend: 'Αποστολή αιτήματος', reqOpen: 'Ανοιχτό', reqDone: 'Έγινε', notFound: 'Αυτή η σελίδα έργου δεν υπάρχει πλέον.', updated: 'Ενημερώθηκε', loading: 'Φόρτωση…',
     fileHint: 'Μόνο λογότυπο ή φωτογραφία · έως 5 MB · μία κάθε φορά. Για μεγάλα αρχεία, μοιραστείτε σύνδεσμο.', tooSoon: 'Περιμένετε ένα λεπτό πριν προσθέσετε την επόμενη εικόνα.', limit: 'Συμπληρώθηκε το όριο εικόνων. Για τις υπόλοιπες μοιραστείτε σύνδεσμο.', langLabel: 'Γλώσσα', panelEmpty: 'Τα σημεία αυτού του βήματος θα εμφανίζονται εδώ.',
   },
 };
@@ -110,7 +110,9 @@ const kb = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB
 export default function ProjectPage() {
   const { lang: urlLang, slug: token = '' } = useParams();
   const [data, setData] = useState<Data | null>(null);
-  const [err, setErr] = useState(false);
+  const [gone, setGone] = useState(false);                  // 404 only: project deleted / invalid link
+  const [upd, setUpd] = useState<Date | null>(null);
+  const lastJson = useRef(''); const fails = useRef(0); const inflight = useRef(false);
   const [msg, setMsg] = useState(''); const [req, setReq] = useState('');
   const [busy, setBusy] = useState<string | null>(null); const [note, setNote] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -121,15 +123,36 @@ export default function ProjectPage() {
   const rtl = !!data?.langs.find((l) => l.code === view)?.rtl;
   const base = `/api/project/${encodeURIComponent(token)}`;
 
-  const load = useCallback(() => {
-    const bl = typeof navigator !== 'undefined' ? encodeURIComponent(navigator.language || '') : '';
-    fetch(`${base}?bl=${bl}`).then((r) => (r.ok ? r.json() : Promise.reject(r.status))).then((j: Data) => { setData(j); setErr(false); }).catch(() => setErr(true));
+  /** One refresh. Only replaces the data when it really changed (typing, selected files and scroll live in other state / DOM and stay untouched). */
+  const load = useCallback(async (force = false): Promise<'ok' | 'gone' | 'err'> => {
+    if (inflight.current && !force) return 'ok';
+    inflight.current = true;
+    try {
+      const bl = typeof navigator !== 'undefined' ? encodeURIComponent(navigator.language || '') : '';
+      const r = await fetch(`${base}?bl=${bl}`);
+      if (r.status === 404) { setGone(true); return 'gone'; }
+      if (!r.ok) throw new Error();
+      const txt = await r.text();
+      fails.current = 0;
+      if (txt !== lastJson.current) { lastJson.current = txt; setData(JSON.parse(txt) as Data); }
+      setUpd(new Date()); return 'ok';
+    } catch { fails.current += 1; return 'err'; } finally { inflight.current = false; }
   }, [base]);
+  // Auto refresh: every 30 s while the tab is visible (120 s after 3 network errors in a row), paused when hidden, immediate on return, stops when the project is gone
   useEffect(() => {
-    load();
+    let timer: number | undefined; let stop = false;
+    const tick = async () => {
+      window.clearTimeout(timer);
+      if (stop || document.hidden) return;
+      const r = await load();
+      if (stop || r === 'gone' || document.hidden) return;
+      timer = window.setTimeout(tick, fails.current >= 3 ? 120000 : 30000);
+    };
+    const vis = () => { if (!document.hidden && !inflight.current) void tick(); };
+    document.addEventListener('visibilitychange', vis);
+    void tick();
     const m = document.createElement('meta'); m.name = 'robots'; m.content = 'noindex, nofollow'; document.head.appendChild(m);
-    const id = window.setInterval(load, 20000);   // new messages from the owner show up without reloading
-    return () => { window.clearInterval(id); m.remove(); };
+    return () => { stop = true; window.clearTimeout(timer); document.removeEventListener('visibilitychange', vis); m.remove(); };
   }, [load]);
   useEffect(() => { if (data) { document.title = `${t.kicker} · ${data.company || 'Chioutworks'}`; document.documentElement.lang = view; } }, [data, view, t.kicker]);
   // Other languages: buttons and labels are translated once on the server (cached for all projects)
@@ -143,7 +166,7 @@ export default function ProjectPage() {
 
   const post = async (path: string, body: object, key: string) => {
     setBusy(key); setNote('');
-    try { const r = await fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) throw new Error(); load(); return true; }
+    try { const r = await fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) throw new Error(); void load(true); return true; }
     catch { setNote(t.uploadErr); return false; } finally { setBusy(null); }
   };
   const changeLang = async (l: string) => {
@@ -153,7 +176,7 @@ export default function ProjectPage() {
       const r = await fetch(base + '/lang', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: l }) });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.path) window.history.replaceState(null, '', j.path);
-      load();
+      void load(true);
     } finally { setBusy(null); }
   };
   const upload = async (f: File) => {
@@ -164,7 +187,7 @@ export default function ProjectPage() {
       const r = await fetch(`${base}/files?name=${encodeURIComponent(f.name)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: f });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setNote(j.error === 'images_only' || j.error === 'type_not_allowed' ? t.badType : j.error === 'too_large' ? t.tooLarge : j.error === 'too_soon' ? t.tooSoon : j.error === 'limit' ? t.limit : t.uploadErr); return; }
-      load();
+      void load(true);
     } catch { setNote(t.uploadErr); } finally { setBusy(null); if (fileRef.current) fileRef.current.value = ''; }
   };
 
@@ -172,7 +195,7 @@ export default function ProjectPage() {
   const h2: React.CSSProperties = { margin: '0 0 14px', fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--c-quartz)' };
   const input: React.CSSProperties = { width: '100%', padding: '12px 14px', borderRadius: 'var(--r-input)', border: '1px solid var(--c-hairline)', background: 'var(--c-abyss)', color: 'var(--c-quartz)', fontFamily: 'inherit', fontSize: 16, boxSizing: 'border-box' };
 
-  if (err) return <main data-site-theme="liquid" data-mode-lock="" style={{ minHeight: '100svh', display: 'grid', placeItems: 'center', padding: 24, background: 'var(--c-void)', color: 'var(--c-mist)' }}>{TX[lang].notFound}</main>;
+  if (gone) return <main data-site-theme="liquid" data-mode-lock="" style={{ minHeight: '100svh', display: 'grid', placeItems: 'center', padding: 24, background: 'var(--c-void)', color: 'var(--c-mist)' }}>{TX[lang].notFound}</main>;
   if (!data) return <main data-site-theme="liquid" data-mode-lock="" style={{ minHeight: '100svh', display: 'grid', placeItems: 'center', background: 'var(--c-void)', color: 'var(--c-ash)' }}>{TX[lang].loading}</main>;
 
   const fileUrl = (id: string) => `${base}/files/${id}`;
@@ -184,6 +207,7 @@ export default function ProjectPage() {
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '18px clamp(16px, 4vw, 36px)', borderBottom: '1px solid var(--c-inkline)' }}>
         <Logo size={26} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {upd && <span aria-live="off" style={{ fontSize: 11, color: 'var(--c-ash)' }}>{t.updated} · {upd.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })}</span>}
           <span className="pj-kicker" style={{ fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--c-ash)' }}>{t.kicker}</span>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
             <span className="sr-only">{t.langLabel}</span>
