@@ -85,3 +85,4 @@ Sahibin örnekleri: "e-postadaki linke tıkladı, başka pencereye sızdı", "gi
 - Tarayıcıya yalnızca `VITE_` önekli ayarlar gider; gizli bir değere asla `VITE_` öneki verilmez.
 - Supabase: sunucuda yalnızca proje gizli anahtarı (`sb_secret_`). Kişisel hesap anahtarı (`sbp_`) hiçbir projede tutulmaz. Publishable key kullanılmaz (tarayıcı veritabanına bağlanmaz).
 - Anahtar, parola ve doğrulama kodu sohbete, koda, loga, belgeye yazılmaz; Claude değerleri yazdırmaz, yalnızca var/yok ve türünü kontrol eder.
+- Hata izleme (Sentry, AB bölgesi, 2026-11-23): yalnızca DSN varsa açık; replay, tracing ve geri bildirim kutusu kapalı. Gönderimden önce gövde, çerez, başlık, IP, sorgu dizesi, form içeriği, e-posta, telefon ve uzun anahtarlar temizlenir; yalnızca yöntem + yol (`:id`) ve maskeli mesaj/yığın gider. Web DSN çalışma anında `/api/public-config` ile gelir, derlemeye girmez.

@@ -21,6 +21,8 @@
     "@google/genai": "^3.3.0",
     "@huggingface/transformers": "4.3.2",
     "@mintplex-labs/piper-tts-web": "1.0.5",
+    "@sentry/node": "^11.16.0",
+    "@sentry/react": "^11.16.0",
     "cors": "^2.8.6",
     "d3-geo": "3.1.1",
     "dotenv": "^18.0.10",

@@ -2,6 +2,7 @@ import { demoText } from '../src/components/demos/demoText.js';
 import { T as SITE_T } from '../src/translations.js';
 import { CATALOG_UI } from '../src/components/demos/i18n/catalog.js';
 import './env.js';
+import { flushSentry } from './sentry.js';
 import { runNightlySnapshot, listSnapshots } from './backup.js';
 import { dbOn, dbInsert, dbUpsert, dbSelect, dbDelete, dbUpdate, kvGet, kvSet } from './db.js';
 import express from 'express';
@@ -27,7 +28,7 @@ import { registerPreview } from './preview.js';
 import { languageOk, SAFE_FALLBACK } from './languageGuard.js';
 import { ids as abuseIds, recordAbuse, voiceBlocked, chatState, recordStrike, blockedMsg, adminList, adminUnlock, rateOk, globalOk, textMsgAllowed, TEXT_SESSION_MAX, insult, abuseExempt, MSG as ABUSE_MSG } from './abuse.js';
 import { validate as v, z, s, idP, idp, LANG, email, emailOpt, bool, anyObj } from './validate.js';
-import { recordError } from './errors.js';
+import { recordError, sendErrorMail, ERR_MAIL_KEY } from './errors.js';
 import { shapeReply, tooLong, truncateReply } from './shapeGuard.js';
 import { pool, capReached, markQuota, quotaRecently, isQuotaError, livePressure, countSession, mintToken, buildLiveInstruction, liveConfigured, type LiveTurn } from './geminiLive.js';
 
@@ -1147,6 +1148,30 @@ app.get('/api/admin/errors', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   return res.json({ errors: dbOn() ? (await dbSelect('app_errors', 'select=id,t,route,kind,message,count&order=t.desc&limit=200').catch(() => [])).slice(0, 200) : [] });
 });
+app.get('/api/admin/settings/error-notify', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  res.set('Cache-Control', 'no-store');
+  return res.json({ email: (await kvGet<{ email?: string }>(ERR_MAIL_KEY).catch(() => null))?.email ?? '', mailConfigured: !!(process.env.RESEND_API_KEY && process.env.DEMO_EMAIL_FROM) });
+});
+app.put('/api/admin/settings/error-notify', v(z.object({ email: emailOpt })), async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  await kvSet(ERR_MAIL_KEY, { email: String(req.body?.email ?? '').trim() });
+  return res.json({ ok: true });
+});
+app.post('/api/admin/settings/error-notify/test', async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  const to = (await kvGet<{ email?: string }>(ERR_MAIL_KEY).catch(() => null))?.email;
+  if (!to) return res.status(400).json({ error: 'no_address' });
+  const e = await sendErrorMail(to, 'Deneme: hata bildirimi', 'Bu bir deneme e-postasıdır. Yeni bir hata kaydedildiğinde böyle bir bildirim gelir.');
+  return e ? res.status(502).json({ error: e }) : res.json({ ok: true });
+});
+// Browser errors (owner, 2026-11-23): scrubbed summary from the visitor's browser into the same own error log, kind prefixed "client:".
+const clientErrLimiter = rateLimit({ store: rlStore('clientErrLimiter'), windowMs: 10 * 60 * 1000, max: 20, skip: demoLimitSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
+app.post('/api/client-error', clientErrLimiter, v(z.object({ message: z.string().max(600), kind: z.string().max(60), path: z.string().max(200), env: z.string().max(60).nullish() })), (req, res) => {
+  const b = req.body as { message: string; kind: string; path: string; env?: string | null };
+  void recordError(b.path, { name: `client:${b.kind.replace(/[^\w .-]/g, '').slice(0, 40)}`, message: `${b.message.slice(0, 220)}${b.env ? ` [${b.env.replace(/[^\w ./-]/g, '')}]` : ''}` });
+  return res.status(204).end();
+});
 app.delete('/api/admin/errors', async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   if (dbOn()) await dbDelete('app_errors', `t=lte.${new Date(Date.now() + 86400e3).toISOString()}`);
@@ -1756,11 +1781,18 @@ registerAffiliates(app, { requireAdmin });
 // AI website preview after the intake is submitted (content only, rendered by our template)
 registerPreview(app, { getGroq, rateSkip: demoLimitSkip });
 
+// Public client config (web error-monitoring DSN is public by design; no secrets)
+app.get('/api/public-config', (_req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({ sentryDsnWeb: process.env.SENTRY_DSN_WEB ?? null, release: process.env.VERCEL_GIT_COMMIT_SHA ?? null, environment: process.env.VERCEL_ENV || 'development' });
+});
+
 // Last-resort error handler (owner, 2026-11-19): async route errors (e.g. database briefly unavailable) answer with a
 // short JSON error; no stack traces or internals to the visitor, and only a short note in the server log.
-app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use(async (err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   void recordError(req.path, err);
   console.error(`[error] ${req.method} ${req.path}: ${String((err as Error)?.message ?? err).slice(0, 200)}`);
+  await flushSentry();   // serverless: send before the function freezes
   if (res.headersSent) return;
   res.status(500).json({ error: 'server_error' });
 });

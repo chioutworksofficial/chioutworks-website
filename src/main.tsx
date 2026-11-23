@@ -7,8 +7,10 @@ import { DemoRoute, LegacyDemoRedirect, LegacyRedirect, LinkInterceptor, PageRou
 import NotFound from './site/pages/NotFound.tsx'
 import './index.css'
 import { startDynamicFavicon } from './lib/favicon.ts'
+import { startMonitoring } from './lib/monitoring.ts'
 
 startDynamicFavicon()
+startMonitoring()
 
 // Safety net: if a page without <Preloader> was opened directly, never leave the index.html intro overlay on screen
 window.setTimeout(() => {
