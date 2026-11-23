@@ -84,6 +84,10 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
   const [micId, setMicSel] = useState(getMicId);
+  const [pick, setPick] = useState<{ mics: MediaDeviceInfo[]; spks: MediaDeviceInfo[]; mic: string; spk: string } | null>(null);   // pre-call device chooser
+  const pickResolve = useRef<((r: { mic: string; spk: string } | null) => void) | null>(null);
+  const sinkRef = useRef('');
+  const devOff = useRef<(() => void) | null>(null);
   const [level, setLevel] = useState(0);   // live microphone level 0..1
   const [prep, setPrep] = useState(0);   // combined Whisper + Piper readiness, %
   const [prepSlow, setPrepSlow] = useState(false);   // preparing > 25 s
@@ -164,6 +168,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     if (hbRef.current) { clearInterval(hbRef.current); hbRef.current = null; }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     watchRef.current?.stop(); watchRef.current = null;
+    devOff.current?.(); devOff.current = null;
     if (closingTimer.current) { clearInterval(closingTimer.current); closingTimer.current = null; }
     if (callRef.current && !endedAtRef.current) { endedAtRef.current = Date.now(); timingRef.current = callRef.current.timing(); if (!endReasonRef.current) endReasonRef.current = 'user_hangup'; }
     callRef.current?.close(); callRef.current = null;
@@ -174,6 +179,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
 
   const teardown = useCallback(() => {
     endLive();
+    pickResolve.current?.(null); pickResolve.current = null; setPick(null);
     sessionRef.current++;
     autoRef.current = false;
     recRef.current?.cancel();
@@ -598,14 +604,46 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     const named = new Promise<void>((r) => { nameResolve.current = r; });
     try {
       streamRef.current = await micP;
-      streamRef.current?.getAudioTracks()[0]?.addEventListener('ended', () => {   // mic unplugged / permission revoked mid-call
+      const micLost = () => {   // mic unplugged / permission revoked mid-call
         if (endingRef.current || finishPending.current || !callRef.current) return;
-        endReasonRef.current ||= 'error:mic_ended'; finishPending.current = true; drain();
-      });
-      setMics(await micInputs());
+        endReasonRef.current ||= 'error:mic_ended'; finishPending.current = true; setNotice(t.micGone); drain();
+      };
+      streamRef.current?.getAudioTracks()[0]?.addEventListener('ended', micLost);
+      const devs = await micInputs();
+      setMics(devs);
+      const onDev = async () => {   // Safari may not fire 'ended': check that the active device still exists
+        const tr = streamRef.current?.getAudioTracks()[0]; if (!tr) return;
+        const gid = tr.getSettings().groupId, now = await micInputs();
+        if (tr.readyState === 'ended' || (gid && now.length && !now.some((d) => d.groupId === gid))) micLost();
+      };
+      navigator.mediaDevices.addEventListener?.('devicechange', onDev);
+      devOff.current = () => navigator.mediaDevices.removeEventListener?.('devicechange', onDev);
+      // device chooser: only with more than one distinct microphone (phones: no extra click)
+      const uniq = (l: MediaDeviceInfo[]) => { const seen = new Set<string>(); return l.filter((d) => { const k = d.groupId || d.deviceId; if (d.deviceId === 'default' || d.deviceId === 'communications' || seen.has(k)) return false; seen.add(k); return true; }); };
+      const um = uniq(devs);
+      const canSink = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
+      let us: MediaDeviceInfo[] = [];
+      if (canSink) { try { us = uniq((await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audiooutput')); } catch { /* none */ } }
+      if (um.length > 1) {
+        const curG = streamRef.current?.getAudioTracks()[0]?.getSettings().groupId, saved = getMicId();
+        const mic = um.find((d) => d.deviceId === saved)?.deviceId ?? um.find((d) => d.groupId === curG)?.deviceId ?? um[0].deviceId;
+        let spk = ''; try { spk = localStorage.getItem('cw-spk') ?? ''; } catch { /* private mode */ }
+        if (!us.some((d) => d.deviceId === spk)) spk = '';
+        const r = await new Promise<{ mic: string; spk: string } | null>((res) => { pickResolve.current = res; setPick({ mics: um, spks: us.length > 1 ? us : [], mic, spk }); });
+        pickResolve.current = null; setPick(null);
+        if (!r || sid !== sessionRef.current) return;
+        setMicId(r.mic);
+        try { if (r.spk) localStorage.setItem('cw-spk', r.spk); } catch { /* private mode */ }
+        sinkRef.current = r.spk;
+        if (r.mic !== mic || streamRef.current?.getAudioTracks()[0]?.readyState === 'ended') {   // other device chosen: reopen (openMic falls back to the default if it is gone)
+          streamRef.current?.getTracks().forEach((x) => x.stop());
+          streamRef.current = await openMic();
+          streamRef.current.getAudioTracks()[0]?.addEventListener('ended', micLost);
+        }
+      }
     } catch { audioP.then((c) => c.close()).catch(() => {}); if (sid === sessionRef.current) toTextChat(t.deniedToText); return; }
     setPrep(25);
-    try { ctxRef.current = await audioP; } catch { if (sid === sessionRef.current) await startFallback(); return; }
+    try { ctxRef.current = await audioP; if (sinkRef.current) await (ctxRef.current as AudioContext & { setSinkId?: (id: string) => Promise<void> }).setSinkId?.(sinkRef.current).catch(() => {}); } catch { if (sid === sessionRef.current) await startFallback(); return; }
     if (sid !== sessionRef.current) { endLive(); return; }
     setPrep(40);
     await named;   // salutation form (optional) is answered or skipped
@@ -786,6 +824,21 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
         <div style={{ margin: 'auto', maxWidth: 560, paddingTop: 40 }}>
           <AssistantConsent lang={lang} mode="voice" primaryAction={{ label: t.allow, run: () => void startVoice() }} secondaryAction={{ label: t.typeInstead, run: () => toTextChat() }} onNavigate={() => { teardown(); setOpen(false); }} />
         </div>
+      ) : phase === 'preparing' && pick ? (
+        <div style={{ margin: 'auto', display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: 420, paddingTop: 36 }}>
+          <h2 style={{ margin: 0, fontSize: 'clamp(20px, 3vw, 26px)', fontFamily: 'var(--font-display)', fontWeight: 600, textAlign: 'center' }}>{t.micPickTitle}</h2>
+          {([[t.micLabel, 'mic', pick.mics], ...(pick.spks.length ? [[t.spkLabel, 'spk', pick.spks]] : [])] as [string, 'mic' | 'spk', MediaDeviceInfo[]][]).map(([lbl, k, list]) => (
+            <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--lq-silver)' }}>
+              {lbl}
+              <select value={pick[k]} onChange={(e) => setPick({ ...pick, [k]: e.target.value })}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--lq-radius-sm)', border: '1px solid var(--lq-line-strong)', background: 'var(--lq-kelp)', color: 'var(--lq-white)', fontFamily: 'inherit', fontSize: 15 }}>
+                {k === 'spk' && <option value="">{t.micAuto}</option>}
+                {list.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `${lbl} ${i + 1}`}</option>)}
+              </select>
+            </label>
+          ))}
+          <button type="button" style={primary} onClick={() => pickResolve.current?.({ mic: pick.mic, spk: pick.spk })}>{t.micStart}</button>
+        </div>
       ) : phase === 'preparing' ? (
         <div style={{ margin: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center', width: '100%', maxWidth: 560, paddingTop: 36 }}>
           <div style={{ position: 'relative', width: 240, height: 240, borderRadius: '50%', overflow: 'hidden', ['--orb' as string]: '240px' }} role="status" aria-live="polite" aria-label={t.sttPreparing.replace('{pct}', String(prep))}>
@@ -854,7 +907,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
             )}
           </div>
 
-          {mics.length > 1 && phase !== 'live' && (
+          {mics.length > 1 && phase !== 'live' && !pick && (
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--lq-silver)' }}>
               {t.micLabel}
               <select value={micId} onChange={(e) => { setMicSel(e.target.value); setMicId(e.target.value); }}
