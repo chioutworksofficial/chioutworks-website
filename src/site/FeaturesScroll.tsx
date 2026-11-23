@@ -93,21 +93,22 @@ function FitBox({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
-    let raf = 0;
-    const fit = () => {
-      setK(1);
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const c = inner.current?.firstElementChild as HTMLElement | null;
-        if (!c) return;
-        const over = c.scrollHeight / Math.max(1, c.clientHeight);
-        if (over > 1.01) setK(Math.max(0.72, 1 / over));
-      });
+    let raf = 0, tm = 0;
+    // Shrink only (never grow back while the demo runs) so the card doesn't pulse; a viewport resize starts again at 1.
+    const check = () => {
+      const c = inner.current?.firstElementChild as HTMLElement | null;
+      if (!c) return;
+      const over = c.scrollHeight / Math.max(1, c.clientHeight);
+      if (over > 1.01) setK((v) => Math.max(0.6, v / over));
     };
+    const fit = () => { setK(1); cancelAnimationFrame(raf); raf = requestAnimationFrame(() => requestAnimationFrame(check)); };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
-    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+    // The demos add rows over time: re-check (throttled) when their content changes
+    const mo = new MutationObserver(() => { if (!tm) tm = window.setTimeout(() => { tm = 0; check(); }, 250); });
+    if (inner.current) mo.observe(inner.current, { childList: true, subtree: true });
+    return () => { ro.disconnect(); mo.disconnect(); cancelAnimationFrame(raf); window.clearTimeout(tm); };
   }, []);
   return (
     <div ref={box} className="absolute left-0 right-0 bottom-0" style={{ top: BADGE_STRIP, transformStyle: 'preserve-3d' }}>
@@ -225,7 +226,7 @@ function CalMock({ m, s, lang, x }: P) {
     <div ref={ref} className="fx-root w-full h-full flex flex-col gap-2.5">
       <AppBar av={x.brand} title={x.calTitle} sub={f.dt({ month: 'long', year: 'numeric' }, wk.days[0])} />
       <Float z={1} className="flex-1 min-h-0">
-        <div className="p-2.5 h-full" style={panel}>
+        <div className="p-2.5 h-full overflow-hidden" style={panel}>
           <div className="grid gap-1.5" style={{ gridTemplateColumns: '30px repeat(5, 1fr)' }}>
             <span />
             {wk.days.map((d, i) => (
@@ -274,7 +275,7 @@ function CrmMock({ s, lang, x }: P) {
       <div className="grid grid-cols-3 gap-2 flex-1 min-h-0">
         {stages.map((stg, c) => (
           <Float key={stg} z={1} className="min-h-0">
-            <div className="p-1.5 flex flex-col gap-1.5 h-full" style={panel}>
+            <div className="p-1.5 flex flex-col gap-1.5 h-full overflow-hidden" style={panel}>
               <div className="px-1 pt-0.5">
                 <p className="flex items-center justify-between" style={lblMono({ fontSize: 9 })}><span className="flex items-center gap-1.5 truncate"><span style={dot(c === 2 ? Q : LI)} />{stg}</span><span style={{ ...pill(false), padding: '0 6px', fontSize: 9.5, letterSpacing: 0 }}>{st.cols[c].length + base[c] + (c === 2 ? st.won : 0)}</span></p>
                 <p style={{ fontSize: 10.5, color: MI, marginTop: 3, fontWeight: 500 }}>{f.cur(c === 2 ? wonTotal : sum(st.cols[c]) + [11800, 7300, 0][c])}</p>
