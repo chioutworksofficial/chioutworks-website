@@ -3,7 +3,7 @@
 > **Ana harita.** Her görevden ÖNCE okunur, SONRA güncellenir. Yapılmış bir şey bozulmaz; istenen şey zaten varsa
 > sahibe "yapıldı, şurada" denir; kısmen varsa eksiği söylenir. Oturum sonunda ve sahip sorduğunda bu tablo verilir.
 > Yazım kuralı: kısaltma yok; her satır ya **tamamen bitti** ya **bitti ama yayında kontrol edilecek / küçük eksik** ya da **yapılmadı** grubundadır.
-> Son güncelleme: 2026-11-20
+> Son güncelleme: 2026-11-23
 
 ## A. Tamamen bitti — öyle kalabilir (dokunmaya gerek yok)
 | Parça | Nerede |
@@ -70,11 +70,11 @@
 | Form soruları DE/EL | Almanca ve Yunanca metinleri bir kişinin okuması | Sen |
 
 ## C. Yapılmadı
-| **Mobil hız ve his (pazartesi 2026-11-23 ilk iş)** | Hayır, ama önemli | Ayrıntı `SON-DURUM.md` en üstte |
+| Mobil hız 80+ (telefonda açılış animasyonunu kaldır/kısalt kararı) | Hayır | 2026-11-23: 3 tur yapıldı, canlı 61–66, masaüstü 98; kalan kısım alan adı + Stripe aşamasına ertelendi |
 | Parça | Yayından önce şart mı? | Not |
 |---|---|---|
 | Hız ve erişilebilirlik (büyük paketleri bölme vb.) | Hayır, ama önemli | |
-| Hata izleme, son test listesi | Hayır, ama önemli | Yayına yakın |
+| Son test listesi | Hayır, ama önemli | Yayına yakın (hata izleme 2026-11-23 Sentry ile yapıldı) |
 | Kendi sitenin yasal metinlerini eRecht24 ile güncelleme (gizlilik, Impressum, AGB; 4 dil, çeviriler kontrollü) | Hayır, ama önemli | Kendi yazdığımız metinler avukat kontrollü değil; eRecht24 alınınca |
 | Kullanım koşulları (AGB) gözden geçirme | Hayır, ama önemli | Avukat incelemesinin yerini tutmaz |
 | Proje tesliminde otomatik devir belgesi (servisler, hesaplar, yapı) | Hayır | Devir maddesiyle bağlantılı |
