@@ -167,6 +167,7 @@ export default function IntakePage() {
   };
   const go = async (to: number) => {
     if (step === 0 && to > 0) { const e = startOk(); if (e) { setErr(e); return; } }
+    if (to > step && cur?.id === 'examples' && cur.qs.some((q) => q.id === 'example_url_1') && (!str(answers.example_url_1) || urlBad('example_url_1') )) { setBadUrls((b) => ({ ...b, example_url_1: true })); setErr(u.badUrl); return; }
     setErr(null);
     await flush();
     setStep(Math.max(0, Math.min(to, total)));
@@ -307,7 +308,7 @@ export default function IntakePage() {
           : q.format === 'url'
           ? <>
               <input id={`q-${q.id}`} style={inputStyle} type="text" inputMode="url" autoComplete="url" placeholder={u.urlPh} aria-invalid={urlBad(q.id)} value={raw(v)} onChange={(e) => set(q.id, e.target.value)} />
-              {urlBad(q.id) && <p role="alert" className="cw-err">{u.badUrl}</p>}
+              {(urlBad(q.id) || (q.required && badUrls[q.id])) && <p role="alert" className="cw-err">{u.badUrl}</p>}
             </>
           : <>
               <textarea id={`q-${q.id}`} style={{ ...inputStyle, minHeight: 84, resize: 'vertical' }} rows={3} placeholder={u.textPh} value={typeof v === 'string' ? v : ''} onChange={(e) => set(q.id, e.target.value)} />
@@ -428,6 +429,11 @@ export default function IntakePage() {
             <div role="note" className="cw-style-note" style={{ margin: '0 0 18px', padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start', borderRadius: 'var(--r-input)', border: '1px solid color-mix(in srgb, var(--c-signal) 55%, transparent)', borderLeft: '4px solid var(--c-signal)', background: 'color-mix(in srgb, var(--c-signal) 12%, transparent)' }}>
               <span aria-hidden="true" style={{ flex: '0 0 auto', width: 24, height: 24, borderRadius: '50%', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14, background: 'var(--c-lilac)', color: 'var(--c-void)' }}>!</span>
               <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: 'var(--c-quartz)' }}><strong style={{ color: 'var(--c-lilac)' }}>{head}</strong>{rest ? ' ' + rest : ''}</p>
+            </div>); })()}
+          {cur.id === 'examples' && cur.qs.some((q) => q.id === 'example_url_1') && (() => { const L = 'styles.refero.design'; const n = u.exNote; const k = n.indexOf('. '); const head = k > 0 ? n.slice(0, k + 1) : n; const rest = (k > 0 ? n.slice(k + 1).trim() : ''); const [a, b] = rest.split(L); return (
+            <div role="note" className="cw-ex-note" style={{ margin: '0 0 18px', padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start', borderRadius: 'var(--r-input)', border: '1px solid color-mix(in srgb, var(--c-pulse) 60%, transparent)', borderLeft: '4px solid var(--c-pulse)', background: 'color-mix(in srgb, var(--c-pulse) 14%, transparent)' }}>
+              <span aria-hidden="true" style={{ flex: '0 0 auto', width: 24, height: 24, borderRadius: '50%', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14, background: 'var(--c-lilac)', color: 'var(--c-void)' }}>★</span>
+              <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: 'var(--c-quartz)' }}><strong style={{ color: 'var(--c-quartz)', fontWeight: 800 }}>{head}</strong>{' '}{a}{b !== undefined ? <><a href="https://styles.refero.design/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--c-quartz)', textDecoration: 'underline', fontWeight: 600 }}>{L}</a>{b}</> : null}</p>
             </div>); })()}
           {cur.kind === 'style' && <StyleInline lang={lang} v={svLocal ?? parseStyle(answers.style_choice)} set={(nv) => { setSvLocal(nv); set('style_choice', nv.likes.length || nv.pal || nv.pair ? JSON.stringify(styleBody(nv)) : ''); }} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: cur.kind === 'style' && cur.qs.length ? 14 : 0 }}>

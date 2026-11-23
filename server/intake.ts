@@ -188,7 +188,7 @@ function friendly(secs: SecDef[]): SecDef[] {
     if (SHOW_IF[out.id]) out.showIf = SHOW_IF[out.id];
     if (out.type === 'text' && SUGGESTIONS[out.id]) out.suggestions = SUGGESTIONS[out.id];
     if (out.type === 'multi' && out.opts) out.opts = out.opts.map((o) => (o.id === 'none' || o.id === 'unsure' ? { ...o, exclusive: true } : o));
-    if (!out.required && !out.id.startsWith('meta_') && !out.opts?.some((o) => o.id === 'unsure')) out.unsure = true;
+    if (!out.required && !out.id.startsWith('meta_') && out.format !== 'url' && !out.opts?.some((o) => o.id === 'unsure')) out.unsure = true;
     return out;
   };
   return sorted.map((s, i) => ({
