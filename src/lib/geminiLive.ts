@@ -95,6 +95,7 @@ export class LiveCall {
   private graceHeardAt = 0;
   private audioAfterHeard = false;
   private sources = new Set<AudioBufferSourceNode>();
+  private guardTimer: ReturnType<typeof setInterval> | null = null;
   constructor(private ctx: AudioContext, private stream: MediaStream, private h: LiveHandlers) {}
 
   /** Resolves when setupComplete arrives; rejects on error/close/timeout before that. */
@@ -114,7 +115,7 @@ export class LiveCall {
       ws.onmessage = async (ev) => {
         let m: LiveServerMessage;
         try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : await (ev.data as Blob).text()); } catch { return; }
-        if (m.setupComplete && !this.ready) { this.ready = true; clearTimeout(timer); setTimeout(() => { this.greeting = false; }, 12000); this.startMic(); resolve(); return; }
+        if (m.setupComplete && !this.ready) { this.ready = true; clearTimeout(timer); setTimeout(() => { this.greeting = false; }, 12000); this.guardTimer = setInterval(() => this.guardCheck(), 250); this.startMic(); resolve(); return; }
         const sc = m.serverContent;
         if (sc) {
           if (sc.interrupted) {
@@ -133,10 +134,16 @@ export class LiveCall {
           const calls = m.toolCall.functionCalls as { id: string; name: string; args?: { reason?: unknown } }[];
           ws.send(JSON.stringify({ toolResponse: { functionResponses: calls.map((c) => ({ id: c.id, name: c.name, response: { ok: true } })) } }));
           const fin = calls.find((c) => c.name === 'finish_conversation');
-          if (fin) this.h.onFinish(fin.args?.reason === 'abuse' ? 'abuse' : fin.args?.reason === 'language' ? 'language' : 'done');
+          if (fin) this.h.onFinish(fin.args?.reason === 'abuse' ? 'abuse' : fin.args?.reason === 'language' ? 'language' : fin.args?.reason === 'closing' ? 'closing' : 'done');
         }
       };
     });
+  }
+
+  /** Safety: if the greeting audio has finished playing and no turnComplete came within 2 s, release the mic guard anyway. */
+  private guardCheck() {
+    if (!this.greeting) { if (this.guardTimer) clearInterval(this.guardTimer); this.guardTimer = null; return; }
+    if (this.gotAudio && !this.speaking() && performance.now() - this.lastAudio >= 2000) { this.greeting = false; dbg('greeting guard released by safety timer'); }
   }
 
   private startMic() {
@@ -252,6 +259,7 @@ export class LiveCall {
   /** Ends the call and releases mic nodes; the caller owns (and stops) the MediaStream and the AudioContext. */
   close() {
     this.closing = true;
+    if (this.guardTimer) clearInterval(this.guardTimer); this.guardTimer = null;
     this.stopPlayback();
     try { this.node?.disconnect(); this.src?.disconnect(); this.sink?.disconnect(); } catch { /* ignore */ }
     if (this.node) this.node.port.onmessage = null;

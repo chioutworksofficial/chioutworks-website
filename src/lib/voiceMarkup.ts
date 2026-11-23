@@ -26,3 +26,13 @@ export function parseMarkup(s: string): Seg[] {
 
 /** Piper parameters per style (length_scale > 1 = slower; noise_w lower = steadier rhythm). null = voice default. */
 export const STYLE_PARAMS: Record<Style, { ls: number; nw?: number } | null> = { n: null, slow: { ls: 1.15 }, warm: { ls: 1.08, nw: 0.6 } };
+
+// Live-call transcripts: drop control tokens the model may emit (<no speech>, {pause}, [x]); an unclosed opener at the end of a chunk
+// is held back in `tail` until the next chunk completes it. Spoken brand spellings are shown as the written brand.
+const LIVE_TOKEN = /<[^<>]{0,40}>|\{[^{}]{0,40}\}|\[[^[\]]{0,40}\]/g;
+const LIVE_OPENER = /[<{[][^<>{}[\]]{0,40}$/;
+export function cleanLive(tail: string, x: string): { text: string; tail: string } {
+  const s = tail + x, m = LIVE_OPENER.exec(s);
+  return { text: (m ? s.slice(0, m.index) : s).replace(LIVE_TOKEN, ''), tail: m ? m[0] : '' };
+}
+export const writtenBrand = (s: string) => s.replace(/Shee-oot works|Schiut-Works|Şiut-vörks|Σιούτ-γουόρκς/gi, 'Chioutworks');

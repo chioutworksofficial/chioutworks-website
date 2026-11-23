@@ -7,7 +7,7 @@ import { pagePath } from '../lib/routes';
 import { VOICE_UI } from './i18n/voice';
 import { sttCapable, sttReady, sttSlow, prepareStt, listenOnce, openMic, micInputs, getMicId, setMicId, type Listening } from '../lib/stt';
 import { readyPiper, unlockAudio, speakPiper, stopPiper, piperBusy } from '../lib/piperTts';
-import { stripMarkup } from '../lib/voiceMarkup';
+import { stripMarkup, cleanLive, writtenBrand } from '../lib/voiceMarkup';
 import AssistantConsent from './AssistantConsent';
 import VoiceOrb from './VoiceOrb';
 import { hasConsent, fallbackAllowed, CONSENT_VERSION } from '../lib/assistantConsent';
@@ -123,6 +123,8 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const voiceStarted = useRef(false);   // startVoice runs once per call (idempotent against re-renders / double events)
   const liveRole = useRef<'user' | 'assistant' | null>(null);
   const outBuf = useRef('');
+  const liveTail = useRef({ user: '', assistant: '' });   // unclosed <...>/{...}/[...] fragment held back between transcript chunks
+  const closingTimer = useRef<ReturnType<typeof setInterval> | null>(null);   // 8 s of silence after the thanks -> farewell
   const liveCut = useRef(false);   // last assistant bubble was interrupted
   const corrections = useRef(0);
   const nameResolve = useRef<() => void>(() => {});
@@ -150,6 +152,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     if (hbRef.current) { clearInterval(hbRef.current); hbRef.current = null; }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     watchRef.current?.stop(); watchRef.current = null;
+    if (closingTimer.current) { clearInterval(closingTimer.current); closingTimer.current = null; }
     if (callRef.current && !endedAtRef.current) { endedAtRef.current = Date.now(); timingRef.current = callRef.current.timing(); if (!endReasonRef.current) endReasonRef.current = 'user_hangup'; }
     callRef.current?.close(); callRef.current = null;
     streamRef.current?.getTracks().forEach((x) => x.stop()); streamRef.current = null;
@@ -191,6 +194,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
 
   useEffect(() => {
     const onOpen = () => {
+      endLive(); liveTail.current = { user: '', assistant: '' };
       turnsRef.current = [];
       setTurns([]); setInterim(''); setText(''); setNotice(null); setTyped(false);
       sessionRef.current++; autoRef.current = true; deniedRef.current = false; inFlight.current = false;
@@ -380,10 +384,14 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   };
 
   // ── Live call (Gemini Live) ─────────────────────────────────────────────────────────────────
-  const addLive = (role: 'user' | 'assistant', text: string) => {
+  const addLive = (role: 'user' | 'assistant', raw: string) => {
+    const c = cleanLive(liveTail.current[role], raw); liveTail.current[role] = c.tail;
+    const text = c.text;
+    if (!text.trim()) return;   // a chunk that was only a control token shows nothing
     if (role === 'user') liveCut.current = false;
     const r = addLiveChunk(turnsRef.current, role, text, liveRole.current === role, liveCut.current);
     turnsRef.current = r.turns; liveRole.current = role;
+    if (role === 'assistant') { const l = turnsRef.current[turnsRef.current.length - 1]; const w = writtenBrand(l.text); if (w !== l.text) turnsRef.current = [...turnsRef.current.slice(0, -1), { ...l, text: w }]; }
     if (r.cutUsed || role === 'user') liveCut.current = false;
     setTurns(turnsRef.current);
   };
@@ -483,6 +491,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     const h: LiveHandlers = {
       onInput: (x) => {
         startTimerOnce(); addLive('user', x);
+        if (closingTimer.current) { clearInterval(closingTimer.current); closingTimer.current = null; }   // the visitor spoke: the model answers with its farewell itself
         watchRef.current?.heard();
         if (!spokeRef.current) { spokeRef.current = true; bumpLiveDay(); }   // only calls where the visitor actually spoke count
       },
@@ -501,8 +510,20 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
         }
       },
       onInterrupted: () => { liveCut.current = turnsRef.current[turnsRef.current.length - 1]?.role === 'assistant'; liveRole.current = null; outBuf.current = ''; },
-      onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; if (finishPending.current && abuseRef.current) drain(); },
+      onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; liveTail.current = { user: '', assistant: '' }; if (finishPending.current && abuseRef.current) drain(); },
       onFinish: (reason) => {
+        if (reason === 'closing') {   // thanks said, not the end: wait for the visitor; after ~8 s of silence ask for the short farewell
+          if (closingTimer.current) clearInterval(closingTimer.current);
+          let quiet = 0;
+          closingTimer.current = setInterval(() => {
+            const c = callRef.current;
+            if (!c || finishPending.current) { if (closingTimer.current) clearInterval(closingTimer.current); closingTimer.current = null; return; }
+            if (c.busy()) { quiet = 0; return; }
+            quiet += 250;
+            if (quiet >= 8000) { if (closingTimer.current) clearInterval(closingTimer.current); closingTimer.current = null; c.sendText('The visitor stayed silent. Say your short farewell now, then call finish_conversation with reason done as your very last action.'); }
+          }, 250);
+          return;
+        }
         if (reason === 'abuse') { abuseRef.current = true; endReasonRef.current = 'abuse'; } else if (reason === 'language') endReasonRef.current = 'language'; else endReasonRef.current ||= 'finish_tool';
         finishPending.current = true; if (reason === 'abuse') setTimeout(drain, 3000); else drain();
       },

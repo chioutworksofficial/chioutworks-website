@@ -80,7 +80,9 @@ function Defer({ id, minH, children }: { id?: string; minH: string; children: Re
  * on the first interaction, or when something asks to open them (that early event is replayed once they are mounted). Both devices; no visible change.
  */
 function LateAssistants({ lang }: { lang: Lang }) {
-  const [armed, setArmed] = useState(false);
+  // Mounted right away again (owner, 2026-11-23: the assistant must stay reliable). The deferred start could swallow the
+  // first open-voice tap and start audio outside the user's gesture; the chunks still load in parallel, not in the entry.
+  const [armed, setArmed] = useState(true);
   const pending = useRef<CustomEvent | null>(null);
   useEffect(() => {
     if (armed) return;
