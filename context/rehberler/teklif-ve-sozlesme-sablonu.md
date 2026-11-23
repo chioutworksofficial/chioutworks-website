@@ -53,3 +53,13 @@ Anlaşma ve teklif hazırlanırken bu sekiz risk mutlaka kapatılır:
 | Kod ve veri kimin, belirsiz | Kod sahipte (müşteriye lisanslı), veri müşteride; yazılı |
 
 Not: anlaşmada "dahil olmayanlar" en az 5 madde (teklifte en az 3).
+
+## 5. Sözleşme dili ve imza şekli ülkeye göre (sahibin kararı, 2026-11-23)
+| Müşterinin ülkesi | Sözleşme dili | İmza / kabul |
+|---|---|---|
+| Almanya | Almanca | Müşteri seçer: dijital kabul ya da basılı kopyanın posta ile gönderilmesi |
+| Yunanistan | **İngilizce geçerli metin** + Yunanca kopya; Yunanca kopyanın üstünde "Bu yalnızca sözleşmenin çevirisidir; geçerli metin İngilizcedir" yazar | Yazılı ad soyad imza olarak kabul edilir (dijital) |
+| Türkiye | Türkçe | Dijital |
+| İngiltere, ABD | İngilizce | Online / dijital kabul |
+| Diğer ülkeler | İngilizce | Online / dijital kabul |
+Not: tüketici (bireysel müşteri) sözleşmelerinde bazı ülkeler yerel dilde metin isteyebilir; şüphede avukata sorulur (sahip: gerekirse yapılacak).
