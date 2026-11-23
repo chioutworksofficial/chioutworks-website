@@ -83,7 +83,8 @@ html[data-mode="light"] .fx-shell{box-shadow:0 2px 6px -2px color-mix(in srgb,va
 @media (prefers-reduced-motion: reduce){.fx-card .fx,.fx-card .fx-dots i,.fx-enter,.fx-flash,.fx-shift{animation:none!important}.fx-ring{display:none}.fx-root,.fx-z1,.fx-z2{transform:none!important}}
 `;
 
-/** Draws the card's mock screen at one fixed design size and scales it to the card's real size (owner, 2026-11-23):
+/** The top 46px of the card is a separate strip for the "Demo" badge, so it never covers the animation (owner, 2026-11-23).
+ *  Draws the card's mock screen at one fixed design size and scales it to the card's real size (owner, 2026-11-23):
  *  cards shrink with the viewport (56svh), and the content used to overflow at the bottom on shorter screens. */
 const FIT_W = 493, FIT_H = 600;   // same 460:560 ratio as the card, a little taller than its max height so nothing is cut
 function FitBox({ children }: { children: ReactNode }) {
@@ -99,7 +100,7 @@ function FitBox({ children }: { children: ReactNode }) {
     return () => ro.disconnect();
   }, []);
   return (
-    <div ref={box} className="absolute inset-0" style={{ transformStyle: 'preserve-3d' }}>
+    <div ref={box} className="absolute left-0 right-0 bottom-0" style={{ top: 46, transformStyle: 'preserve-3d' }}>
       <div className="absolute left-0 top-0" style={{ width: FIT_W, height: FIT_H, transform: `scale(${k || 1})`, transformOrigin: '0 0', transformStyle: 'preserve-3d', visibility: k ? 'visible' : 'hidden' }}>{children}</div>
     </div>
   );
@@ -789,7 +790,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
                       style={{ background: 'linear-gradient(160deg, var(--c-cobalt, #12244f) 0%, var(--c-deep-sea, #0d172b) 55%, var(--c-abyss, #0e111b) 100%)', border: '1px solid var(--c-hairline, #24375a)' }}>
                       <div aria-hidden="true" className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-300 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 z-20" style={{ border: '2px solid var(--c-lilac, #85a6e9)', background: 'radial-gradient(90% 50% at 50% 0%, color-mix(in srgb, var(--c-lilac, #85a6e9) 22%, transparent), transparent 70%)' }} />
                       <div aria-hidden="true" className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: '45%', background: 'linear-gradient(180deg, color-mix(in srgb, var(--c-quartz, #ffffff) 12%, transparent), transparent)' }} />
-                      <span className="absolute z-10 top-4 right-4 rounded-full pl-1.5 pr-3.5 py-1.5 flex items-center gap-2 transition-colors duration-300 group-hover:bg-[var(--c-lilac, #85a6e9)] group-hover:text-[var(--c-abyss, #0e111b)]" style={{ fontSize: 12, fontWeight: 500, color: 'var(--c-quartz, #ffffff)', background: 'color-mix(in srgb, var(--c-abyss, #0e111b) 55%, transparent)', border: '1px solid var(--c-hairline, #24375a)' }}>
+                      <span className="absolute z-10 top-2.5 right-3 rounded-full pl-1.5 pr-3.5 py-1 flex items-center gap-2 transition-colors duration-300 group-hover:bg-[var(--c-lilac, #85a6e9)] group-hover:text-[var(--c-abyss, #0e111b)]" style={{ fontSize: 12, fontWeight: 500, color: 'var(--c-quartz, #ffffff)', background: 'color-mix(in srgb, var(--c-abyss, #0e111b) 55%, transparent)', border: '1px solid var(--c-hairline, #24375a)' }}>
                         <span className="flex items-center justify-center rounded-full" style={{ width: 18, height: 18, background: 'var(--c-lilac, #85a6e9)' }}><svg width="7" height="8" viewBox="0 0 7 8" aria-hidden="true"><path d="M1 0.8L6.2 4L1 7.2Z" style={{ fill: 'var(--c-abyss, #0e111b)' }} /></svg></span>{ui.demo}
                       </span>
                       <FitBox>
