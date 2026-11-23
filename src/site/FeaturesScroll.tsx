@@ -695,6 +695,7 @@ const CF_CSS = `
 @keyframes cf-marq{from{transform:translateX(0)}to{transform:translateX(-33.3333%)}}
 #features[data-vis="0"] .cf-marq{animation-play-state:paused}
 @keyframes cf-star{to{background-position:320px 220px}}
+.cf-stage{overscroll-behavior-x:contain;touch-action:pan-y}
 .cf-stage{--w:min(520px,36vw,calc((100svh - 330px)*1.6));--h:calc(var(--w)/1.6);--rx:1.08;--rz:.91;--ty:.17;--top:calc(var(--h)*.87);position:relative;height:calc(var(--h)*1.9);perspective:1800px;perspective-origin:50% 30%;z-index:1;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;outline:none}
 .cf-stage[data-drag="1"],.cf-stage[data-drag="1"] *{cursor:grabbing!important}
 .cf-space{position:absolute;inset:0;z-index:0;opacity:0;transition:opacity .7s ease;pointer-events:none;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);background:radial-gradient(ellipse 60% 70% at 50% 55%,color-mix(in srgb,var(--c-signal,#2862d7) 45%,var(--c-deep-sea,#0d172b)) 0%,var(--c-deep-sea,#0d172b) 45%,var(--c-void,#0b0c0e) 80%)}

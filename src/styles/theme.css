@@ -40,6 +40,7 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overscroll-behavior-y: none;
+    overscroll-behavior-x: none;   /* two-finger horizontal swipe must not trigger browser back/forward (owner 2026-11-24: language seemed to change) */
     margin: 0; padding: 0; width: 100%;
   }
   * { box-sizing: border-box; }
