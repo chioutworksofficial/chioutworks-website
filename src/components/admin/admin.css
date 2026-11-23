@@ -6,6 +6,12 @@
 .adm-nav { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid transparent; background: transparent; color: var(--c-ash); font: 500 14px/1.2 var(--font-body); cursor: pointer; text-align: left; border-radius: 9999px; }
 .adm-nav:hover { color: var(--c-quartz); background: var(--c-inkline); }
 .adm-nav[aria-current='page'] { color: var(--c-quartz); background: var(--c-cobalt); border-color: var(--c-hairline); }
+.adm-group { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.adm-grouplabel { padding: 0 12px; font: 600 11px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c-ash); opacity: .75; }
+.adm-more { position: relative; }
+.adm-more > summary { list-style: none; cursor: pointer; }
+.adm-more > summary::-webkit-details-marker { display: none; }
+.adm-more-menu { position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 25; display: flex; flex-direction: column; gap: 4px; padding: 8px; min-width: 190px; background: var(--c-abyss); border: 1px solid var(--c-edge); border-radius: var(--r-card); }
 .adm-nav:focus-visible { outline: 2px solid var(--c-lilac); outline-offset: 2px; }
 .adm-badge { margin-left: auto; min-width: 20px; padding: 2px 7px; border-radius: 9999px; background: var(--c-signal); color: var(--c-quartz); font: 600 11px/1.4 var(--font-body); text-align: center; }
 .adm-spacer { flex: 1; }
@@ -67,7 +73,9 @@ button.adm-chip { cursor: pointer; }
   .adm-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
   .adm-tabs::-webkit-scrollbar { display: none; }
   .adm-tabs .adm-nav { width: auto; flex: none; padding: 8px 10px; font-size: 12.5px; }
-  .adm-tabs { gap: 2px; }
+  .adm-tabs { gap: 6px; }
+  .adm-tabs .adm-group { flex: none; flex-direction: row; align-items: center; margin-top: 0; gap: 2px; }
+  .adm-tabs .adm-grouplabel { padding: 0 10px; font-size: 10px; }
   .adm-main { padding: 20px 16px 48px; width: 100%; }
   .adm-h1 { font-size: 24px; }
   .adm-grid4 { grid-template-columns: 1fr 1fr; gap: 12px; }

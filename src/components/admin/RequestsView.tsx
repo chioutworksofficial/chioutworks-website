@@ -76,7 +76,7 @@ function WantBox({ r, style }: { r: Req; style: string }) {
 
 export default function RequestsView({ reqs, setReqs, openId, setOpenId, go, setSessions }: Props) {
   const [q, setQ] = useState('');
-  const [status, setStatus] = useState<'all' | 'new' | 'read'>('all');
+  const [status, setStatus] = useState<'all' | 'new' | 'read' | 'archived'>('all');
   const [tag, setTag] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -84,6 +84,7 @@ export default function RequestsView({ reqs, setReqs, openId, setOpenId, go, set
   const list = useMemo(() => {
     const s = q.trim().toLowerCase();
     return (reqs ?? []).filter((r) => {
+      if (status === 'archived' ? !r.archived : r.archived) return false;
       if (status === 'new' && r.read) return false;
       if (status === 'read' && !r.read) return false;
       if (tag && tagsOf(r)[0]?.key !== tag) return false;
@@ -93,14 +94,14 @@ export default function RequestsView({ reqs, setReqs, openId, setOpenId, go, set
 
   const sel = useSelection(list.map((r) => r.id));
   const note = useNote();
-  const bulk = async (action: 'read' | 'unread' | 'delete') => {
+  const bulk = async (action: 'read' | 'unread' | 'delete' | 'archive' | 'unarchive') => {
     const ids = sel.sel; const prev = reqs ?? []; const set = new Set(ids);
-    setReqs(action === 'delete' ? prev.filter((x) => !set.has(x.id)) : prev.map((x) => set.has(x.id) ? { ...x, read: action === 'read' } : x));
+    setReqs(action === 'delete' ? prev.filter((x) => !set.has(x.id)) : prev.map((x) => !set.has(x.id) ? x : action === 'archive' || action === 'unarchive' ? { ...x, archived: action === 'archive' } : { ...x, read: action === 'read' }));
     if (action === 'delete') setSessions?.((ss) => ss && ss.map((v) => v.contactId && set.has(v.contactId) ? { ...v, contactId: undefined, contactSubmitted: false } : v));
     sel.clear();
     try {
       const n = await bulkApi('/api/admin/quote-requests/bulk', ids, action);
-      note.show({ ok: true, text: action === 'delete' ? `${n} kayıt silindi` : `${n} kayıt ${action === 'read' ? 'okundu' : 'okunmadı'} yapıldı` });
+      note.show({ ok: true, text: action === 'delete' ? `${n} kayıt silindi` : action === 'archive' ? `${n} kayıt arşivlendi` : action === 'unarchive' ? `${n} kayıt arşivden çıkarıldı` : `${n} kayıt ${action === 'read' ? 'okundu' : 'okunmadı'} yapıldı` });
     } catch { setReqs(prev); note.show({ ok: false, text: 'Toplu işlem yapılamadı, tekrar deneyin.' }); }
   };
 
@@ -126,7 +127,7 @@ export default function RequestsView({ reqs, setReqs, openId, setOpenId, go, set
       <ManualAdd onAdded={(r) => { setReqs([r, ...(reqs ?? [])]); setOpenId(r.id); setConfirm(false); setMsg(null); }} />
       <input className="adm-input" style={{ marginBottom: 12 }} type="search" placeholder="Ad, e-posta, telefon veya mesajda ara" aria-label="Ara" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="adm-chips" role="group" aria-label="Durum">
-        {([['all', 'Tümü'], ['new', 'Yeni'], ['read', 'Okundu']] as const).map(([k, l]) => (
+        {([['all', 'Tümü'], ['new', 'Yeni'], ['read', 'Okundu'], ['archived', 'Arşiv']] as const).map(([k, l]) => (
           <button key={k} className="adm-chip" aria-pressed={status === k} onClick={() => setStatus(k)}>{l}</button>))}
       </div>
       <div className="adm-chips" role="group" aria-label="Nereden geldi">
@@ -145,6 +146,7 @@ export default function RequestsView({ reqs, setReqs, openId, setOpenId, go, set
               <span className="adm-name" style={{ fontWeight: r.read ? 500 : 700 }}>{r.name || r.email || 'İsimsiz'}</span><br />
               <span className="adm-meta">{fmtDate(r.createdAt)}</span>
             </span>
+            <span className="adm-chip tag">{r.archived ? 'Arşivde' : r.read ? 'Okundu' : 'Yeni'}</span>
             <span className="adm-chip tag" data-src={tagsOf(r)[0]?.key}>{tagsOf(r)[0]?.label}</span>
             {r.preferredStart && <span className="adm-meta">Başlangıç: {fmtDay(r.preferredStart)}</span>}
             {r.kind === 'contact' && <span className="adm-meta">{r.replyPreference === 'phone' ? 'Telefon' : 'Yazılı cevap'}</span>}
@@ -152,8 +154,14 @@ export default function RequestsView({ reqs, setReqs, openId, setOpenId, go, set
           </div>))}</div>}
       <BulkBar count={sel.sel.length} onDelete={() => bulk('delete')}>
         <button className="lq-btn-ghost adm-btn sm" onClick={() => bulk('read')}>Okundu yap</button>
-        <button className="lq-btn-ghost adm-btn sm" onClick={() => bulk('unread')}>Okunmadı yap</button>
-        <button className="lq-btn-ghost adm-btn sm" onClick={() => exportCsv((reqs ?? []).filter((r) => sel.has(r.id)))}>Dışa aktar (CSV)</button>
+        <button className="lq-btn-ghost adm-btn sm" onClick={() => bulk(status === 'archived' ? 'unarchive' : 'archive')}>{status === 'archived' ? 'Arşivden çıkar' : 'Arşivle'}</button>
+        <details className="adm-more">
+          <summary className="lq-btn-ghost adm-btn sm">Diğer ▾</summary>
+          <div className="adm-more-menu">
+            <button className="lq-btn-ghost adm-btn sm" onClick={() => bulk('unread')}>Okunmadı yap</button>
+            <button className="lq-btn-ghost adm-btn sm" onClick={() => exportCsv((reqs ?? []).filter((r) => sel.has(r.id)))}>Dışa aktar (CSV)</button>
+          </div>
+        </details>
       </BulkBar>
 
       {open && <>

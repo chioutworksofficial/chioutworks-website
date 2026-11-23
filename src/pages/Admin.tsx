@@ -15,10 +15,10 @@ import ErrorsView from '../components/admin/ErrorsView';
 
 type Auth = 'checking' | 'out' | 'in' | 'unset';
 export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors';
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'overview', label: 'Genel bakış' }, { key: 'requests', label: 'Talepler' }, { key: 'intakes', label: 'Analiz formları' }, { key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' },
-  { key: 'voice', label: 'Sesli görüşmeler' }, { key: 'calendar', label: 'Takvim' },
-  { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'appointments', label: 'Randevular' }, { key: 'errors', label: 'Hatalar / Errors' },
+const GROUPS: { label: string; tabs: { key: Tab; label: string }[] }[] = [
+  { label: 'Gelenler', tabs: [{ key: 'requests', label: 'Talepler' }, { key: 'intakes', label: 'Analiz formları' }, { key: 'voice', label: 'Sesli görüşmeler' }] },
+  { label: 'İşler', tabs: [{ key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' }, { key: 'calendar', label: 'Takvim' }, { key: 'appointments', label: 'Randevular' }] },
+  { label: 'Site', tabs: [{ key: 'overview', label: 'Genel bakış' }, { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'errors', label: 'Hatalar / Errors' }] },
 ];
 
 function Login({ unset, onDone }: { unset: boolean; onDone: () => void }) {
@@ -117,10 +117,11 @@ export default function Admin() {
 
   const unread = (reqs ?? []).filter((r) => !r.read).length;
   const go = (t: Tab, id?: string) => { setTab(t); if (t === 'requests') setOpenReq(id ?? null); if (t === 'voice') setOpenVoice(id ?? null); if (t === 'offers') setOpenOffer(id ?? null); window.scrollTo(0, 0); };
-  const nav = (cls?: string) => TABS.map((t) => (
+  const nav = (cls?: string) => GROUPS.map((g) => (
+    <div key={g.label} className="adm-group"><span className="adm-grouplabel">{g.label}</span>{g.tabs.map((t) => (
     <button key={t.key} className="adm-nav" aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key)}>
       {t.label}{t.key === 'requests' && unread > 0 && <span className={cls ?? 'adm-badge'}>{unread}</span>}{t.key === 'offers' && offerUnread > 0 && <span className={cls ?? 'adm-badge'}>{offerUnread}</span>}{t.key === 'projects' && projectUnread > 0 && <span className={cls ?? 'adm-badge'}>{projectUnread}</span>}
-    </button>
+    </button>))}</div>
   ));
 
   return (

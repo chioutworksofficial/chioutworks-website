@@ -360,7 +360,7 @@ const sessionS = z.object({ lang: LANG, turns: z.array(turnS).min(1).max(30), id
 const cardS = z.object({ secret: s(200), name: s(80), email: emailOpt, phone: s(40), business: s(100), city: s(80), message: s(2000) }).passthrough();
 const vcontactS = z.object({ ...WS, email, name: s(80), phone: s(60), message: s(1000), secret: s(200) });
 const vreqS = z.object({ ...WS, email, firstName: s(40), lastName: s(40), secret: s(200), page: s(200) });
-const bulkS = z.object({ ids: z.array(z.string().max(100)).min(1).max(500), action: z.enum(['read', 'unread', 'delete']) });
+const bulkS = z.object({ ids: z.array(z.string().max(100)).min(1).max(500), action: z.enum(['read', 'unread', 'delete', 'archive', 'unarchive']) });
 const liveTokS = z.object({ consent: bool, consentVersion: s(40), lang: LANG.nullish(), bid: s(200), prevSessionId: s(64), ticket: s(64), visitor: anyObj, transcript: z.array(z.any()).max(200).nullish() }).passthrough();
 const liveBeatS = z.object({ sessionId: s(64), abuse: bool, bid: s(200) });
 const extractS = z.object({ consent: bool, consentVersion: s(40), transcript: z.array(z.any()).max(200).nullish(), groqOk: bool });
@@ -1291,7 +1291,7 @@ app.post('/api/admin/quote-requests/bulk', v(bulkS), async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
   const ids = bulkIds(req.body);
   const action = req.body?.action;
-  if (!ids || !['read', 'unread', 'delete'].includes(action)) return res.status(400).json({ error: 'invalid' });
+  if (!ids || !['read', 'unread', 'delete', 'archive', 'unarchive'].includes(action)) return res.status(400).json({ error: 'invalid' });
   try {
     const set = new Set(ids);
     const all = await listRequests();
@@ -1303,7 +1303,7 @@ app.post('/api/admin/quote-requests/bulk', v(bulkS), async (req, res) => {
       for (const v of await listVoice()) if (v.contactId && found.has(v.contactId)) { delete v.contactId; v.contactSubmitted = false; changed.push(v); }
       await saveVoice(changed);
     } else {
-      for (const x of hit) x.read = action === 'read';
+      for (const x of hit) { if (action === 'archive' || action === 'unarchive') x.archived = action === 'archive'; else x.read = action === 'read'; }
       await saveRequest(hit);
     }
     return res.json({ ok: true, affected: hit.length, missing: ids.length - hit.length });

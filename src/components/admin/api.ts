@@ -4,7 +4,7 @@ export interface Req {
   voiceSessionId?: string; replyPreference?: 'written' | 'phone'; preferredStart?: string; callTime?: string; topic?: string;
   roiCalc?: { sector: string; sectorLabel: string; tasks: { name: string; min: number; perWeek: number; auto: number }[]; staff: number; cost: number; currency: string; lang: string; results: { weekH: number; monthH: number; yearH: number; moneyMonth: number; moneyYear: number; days: number } };
   city?: string; existingSite?: string; contactWhen?: string; startWhen?: string; budget?: string; notes?: string; examples?: { urls: string[]; note: string; none: boolean };
-  read?: boolean; analysis?: Analysis;
+  read?: boolean; archived?: boolean; analysis?: Analysis;
 }
 export interface AnalysisData {
   summary: string; recommended: { website: string | null; automation: string | null; aiAssistant: string | null };
@@ -58,8 +58,8 @@ export const fmtDay = (ymd: string) => {
 export type Source = 'form' | 'voice' | 'chat' | 'calculator' | 'resources' | 'demo' | 'package' | 'manual';
 /** Where the request was sent from (filled by the server, also for older records). */
 export const SOURCE: Record<Source, string> = {
-  form: 'İletişim formu', voice: 'Sesli asistan', chat: 'Yazılı sohbet', calculator: 'Tasarruf hesaplayıcısı',
-  resources: 'Kaynaklar sayfası', demo: 'Demo talebi', package: 'Paket teklifi', manual: 'Manuel eklendi',
+  form: 'Form', voice: 'Sesli', chat: 'Sohbet', calculator: 'Hesaplayıcı',
+  resources: 'Kaynaklar', demo: 'Demo', package: 'Paket', manual: 'Elle',
 };
 export const TOPIC: Record<string, string> = { 'res-qr': 'QR kod', 'res-review': 'Google yorum', 'res-messages': 'Mesaj şablonları', 'res-legal': 'Yasal kontrol' };
 export const TAGS: { key: string; label: string }[] = (Object.keys(SOURCE) as Source[]).map((k) => ({ key: k, label: SOURCE[k] }));
