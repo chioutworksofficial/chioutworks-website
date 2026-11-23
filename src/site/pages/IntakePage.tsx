@@ -426,8 +426,8 @@ export default function IntakePage() {
             </ol>)}
           {cur.kind === 'style' && (() => { const i = u.styleNote.indexOf(';'); const head = i > 0 ? u.styleNote.slice(0, i + 1) : u.styleNote; const rest = i > 0 ? u.styleNote.slice(i + 1).trim() : ''; return (
             <div role="note" className="cw-style-note" style={{ margin: '0 0 18px', padding: '14px 16px', display: 'flex', gap: 12, alignItems: 'flex-start', borderRadius: 'var(--r-input)', border: '1px solid color-mix(in srgb, var(--c-signal) 55%, transparent)', borderLeft: '4px solid var(--c-signal)', background: 'color-mix(in srgb, var(--c-signal) 12%, transparent)' }}>
-              <span aria-hidden="true" style={{ flex: '0 0 auto', width: 24, height: 24, borderRadius: '50%', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14, background: 'var(--c-signal)', color: 'var(--c-void)' }}>!</span>
-              <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: 'var(--c-quartz)' }}><strong style={{ color: 'var(--c-signal)' }}>{head}</strong>{rest ? ' ' + rest : ''}</p>
+              <span aria-hidden="true" style={{ flex: '0 0 auto', width: 24, height: 24, borderRadius: '50%', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14, background: 'var(--c-lilac)', color: 'var(--c-void)' }}>!</span>
+              <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: 'var(--c-quartz)' }}><strong style={{ color: 'var(--c-lilac)' }}>{head}</strong>{rest ? ' ' + rest : ''}</p>
             </div>); })()}
           {cur.kind === 'style' && <StyleInline lang={lang} v={svLocal ?? parseStyle(answers.style_choice)} set={(nv) => { setSvLocal(nv); set('style_choice', nv.likes.length || nv.pal || nv.pair ? JSON.stringify(styleBody(nv)) : ''); }} />}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: cur.kind === 'style' && cur.qs.length ? 14 : 0 }}>
