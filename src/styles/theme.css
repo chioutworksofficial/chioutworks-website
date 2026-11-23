@@ -1614,3 +1614,25 @@ html[data-mode='light'] [data-site-theme='liquid'] :is(.bks-steps li.is-on, .bks
   [data-site-theme='liquid'] .cw-opt, [data-site-theme='liquid'] .cw-sug, [data-site-theme='liquid'] .cw-primary, [data-site-theme='liquid'] .cw-bar > i { transition: none; }
   [data-site-theme='liquid'] .cw-opt:hover, [data-site-theme='liquid'] .cw-opt:active, [data-site-theme='liquid'] .cw-sug:hover, [data-site-theme='liquid'] .cw-primary:hover:not(:disabled), [data-site-theme='liquid'] .cw-primary:active:not(:disabled) { transform: none; }
 }
+
+/* ── Intake page (2026-11-23): follows the light/dark switch; calm, softer dark (page = Abyss, static navy glow, lighter cards) ── */
+[data-site-theme='liquid'].cw-intake {
+  --cw-line: var(--c-hairline);
+  background: radial-gradient(ellipse 52% 420px at 50% 0, color-mix(in srgb, var(--c-signal) 11%, transparent), transparent 75%), var(--c-abyss);
+}
+[data-site-theme='liquid'].cw-intake .lq-card { background: color-mix(in srgb, var(--c-quartz) 4%, var(--c-deep-sea)); border-color: color-mix(in srgb, var(--c-quartz) 9%, var(--c-edge)); }
+[data-site-theme='liquid'].cw-intake .lq-card--highlight { background: var(--c-cobalt); }
+[data-site-theme='liquid'].cw-intake .cw-soft { background: color-mix(in srgb, var(--c-signal) 9%, var(--c-deep-sea)); }
+[data-site-theme='liquid'].cw-intake .cw-actions { background: color-mix(in srgb, var(--c-abyss) 92%, transparent); }
+html[data-mode='light'] [data-site-theme='liquid'].cw-intake {
+  --cw-line: #7d879b;
+  background: radial-gradient(ellipse 52% 420px at 50% 0, color-mix(in srgb, var(--c-signal) 6%, transparent), transparent 75%), #f7f6f3;
+}
+html[data-mode='light'] [data-site-theme='liquid'].cw-intake .lq-card { background: #ffffff; border-color: var(--c-edge); }
+html[data-mode='light'] [data-site-theme='liquid'].cw-intake .lq-card--highlight { background: var(--c-cobalt); }
+html[data-mode='light'] [data-site-theme='liquid'].cw-intake .cw-soft { background: color-mix(in srgb, var(--c-signal) 6%, #ffffff); }
+html[data-mode='light'] [data-site-theme='liquid'].cw-intake .cw-actions { background: color-mix(in srgb, #f7f6f3 94%, transparent); }
+html[data-mode='light'] [data-site-theme='liquid'].cw-intake .cw-opt { border-color: var(--cw-line); }
+html[data-mode='light'] [data-site-theme='liquid'].cw-intake .cw-opt[aria-checked='true'] { border-color: var(--c-signal); }
+[data-site-theme='liquid'].cw-intake .cw-step { color: var(--c-lilac); }
+[data-site-theme='liquid'].cw-intake .cw-soft svg { color: var(--c-lilac); }

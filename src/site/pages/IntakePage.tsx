@@ -5,6 +5,7 @@ import { INTAKE_UI } from '../intakeUi';
 import IntakeProgress from '../IntakeProgress';
 import { LANGS, intakePath, isLang, pagePath } from '../../lib/routes';
 import type { Lang } from '../../translations';
+import ModeToggle from '../ModeToggle';
 import { StyleCta } from './StylePage';
 import type { Definition, L4, QDef } from '../../data/intakeSectors';
 import { guardFields, prefetchFormToken } from '../../lib/formGuard';
@@ -206,23 +207,23 @@ export default function IntakePage() {
   };
 
   const Header = (
-    <header style={{ borderBottom: '1px solid var(--c-edge)', background: 'var(--c-abyss)' }}>
+    <header style={{ borderBottom: '1px solid var(--c-edge)' }}>
       <div className="max-w-3xl mx-auto px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
         <span className="inline-flex items-center gap-3"><LogoMark size={26} /><span style={{ fontFamily: 'var(--font-display)', letterSpacing: '0.14em', fontSize: 13, color: 'var(--c-quartz)' }}>CHIOUT<span style={{ color: 'var(--c-lilac)' }}>WORKS</span></span></span>
-        <nav aria-label="Language" className="flex gap-1">
+        <div className="flex items-center gap-2"><nav aria-label="Language" className="flex gap-1">
           {LANGS.slice().sort().map((l) => (
             <Link key={l} to={intakePath(l, token)} aria-current={l === lang ? 'true' : undefined} lang={l} title={NAME[l]}
               style={{ padding: '4px 10px', fontSize: 12, border: '1px solid ' + (l === lang ? 'var(--c-lilac)' : 'var(--c-hairline)'), background: l === lang ? 'var(--c-cobalt)' : 'transparent', color: 'var(--c-quartz)' }}>{LABEL[l]}</Link>
           ))}
-        </nav>
+        </nav><ModeToggle lang={lang} /></div>
       </div>
     </header>
   );
 
   const shell = (children: React.ReactNode) => (
-    <div data-site-theme="liquid" data-mode-lock="" style={{ minHeight: '100dvh', background: 'var(--c-void)', color: 'var(--c-mist)' }}>
+    <div data-site-theme="liquid" className="cw-intake" style={{ minHeight: '100dvh', color: 'var(--c-mist)' }}>
       {Header}
-      <main className="max-w-3xl mx-auto px-5 py-10">{children}</main>
+      <main className="mx-auto px-5 py-10" style={{ maxWidth: 704 }}>{children}</main>
     </div>
   );
 
@@ -243,7 +244,7 @@ export default function IntakePage() {
     {/* the "your website will look like this" demo preview was removed (owner, 2026-11-19); IntakePreview stays for the admin view */}
   </>);
 
-  const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', background: 'var(--c-abyss)', border: '1px solid var(--c-hairline)', color: 'var(--c-quartz)', font: '400 16px/1.4 var(--font-body)' };
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', background: 'var(--c-abyss)', border: '1px solid var(--cw-line)', color: 'var(--c-quartz)', font: '400 16px/1.4 var(--font-body)' };
 
   const urlBad = (id: string) => { const t = str(answers[id]); return !!badUrls[id] || (!!t && !URL_RE.test(normUrl(t))); };
   const addText = (id: string, t: string) => {
@@ -364,7 +365,7 @@ export default function IntakePage() {
         </label>
         {showSecond && (
           <select aria-label={u.pickLang} value={helper ?? ''} onChange={(e) => setSecond(e.target.value || null)}
-            style={{ padding: '8px 12px', background: 'var(--c-abyss)', border: '1px solid var(--c-hairline)', color: 'var(--c-quartz)', fontSize: 14, maxWidth: '100%' }}>
+            style={{ padding: '8px 12px', background: 'var(--c-abyss)', border: '1px solid var(--cw-line)', color: 'var(--c-quartz)', fontSize: 14, maxWidth: '100%' }}>
             {deviceForeign() && <optgroup label={u.deviceLang}><option value={deviceForeign()!}>{nativeName(deviceForeign()!)}</option></optgroup>}
             <optgroup label="Chioutworks">{LANGS.filter((l) => l !== lang).map((l) => <option key={l} value={l}>{NAME[l]}</option>)}</optgroup>
             <optgroup label={u.moreLangs}>{MORE_LANGS.map((c) => [c, nativeName(c)] as const).sort((a, b) => a[1].localeCompare(b[1])).map(([c, n]) => <option key={c} value={c}>{n}</option>)}</optgroup>
