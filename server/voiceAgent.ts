@@ -68,12 +68,12 @@ const getSettings = async (): Promise<Settings> => {
 };
 
 // ── SSRF guard for the n8n URL ─────────────────────────────────────────────
-const privateIp = (ip: string) => {
+export const privateIp = (ip: string) => {
   if (net.isIPv4(ip)) { const [a, b] = ip.split('.').map(Number); return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127); }
   const l = ip.toLowerCase(); if (l.startsWith('::ffff:')) return privateIp(l.slice(7));
   return l === '::1' || l === '::' || l.startsWith('fc') || l.startsWith('fd') || l.startsWith('fe8') || l.startsWith('fe9') || l.startsWith('fea') || l.startsWith('feb');
 };
-const hostBad = (h: string) => { const x = h.replace(/^\[|\]$/g, '').toLowerCase(); return x === 'localhost' || x.endsWith('.localhost') || x.endsWith('.local') || x.endsWith('.internal') || (net.isIP(x) > 0 && privateIp(x)); };
+export const hostBad = (h: string) => { const x = h.replace(/^\[|\]$/g, '').toLowerCase(); return x === 'localhost' || x.endsWith('.localhost') || x.endsWith('.local') || x.endsWith('.internal') || (net.isIP(x) > 0 && privateIp(x)); };
 const urlProblem = (u: string): string | null => {
   let p: URL; try { p = new URL(u); } catch { return 'Adres geçersiz.'; }
   if (p.protocol !== 'https:') return 'n8n adresi https ile başlamalı.';
@@ -140,6 +140,14 @@ const baseUrl = (req: Request) => (process.env.PUBLIC_ORIGIN ?? '').split(',')[0
 const ENDPOINTS = ['GET /api/customers?status=to_call', 'GET /api/customers/{id}', 'PATCH /api/customers/{id}', 'GET /api/calendar/availability?date=YYYY-MM-DD', 'POST /api/appointments', 'POST /api/voice-agent/call-log'];
 let lock: Promise<unknown> = Promise.resolve();   // serialises booking so two calls cannot take the same slot (single instance)
 const exclusive = <T,>(fn: () => Promise<T>) => { const r = lock.then(fn, fn); lock = r.catch(() => {}); return r; };
+
+/** Sales module: create/update a queue customer for a lead (idempotent by sourceLeadId). */
+export async function vaQueueLead(lead: { id: string; name: string; phone: string; notes: string; sector: string }) {
+  const ex = (await tList('customers')).find((c) => c.sourceLeadId === lead.id);
+  const rec: Row = { ...(ex ?? { id: rid('cust'), createdAt: new Date().toISOString(), notesHistory: [], preferred_time: 'any' }), sourceLeadId: lead.id, source: 'sales',
+    name: lead.name.slice(0, 80) || 'İsimsiz', phone: lead.phone.slice(0, 40), notes: lead.notes.slice(0, 500), sector: lead.sector.slice(0, 60) || 'Genel', status: 'to_call' };
+  await tPut('customers', rec); return rec.id as string;
+}
 
 export function registerVoiceAgent(app: Express, deps: VaDeps) {
   const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response) =>

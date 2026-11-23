@@ -13,12 +13,14 @@ import OffersView from '../components/admin/OffersView';
 import ProjectsView from '../components/admin/ProjectsView';
 import ErrorsView from '../components/admin/ErrorsView';
 import VoiceAgentView from '../components/admin/VoiceAgentView';
+import SalesView from '../components/admin/SalesView';
+import MarketingView from '../components/admin/MarketingView';
 
 type Auth = 'checking' | 'out' | 'in' | 'unset';
-export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent';
+export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent' | 'sales' | 'marketing';
 const GROUPS: { label: string; tabs: { key: Tab; label: string }[] }[] = [
   { label: 'Gelenler', tabs: [{ key: 'requests', label: 'Talepler' }, { key: 'intakes', label: 'Analiz formları' }, { key: 'voice', label: 'Sesli görüşmeler' }] },
-  { label: 'İşler', tabs: [{ key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' }, { key: 'calendar', label: 'Takvim' }, { key: 'appointments', label: 'Randevular' }, { key: 'voiceAgent', label: 'Voice Agent' }] },
+  { label: 'İşler', tabs: [{ key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' }, { key: 'calendar', label: 'Takvim' }, { key: 'appointments', label: 'Randevular' }, { key: 'voiceAgent', label: 'Voice Agent' }, { key: 'sales', label: 'Satış' }, { key: 'marketing', label: 'Pazarlama' }] },
   { label: 'Site', tabs: [{ key: 'overview', label: 'Genel bakış' }, { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'errors', label: 'Hatalar ve e-posta' }] },
 ];
 
@@ -153,6 +155,8 @@ export default function Admin() {
         {tab === 'analytics' && <AnalyticsView />}
         {tab === 'appointments' && <AppointmentsView />}
         {tab === 'voiceAgent' && <VoiceAgentView reqs={reqs} />}
+        {tab === 'sales' && <SalesView />}
+        {tab === 'marketing' && <MarketingView />}
         {tab === 'errors' && <ErrorsView onMailSaved={setNotifyMail} />}
       </main>
     </div>

@@ -160,6 +160,16 @@ button.adm-chip { cursor: pointer; }
 [data-state='calling'] { --c: var(--adm-warn); }
 [data-state='booked'] { --c: var(--adm-ok); }
 [data-state='no_answer'] { --c: var(--adm-bad); }
+[data-state='gA'], [data-state='interested'], [data-state='won'] { --c: var(--adm-ok); }
+[data-state='gB'] { --c: var(--adm-src-form); }
+[data-state='gC'], [data-state='called'] { --c: var(--adm-warn); }
+[data-state='gD'], [data-state='not_interested'], [data-state='lost'] { --c: var(--adm-bad); }
+[data-state='new'] { --c: var(--adm-src-manual); }
+.adm-md { font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.adm-md h1, .adm-md h2, .adm-md h3 { margin: 14px 0 6px; font-family: var(--font-display); }
+.adm-md p, .adm-md ul, .adm-md ol { margin: 0 0 8px; }
+.adm-md ul, .adm-md ol { padding-left: 20px; }
+.adm-md code { font-family: var(--font-mono); font-size: 12px; }
 button.adm-chip[data-src][aria-pressed='true'] { background: color-mix(in srgb, var(--c) 34%, transparent); color: white; }
 
 /* ── Light mode: tokens come from theme.css (admin no longer carries data-mode-lock); only status colours and on-accent text need care. ── */

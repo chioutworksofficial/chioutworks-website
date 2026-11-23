@@ -25,6 +25,8 @@ import { registerNewsletter } from './newsletter.js';
 import { registerAnalytics } from './analytics.js';
 import { registerAffiliates } from './affiliates.js';
 import { registerVoiceAgent } from './voiceAgent.js';
+import { registerSales } from './sales.js';
+import { registerMarketing } from './marketing.js';
 import { registerPreview } from './preview.js';
 import { languageOk, SAFE_FALLBACK } from './languageGuard.js';
 import { ids as abuseIds, recordAbuse, voiceBlocked, chatState, recordStrike, blockedMsg, adminList, adminUnlock, rateOk, globalOk, textMsgAllowed, TEXT_SESSION_MAX, insult, abuseExempt, MSG as ABUSE_MSG } from './abuse.js';
@@ -1785,6 +1787,8 @@ registerNewsletter(app, { rateSkip: demoLimitSkip });
 registerAnalytics(app, { requireAdmin, rateSkip: demoLimitSkip });
 registerAffiliates(app, { requireAdmin });
 registerVoiceAgent(app, { requireAdmin, saveRequest, deleteRequests, listRequests, readBlocked });
+registerSales(app, { requireAdmin });
+registerMarketing(app, { requireAdmin });
 // AI website preview after the intake is submitted (content only, rendered by our template)
 registerPreview(app, { getGroq, rateSkip: demoLimitSkip });
 
