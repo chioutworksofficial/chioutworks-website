@@ -565,8 +565,8 @@
        "id": "home",
        "text": {
         "de": "Startseite",
-        "tr": "Startseite (Ana sayfa)",
-        "el": "Startseite (Αρχική)",
+        "tr": "Ana sayfa",
+        "el": "Αρχική",
         "tr_TR": "Ana sayfa",
         "el_GR": "Αρχική"
        }
@@ -575,8 +575,8 @@
        "id": "about",
        "text": {
         "de": "Über uns",
-        "tr": "Über uns (Hakkımızda)",
-        "el": "Über uns (Σχετικά με εμάς)",
+        "tr": "Hakkımızda",
+        "el": "Σχετικά με εμάς",
         "tr_TR": "Hakkımızda",
         "el_GR": "Σχετικά με εμάς"
        }
@@ -585,8 +585,8 @@
        "id": "services",
        "text": {
         "de": "Leistungen",
-        "tr": "Leistungen (Hizmetler)",
-        "el": "Leistungen (Υπηρεσίες)",
+        "tr": "Hizmetler",
+        "el": "Υπηρεσίες",
         "tr_TR": "Hizmetler",
         "el_GR": "Υπηρεσίες"
        }
@@ -595,8 +595,8 @@
        "id": "references",
        "text": {
         "de": "Referenzen",
-        "tr": "Referenzen (Referanslar)",
-        "el": "Referenzen (Αναφορές / έργα)",
+        "tr": "Referanslar",
+        "el": "Αναφορές / έργα",
         "tr_TR": "Referanslar",
         "el_GR": "Αναφορές / έργα"
        }
@@ -605,8 +605,8 @@
        "id": "prices",
        "text": {
         "de": "Preise",
-        "tr": "Preise (Fiyatlar)",
-        "el": "Preise (Τιμές)",
+        "tr": "Fiyatlar",
+        "el": "Τιμές",
         "tr_TR": "Fiyatlar",
         "el_GR": "Τιμές"
        }
@@ -615,8 +615,8 @@
        "id": "contact",
        "text": {
         "de": "Kontakt",
-        "tr": "Kontakt (İletişim)",
-        "el": "Kontakt (Επικοινωνία)",
+        "tr": "İletişim",
+        "el": "Επικοινωνία",
         "tr_TR": "İletişim",
         "el_GR": "Επικοινωνία"
        }
@@ -625,8 +625,8 @@
        "id": "faq",
        "text": {
         "de": "FAQ",
-        "tr": "FAQ (SSS)",
-        "el": "FAQ (Συχνές ερωτήσεις)",
+        "tr": "SSS",
+        "el": "Συχνές ερωτήσεις",
         "tr_TR": "SSS (Sık sorulan sorular)",
         "el_GR": "Συχνές ερωτήσεις"
        }
@@ -635,8 +635,8 @@
        "id": "career",
        "text": {
         "de": "Karriere",
-        "tr": "Karriere (Kariyer)",
-        "el": "Karriere (Καριέρα)",
+        "tr": "Kariyer",
+        "el": "Καριέρα",
         "tr_TR": "Kariyer",
         "el_GR": "Καριέρα"
        }
@@ -653,8 +653,8 @@
        "id": "gallery",
        "text": {
         "de": "Galerie / Vorher-Nachher",
-        "tr": "Galerie (Öncesi-Sonrası)",
-        "el": "Galerie (Πριν-Μετά)",
+        "tr": "Galeri (öncesi-sonrası)",
+        "el": "Συλλογή (πριν-μετά)",
         "tr_TR": "Galeri / Öncesi-Sonrası",
         "el_GR": "Γκαλερί / Πριν-Μετά"
        }
@@ -663,8 +663,8 @@
        "id": "privacy",
        "text": {
         "de": "Datenschutz",
-        "tr": "Datenschutz (Gizlilik)",
-        "el": "Datenschutz (Προστασία δεδομένων)",
+        "tr": "Gizlilik",
+        "el": "Προστασία δεδομένων",
         "tr_TR": "KVKK Aydınlatma Metni / Gizlilik",
         "el_GR": "Πολιτική απορρήτου (GDPR)"
        }
@@ -673,8 +673,8 @@
        "id": "legal",
        "text": {
         "de": "Impressum",
-        "tr": "Impressum (Yasal künye)",
-        "el": "Impressum (Νομικά στοιχεία)",
+        "tr": "Yasal künye",
+        "el": "Νομικά στοιχεία",
         "tr_TR": "Çerez politikası",
         "el_GR": "Όροι χρήσης / Cookies"
        }
@@ -928,8 +928,8 @@
        "id": "office",
        "text": {
         "de": "Büroreinigung",
-        "tr": "Büroreinigung (ofis)",
-        "el": "Büroreinigung (γραφεία)",
+        "tr": "ofis",
+        "el": "γραφεία",
         "tr_TR": "Ofis temizliği",
         "el_GR": "Καθαρισμός γραφείων"
        }
@@ -938,8 +938,8 @@
        "id": "building",
        "text": {
         "de": "Gebäudereinigung",
-        "tr": "Gebäudereinigung (bina)",
-        "el": "Gebäudereinigung (κτίρια)",
+        "tr": "bina",
+        "el": "κτίρια",
         "tr_TR": "Bina temizliği",
         "el_GR": "Καθαρισμός κτιρίων"
        }
@@ -948,8 +948,8 @@
        "id": "maintenance",
        "text": {
         "de": "Unterhaltsreinigung",
-        "tr": "Unterhaltsreinigung (periyodik)",
-        "el": "Unterhaltsreinigung (τακτικός)",
+        "tr": "periyodik",
+        "el": "τακτικός",
         "tr_TR": "Periyodik temizlik",
         "el_GR": "Τακτικός καθαρισμός"
        }
@@ -958,8 +958,8 @@
        "id": "windows",
        "text": {
         "de": "Fenster- / Glasreinigung",
-        "tr": "Fenster-/Glasreinigung (cam)",
-        "el": "Fenster-/Glasreinigung (τζάμια)",
+        "tr": "Cam temizliği",
+        "el": "Καθαρισμός τζαμιών",
         "tr_TR": "Cam temizliği",
         "el_GR": "Καθαρισμός τζαμιών"
        }
@@ -968,8 +968,8 @@
        "id": "stairwell",
        "text": {
         "de": "Treppenhausreinigung",
-        "tr": "Treppenhausreinigung (merdiven)",
-        "el": "Treppenhausreinigung (κλιμακοστάσια)",
+        "tr": "merdiven",
+        "el": "κλιμακοστάσια",
         "tr_TR": "Apartman / merdiven temizliği",
         "el_GR": "Καθαρισμός κλιμακοστασίων"
        }
@@ -978,8 +978,8 @@
        "id": "deep",
        "text": {
         "de": "Grundreinigung",
-        "tr": "Grundreinigung (detaylı)",
-        "el": "Grundreinigung (γενικός)",
+        "tr": "detaylı",
+        "el": "γενικός",
         "tr_TR": "Detaylı temizlik",
         "el_GR": "Γενικός καθαρισμός"
        }
@@ -988,8 +988,8 @@
        "id": "construction",
        "text": {
         "de": "Bauendreinigung",
-        "tr": "Bauendreinigung (inşaat sonrası)",
-        "el": "Bauendreinigung (μετά από εργασίες)",
+        "tr": "inşaat sonrası",
+        "el": "μετά από εργασίες",
         "tr_TR": "İnşaat sonrası temizlik",
         "el_GR": "Καθαρισμός μετά από οικοδομικές εργασίες"
        }
@@ -998,8 +998,8 @@
        "id": "medical",
        "text": {
         "de": "Praxisreinigung",
-        "tr": "Praxisreinigung (muayenehane)",
-        "el": "Praxisreinigung (ιατρεία)",
+        "tr": "muayenehane",
+        "el": "ιατρεία",
         "tr_TR": "Klinik / muayenehane temizliği",
         "el_GR": "Καθαρισμός ιατρείων"
        }
@@ -1008,8 +1008,8 @@
        "id": "hotel",
        "text": {
         "de": "Hotelreinigung",
-        "tr": "Hotelreinigung (otel)",
-        "el": "Hotelreinigung (ξενοδοχεία)",
+        "tr": "otel",
+        "el": "ξενοδοχεία",
         "tr_TR": "Otel temizliği",
         "el_GR": "Καθαρισμός ξενοδοχείων"
        }
@@ -1018,8 +1018,8 @@
        "id": "holiday",
        "text": {
         "de": "Ferienwohnungen",
-        "tr": "Ferienwohnung (tatil evi)",
-        "el": "Ferienwohnung (ενοικ. καταλύματα)",
+        "tr": "Tatil evi",
+        "el": "Ενοικιαζόμενα καταλύματα",
         "tr_TR": "Günlük kiralık / Airbnb daire",
         "el_GR": "Airbnb / ενοικιαζόμενα καταλύματα"
        }
@@ -1028,8 +1028,8 @@
        "id": "industrial",
        "text": {
         "de": "Industriereinigung",
-        "tr": "Industriereinigung (endüstriyel)",
-        "el": "Industriereinigung (βιομηχανικός)",
+        "tr": "endüstriyel",
+        "el": "βιομηχανικός",
         "tr_TR": "Endüstriyel temizlik",
         "el_GR": "Βιομηχανικός καθαρισμός"
        }
