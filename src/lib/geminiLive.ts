@@ -89,6 +89,10 @@ export class LiveCall {
   private passUntil = 0;
   private greeting = true;   // until the first assistant turn is done: mic muted, interruptions ignored
   private gotAudio = false;
+  private turnText = '';   // output transcript of the current model turn
+  private muteTurn = false;  // the turn is only a control token like <no speech> or {pause}: never play it
+  private greetHeard = false;   // greeting audio has played at least once (never reset by an 'interrupted' event)
+  private held: { pcm: Uint8Array; rms: number }[] = [];   // mic frames captured after the greeting audio ended, before the guard opened
   private kickoffs = 0;
   private grace = false;
   private graceStart = 0;
@@ -115,7 +119,7 @@ export class LiveCall {
       ws.onmessage = async (ev) => {
         let m: LiveServerMessage;
         try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : await (ev.data as Blob).text()); } catch { return; }
-        if (m.setupComplete && !this.ready) { this.ready = true; clearTimeout(timer); setTimeout(() => { this.greeting = false; }, 12000); this.guardTimer = setInterval(() => this.guardCheck(), 250); this.startMic(); resolve(); return; }
+        if (m.setupComplete && !this.ready) { this.ready = true; clearTimeout(timer); setTimeout(() => { if (this.greeting) this.openGuard('12 s timer'); }, 12000); this.guardTimer = setInterval(() => this.guardCheck(), 250); this.startMic(); resolve(); return; }
         const sc = m.serverContent;
         if (sc) {
           if (sc.interrupted) {
@@ -124,10 +128,15 @@ export class LiveCall {
             if (this.greeting) this.gotAudio = false;
             else if (!this.ending) { this.stopPlayback(); this.h.onInterrupted(); }
           }
-          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) { this.gotAudio = true; this.generating = true; this.lastAudio = performance.now(); if (this.ending) this.audioAfterEnd = true; if (this.ending || this.grace) this.turnDone = false; if (this.grace && this.graceHeardAt) this.audioAfterHeard = true; this.play(p.inlineData.data); }
+          for (const p of sc.modelTurn?.parts ?? []) if (p.inlineData?.data) { this.gotAudio = true; this.greetHeard = true; this.generating = true; this.lastAudio = performance.now(); if (this.ending) this.audioAfterEnd = true; if (this.ending || this.grace) this.turnDone = false; if (this.grace && this.graceHeardAt) this.audioAfterHeard = true; if (!this.muteTurn) this.play(p.inlineData.data); }
           if (sc.inputTranscription?.text) { if (this.grace) this.heardInGrace(); this.h.onInput(sc.inputTranscription.text); }
-          if (sc.outputTranscription?.text) this.h.onOutput(sc.outputTranscription.text);
-          if (sc.turnComplete) { this.generating = false; this.lastTurnAt = performance.now(); if (this.ending || this.grace) this.turnDone = true; if (this.gotAudio && this.greeting) { this.greeting = false; dbg('first turnComplete: greeting guard released'); } this.h.onTurnComplete(); }
+          if (sc.outputTranscription?.text) {
+            this.turnText += sc.outputTranscription.text;
+            // the model sometimes voices placeholders such as "<no speech>{pause}": silence that turn at once
+            if (!this.muteTurn && /^\s*[<{[]/.test(this.turnText)) { this.muteTurn = true; this.stopPlayback(); dbg('placeholder turn muted'); }
+            this.h.onOutput(sc.outputTranscription.text);
+          }
+          if (sc.turnComplete) { this.turnText = ''; this.muteTurn = false; this.generating = false; this.lastTurnAt = performance.now(); if (this.ending || this.grace) this.turnDone = true; if (this.gotAudio && this.greeting) { this.openGuard('first turnComplete'); } this.h.onTurnComplete(); }
         }
         if (m.goAway) this.h.onGoAway?.();
         if (m.toolCall?.functionCalls) {
@@ -143,7 +152,18 @@ export class LiveCall {
   /** Safety: if the greeting audio has finished playing and no turnComplete came within 2 s, release the mic guard anyway. */
   private guardCheck() {
     if (!this.greeting) { if (this.guardTimer) clearInterval(this.guardTimer); this.guardTimer = null; return; }
-    if (this.gotAudio && !this.speaking() && performance.now() - this.lastAudio >= 2000) { this.greeting = false; dbg('greeting guard released by safety timer'); }
+    // greetHeard is never reset by an 'interrupted' event (that reset used to keep the mic shut for 12 s while the visitor
+    // was already answering, so the visitor's first sentence was lost and the call stood still)
+    if (this.greetHeard && !this.speaking() && performance.now() - this.lastAudio >= 900) this.openGuard('greeting audio finished');
+  }
+
+  /** Opens the mic after the greeting; replays what the visitor already said in the last ~3 s (they often answer at once). */
+  private openGuard(why: string) {
+    if (!this.greeting) return;
+    this.greeting = false; dbg('greeting guard released:', why);
+    const spoke = this.held.some((f) => f.rms > BARGE_RMS);
+    if (spoke && this.ws?.readyState === WebSocket.OPEN) for (const f of this.held) this.ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64(f.pcm), mimeType: 'audio/pcm;rate=16000' } } }));
+    this.held = [];
   }
 
   private startMic() {
@@ -153,7 +173,10 @@ export class LiveCall {
       if (!this.ready || this.ws?.readyState !== WebSocket.OPEN) return;
       let pcm = new Uint8Array(e.data.pcm);
       const now = this.ctx.currentTime;
-      if (this.greeting) return;   // no frames at all until the greeting is done (not even silence: any stream may trigger server VAD)
+      if (this.greeting) {   // no frames until the greeting is done (any stream may trigger server VAD); keep the last ~3 s once its audio ended
+        if (this.greetHeard && !this.speaking()) { this.held.push({ pcm, rms: e.data.rms }); if (this.held.length > 75) this.held.shift(); }
+        return;
+      }
       if (this.grace && e.data.rms > BARGE_RMS) this.heardInGrace();
       if (this.ending) pcm = new Uint8Array(pcm.length);
       else if (this.next + GATE_TAIL > now) {   // assistant audible (or just ended): echo gate
