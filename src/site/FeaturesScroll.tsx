@@ -1,5 +1,4 @@
-import { SCRUB } from '../lib/smoothScroll';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -12,8 +11,6 @@ gsap.registerPlugin(ScrollTrigger);
 // Phones (owner, 2026-11-23: card run felt stuck while scrolling): don't recompute every pin when the address bar hides/shows,
 // and follow the finger closely instead of trailing behind native touch scrolling.
 ScrollTrigger.config({ ignoreMobileResize: true });
-const TOUCH = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
-const DEV = (import.meta as unknown as { env: { DEV: boolean } }).env.DEV;
 
 type Mock = (typeof FEATURES_UI)['en']['mock'];
 const SHOTS: (string | null)[] = [null, 'demokuafor', 'democrm', 'demoklinik', 'demotemizlik', null, null, null, 'demokuafor', 'demotemizlik', 'demosadakat', 'demokafe'];
@@ -38,9 +35,10 @@ const Star = ({ size }: { size: number }) => (
 
 const outline: CSSProperties = { WebkitTextStroke: '1.5px color-mix(in srgb, var(--c-lilac, #85a6e9) 26%, transparent)', color: 'transparent', fontWeight: 500, lineHeight: 0.9, letterSpacing: '-0.03em', whiteSpace: 'nowrap' };
 
-function Row({ text, refEl }: { text: string; refEl: (el: HTMLDivElement | null) => void }) {
+/** Gentle CSS marquee (three identical copies, the keyframe moves by one copy = 33.333%). */
+function Row({ text, rev }: { text: string; rev?: boolean }) {
   return (
-    <div ref={refEl} className="flex items-center w-max will-change-transform" style={{ fontSize: 'clamp(110px, 17.5vw, 252px)', ...outline }}>
+    <div className="flex items-center w-max cf-marq" style={{ fontSize: 'clamp(110px, 17.5vw, 252px)', animationDirection: rev ? 'reverse' : 'normal', ...outline }}>
       {[0, 1, 2].map((i) => (
         <span key={i} className="flex items-center">{text}<Star size={185} /></span>
       ))}
@@ -83,7 +81,7 @@ html[data-mode="light"] .fx-shell{box-shadow:0 2px 6px -2px color-mix(in srgb,va
 @media (prefers-reduced-motion: reduce){.fx-card .fx,.fx-card .fx-dots i,.fx-enter,.fx-flash,.fx-shift{animation:none!important}.fx-ring{display:none}.fx-root,.fx-z1,.fx-z2{transform:none!important}}
 `;
 
-const BADGE_STRIP = 40;   // top strip of the card reserved for the "Demo" badge (owner, 2026-11-23: badge must not cover the animation)
+const BADGE_STRIP = 56;   // top strip of the card reserved for the "Demo" badge (owner, 2026-11-23: badge must not cover the animation)
 /** Lays the mock out at the card's real size; only if the content doesn't fit (short screens) it is laid out taller and
  *  scaled down just enough to fit. At normal size nothing changes (scale 1). */
 function FitBox({ children }: { children: ReactNode }) {
@@ -688,141 +686,177 @@ function QrMock({ s, lang, x }: P) {
 
 const MOCK_BY: ((p: P) => ReactNode)[] = [VoiceMock, CalMock, CrmMock, QueueMock, PriceMock, PropMock, ChatMock, DashMock, ReviewsMock, QuoteMock, LoyaltyMock, QrMock];
 
-// Scroll distance per card, in viewport heights (owner, 2026-11-23): the card run moves clearly slower than the rest of
-// the page so the eye can follow each card; was 0.468. Before and after the pinned run the page scrolls at normal speed.
-const CARD_PACE = 0.78;
+
+// Coverflow carousel (owner, 2026-11-23). Desktop: 3D tilt of the neighbours; phone (<768px or coarse pointer): 2D scale/opacity only.
+const CF_CSS = `
+.cf-marq{animation:cf-marq 70s linear infinite}
+@keyframes cf-marq{from{transform:translateX(0)}to{transform:translateX(-33.3333%)}}
+#features[data-vis="0"] .cf-marq{animation-play-state:paused}
+.cf-stage{--cw:min(860px,60vw,calc((100svh - 290px)*1.6));position:relative;perspective:1900px;touch-action:pan-y;user-select:none;-webkit-user-select:none;height:calc(var(--cw)*.625 + 44px);outline:none}
+.cf-card{position:absolute;left:50%;top:22px;width:var(--cw);margin-left:calc(var(--cw)/-2);aspect-ratio:16/10;container-type:inline-size;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.8,.2,1),opacity .65s cubic-bezier(.2,.8,.2,1);will-change:transform,opacity;border-radius:20px}
+.cf-card[data-d="0"]{transform:none}
+.cf-card[data-d="1"]{transform:translateX(57%) translateZ(-120px) rotateY(24deg) scale(.82);opacity:.95}
+.cf-card[data-d="-1"]{transform:translateX(-57%) translateZ(-120px) rotateY(-24deg) scale(.82);opacity:.95}
+.cf-card[data-d="2"]{transform:translateX(76%) translateY(-5%) translateZ(-300px) scale(.66);opacity:.42}
+.cf-card[data-d="-2"]{transform:translateX(-76%) translateY(-5%) translateZ(-300px) scale(.66);opacity:.42}
+.cf-card[data-d="3"]{transform:translateX(88%) translateY(-9%) translateZ(-460px) scale(.52);opacity:.2}
+.cf-card[data-d="-3"]{transform:translateX(-88%) translateY(-9%) translateZ(-460px) scale(.52);opacity:.2}
+.cf-card[data-d="4"],.cf-card[data-d="-4"]{transform:translateX(0) translateY(-9%) translateZ(-460px) scale(.5);opacity:0;pointer-events:none}
+.cf-card[data-d="4"] .cf-hit,.cf-card[data-d="-4"] .cf-hit{display:none}
+.cf-frame{position:absolute;inset:0;border-radius:20px;overflow:hidden;background:linear-gradient(160deg,var(--c-cobalt,#12244f) 0%,var(--c-deep-sea,#0d172b) 55%,var(--c-abyss,#0e111b) 100%);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 22%,var(--c-hairline,#24375a));box-shadow:0 30px 70px -28px color-mix(in srgb,var(--c-void,#0b0c0e) 90%,transparent),0 4px 12px -4px color-mix(in srgb,var(--c-void,#0b0c0e) 60%,transparent)}
+.cf-hit{position:absolute;inset:0;z-index:5;cursor:pointer;border-radius:20px;background:transparent;border:0}
+.cf-over{position:absolute;left:0;right:0;bottom:0;height:52%;z-index:3;pointer-events:none;background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--c-void,#0b0c0e) 82%,transparent) 50%,color-mix(in srgb,var(--c-void,#0b0c0e) 94%,transparent))}
+.cf-cap{position:absolute;left:0;right:0;bottom:0;z-index:4;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:0 5cqw 4.2cqw;transition:opacity .4s}
+.cf-card:not([data-d="0"]) .cf-cap{opacity:.85}
+.cf-t{font-family:var(--font-display,Figtree,sans-serif);font-size:clamp(18px,3.4cqw,34px);font-weight:700;letter-spacing:-.02em;line-height:1.1;color:var(--c-quartz,#fff)}
+.cf-s{margin-top:.5em;font-size:clamp(12px,1.75cqw,16px);line-height:1.4;color:var(--c-mist,#c7c9d1);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.cf-cta{flex:none;display:inline-flex;align-items:center;white-space:nowrap;border-radius:9999px;background:var(--c-signal,#2862d7);color:var(--c-quartz,#fff);font-weight:600;font-size:clamp(12px,1.8cqw,16px);padding:.8em 1.5em;box-shadow:0 10px 24px -10px var(--c-signal,#2862d7);transition:transform .2s,filter .2s}
+.cf-cta:hover{transform:translateY(-1px);filter:brightness(1.12)}
+.cf-cta:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
+.cf-tag{position:absolute;top:3.2cqw;left:3.2cqw;z-index:4;border-radius:9999px;padding:.45em 1.1em;font-size:clamp(11px,1.5cqw,14px);font-weight:600;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-void,#0b0c0e) 62%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 18%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cf-glow{position:absolute;left:50%;top:50%;width:min(1100px,96vw);height:min(640px,70%);transform:translate(-50%,-50%);pointer-events:none;background:radial-gradient(50% 50% at 50% 50%,color-mix(in srgb,var(--c-signal,#2862d7) 34%,transparent),color-mix(in srgb,var(--c-cobalt,#12244f) 20%,transparent) 55%,transparent 80%);filter:blur(30px)}
+html[data-mode="light"] .cf-glow{background:radial-gradient(50% 50% at 50% 50%,color-mix(in srgb,var(--c-signal,#2862d7) 16%,transparent),transparent 75%)}
+.cf-arrow{position:absolute;top:50%;z-index:200;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:58px;height:58px;border-radius:9999px;border:0;cursor:pointer;color:var(--c-void,#0b0c0e);background:var(--c-quartz,#fff);box-shadow:0 14px 30px -12px color-mix(in srgb,var(--c-void,#0b0c0e) 70%,transparent);transition:transform .2s,box-shadow .2s}
+.cf-arrow:hover{transform:translateY(-50%) scale(1.07)}
+.cf-arrow:focus-visible,.cf-btn:focus-visible,.cf-dot:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
+.cf-prev{left:max(12px,2.5vw)}.cf-next{right:max(12px,2.5vw)}
+.cf-btn{display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:9999px;border:0;cursor:pointer;color:var(--c-void,#0b0c0e);background:var(--c-quartz,#fff);box-shadow:0 8px 20px -10px color-mix(in srgb,var(--c-void,#0b0c0e) 70%,transparent)}
+.cf-dot{height:8px;width:8px;border-radius:9999px;border:0;padding:0;cursor:pointer;background:var(--c-hairline,#24375a);transition:width .35s,background .35s}
+.cf-dot[aria-current="true"]{width:28px;background:var(--c-signal,#2862d7)}
+.cf-dotw{display:flex;align-items:center;justify-content:center;min-width:14px;height:32px}
+.cf-card[data-act="0"] .fx,.cf-card[data-act="0"] .fx-dots i{animation-play-state:paused}
+@media (max-width:767px),(pointer:coarse){
+  .cf-stage{--cw:min(86vw,520px,calc((100svh - 250px)*.86));perspective:none;height:calc(var(--cw)*1.14 + 28px)}
+  .cf-card{aspect-ratio:5/6;top:14px;border-radius:18px}
+  .cf-frame,.cf-hit{border-radius:18px}
+  .cf-card[data-d="1"]{transform:translateX(97%) scale(.86);opacity:.55}
+  .cf-card[data-d="-1"]{transform:translateX(-97%) scale(.86);opacity:.55}
+  .cf-card[data-d="2"],.cf-card[data-d="-2"],.cf-card[data-d="3"],.cf-card[data-d="-3"],.cf-card[data-d="4"],.cf-card[data-d="-4"]{transform:scale(.8);opacity:0;pointer-events:none}
+  .cf-card[data-d="2"] .cf-hit,.cf-card[data-d="-2"] .cf-hit,.cf-card[data-d="3"] .cf-hit,.cf-card[data-d="-3"] .cf-hit{display:none}
+  .cf-cap{flex-direction:column;align-items:flex-start;gap:12px;padding:0 5.5cqw 5.5cqw}
+  .cf-t{font-size:clamp(19px,6.2cqw,26px)}
+  .cf-s{font-size:clamp(12.5px,3.7cqw,15px)}
+  .cf-cta{font-size:13.5px;padding:.7em 1.3em}
+  .cf-tag{top:12px;left:12px;font-size:11.5px;max-width:70%}
+  .cf-arrow{display:none}
+  .cf-glow{height:60%}
+}
+@media (prefers-reduced-motion: reduce){.cf-card{transition:none}.cf-marq{animation:none}.cf-dot{transition:none}}
+`;
+
+const Chev = ({ r }: { r?: boolean }) => (
+  <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={r ? { transform: 'scaleX(-1)' } : undefined}><path d="M15 5l-7 7 7 7" /></svg>
+);
+
+const N = ORDER.length;
 
 export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const ui = FEATURES_UI[lang];
   const root = useRef<HTMLElement>(null);
-  const track = useRef<HTMLDivElement>(null);
-  const rows = useRef<(HTMLDivElement | null)[]>([]);
-  const tilts = useRef<(HTMLDivElement | null)[]>([]);
-  const caps = useRef<(HTMLDivElement | null)[]>([]);
-  const [pin, setPin] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: no-preference)').matches);
+  const [idx, setIdx] = useState(0);
+  const [vis, setVis] = useState(true);
+  const paused = useRef(false);
+  const drag = useRef<{ x: number; moved: boolean } | null>(null);
+  const reduce = useRef(false);
+
+  const go = useCallback((to: number) => setIdx(((to % N) + N) % N), []);
+  const step = useCallback((d: number) => setIdx((i) => (((i + d) % N) + N) % N), []);
 
   useLayoutEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: no-preference)');
-    const on = () => setPin(mq.matches);
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    reduce.current = mq.matches;
+    const on = () => { reduce.current = mq.matches; };
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
 
-  useLayoutEffect(() => {
-    if (!pin || !root.current || !track.current) return;
-    const ctx = gsap.context(() => {
-      const vh = window.innerHeight;
-      const dist = () => track.current!.scrollWidth - window.innerWidth;
-      // Card centres are measured once per refresh (relative to the track at x = 0); per frame only the track's x is read.
-      // The old version called getBoundingClientRect on every card on every scroll frame, which made the run stutter.
-      let base: number[] = [];
-      const measure = () => {
-        const x0 = Number(gsap.getProperty(track.current!, 'x')) || 0;
-        base = tilts.current.map((t) => { if (!t) return 0; const r = t.parentElement!.getBoundingClientRect(); return r.left + r.width / 2 - x0; });
-      };
-      const tilt = () => {
-        const vw = window.innerWidth;
-        const x = Number(gsap.getProperty(track.current!, 'x')) || 0;
-        tilts.current.forEach((t, i) => {
-          if (!t) return;
-          const raw = Math.max(-1.4, Math.min(1.4, (base[i] + x - vw / 2) / (vw * 0.5)));
-          const a = Math.min(1, Math.abs(raw));
-          gsap.set(t, TOUCH ? { rotateZ: raw * 7, scale: 1 - a * 0.05, force3D: true } : { rotateZ: raw * 7, rotateY: raw * -3, rotateX: a * 3, scale: 1 - a * 0.05, force3D: true });
-          t.style.setProperty('--tx', raw.toFixed(3));
-          const act = Math.abs(raw) < 1.15 ? '1' : '0';
-          if (t.dataset.act !== act) t.dataset.act = act;
-          const cap = caps.current[i];
-          if (cap) gsap.set(cap, { opacity: Math.max(0.3, Math.min(1, 1.25 - a * 1.1)) });
-        });
-      };
-      const tl = gsap.timeline({
-        defaults: { ease: 'none' },
-        onUpdate: tilt,
-        scrollTrigger: {
-          trigger: root.current, start: 'top top', end: () => { const l = (i: number) => tilts.current[i]!.parentElement!.parentElement as HTMLElement; return `+=${Math.round((dist() * CARD_PACE * vh) / (l(1).offsetLeft - l(0).offsetLeft))}`; }, pin: true, anticipatePin: 1, scrub: TOUCH ? 0.35 : SCRUB, invalidateOnRefresh: true, onRefresh: () => { measure(); tilt(); },
-          // No snap (owner, 2026-11-23): snapping stopped and re-settled the scroll at each card, which felt like stuttering.
-        },
-      });
-      tl.fromTo(track.current, { x: 0 }, { x: () => -dist() }, 0)
-        .fromTo(rows.current[0], { x: 0 }, { x: -2600 }, 0)
-        .fromTo(rows.current[1], { x: -2600 }, { x: 0 }, 0);
-      measure();
-      tilt();
-      if (DEV) {
-        (window as unknown as { __cwFeatures: unknown }).__cwFeatures = { goto: (i: number) => {
-          const st = tl.scrollTrigger!, d = dist(), l = tilts.current[i]!.parentElement!.parentElement as HTMLElement;
-          const top = st.start + ((l.offsetLeft + l.offsetWidth / 2 - window.innerWidth / 2) / d) * (st.end - st.start);
-          window.scrollTo({ top, behavior: 'instant' });
-        } };
-      }
-    }, root);
-    return () => ctx.revert();
-  }, [pin, lang]);
-
-  const onMove = (e: React.PointerEvent) => {
-    const el = (e.target as HTMLElement).closest('.fx-card') as HTMLElement | null;
+  // Off-screen: pause animations and auto-advance. Later pinned sections are measured once the layout is final.
+  useEffect(() => {
+    const el = root.current;
     if (!el) return;
-    const r = el.getBoundingClientRect();
-    el.style.setProperty('--px', String(Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width - 0.5) * 2))));
-    el.style.setProperty('--py', String(Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height - 0.5) * 2))));
+    const io = new IntersectionObserver(([e]) => setVis(e.isIntersecting), { rootMargin: '80px' });
+    io.observe(el);
+    const t = window.setTimeout(() => ScrollTrigger.refresh(), 400);
+    return () => { io.disconnect(); window.clearTimeout(t); };
+  }, []);
+
+  useEffect(() => {
+    if (!vis) return;
+    const id = window.setInterval(() => { if (!paused.current && !reduce.current && !document.hidden) step(1); }, 6000);
+    return () => window.clearInterval(id);
+  }, [vis, idx, step]);
+
+  const onDown = (e: React.PointerEvent) => { drag.current = { x: e.clientX, moved: false }; if (e.pointerType === 'touch') paused.current = true; };
+  const onMoveP = (e: React.PointerEvent) => { const d = drag.current; if (d && Math.abs(e.clientX - d.x) > 8) d.moved = true; };
+  const onUp = (e: React.PointerEvent) => {
+    const d = drag.current; drag.current = null;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1);
+    if (e.pointerType === 'touch') window.setTimeout(() => { paused.current = false; }, 4000);
   };
-  const onLeave = () => root.current?.querySelectorAll<HTMLElement>('.fx-card').forEach((el) => { el.style.setProperty('--px', '0'); el.style.setProperty('--py', '0'); });
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); } else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+  };
+  const hold = (v: boolean) => () => { paused.current = v; };
 
   return (
-    <section ref={root} id="features" className="relative overflow-hidden" onPointerMove={pin ? onMove : undefined} onPointerLeave={pin ? onLeave : undefined} style={{ background: 'var(--c-void, #0b0c0e)' }}>
-      <style>{FX_CSS}</style>
-      <div className={pin ? 'relative h-[100svh]' : 'relative py-16 md:py-24'}>
-        {pin ? (
-          <>
-            <h2 className="sr-only">{ui.heading}</h2>
-            <div aria-hidden="true" className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex flex-col pointer-events-none">
-              <Row text={ui.rowA} refEl={(el) => { rows.current[0] = el; }} />
-              <Row text={ui.rowB} refEl={(el) => { rows.current[1] = el; }} />
-            </div>
-          </>
-        ) : (
-          <h2 className="mx-auto px-5 md:px-9 mb-10" style={{ maxWidth: 1440, fontFamily: 'var(--font-display, Figtree, sans-serif)', fontSize: 'clamp(32px, 7vw, 52px)', fontWeight: 500, lineHeight: 1, letterSpacing: '-0.04em', color: 'var(--c-quartz, #ffffff)', textTransform: 'uppercase' }}>{ui.heading}</h2>
-        )}
+    <section ref={root} id="features" data-vis={vis ? '1' : '0'} className="relative overflow-hidden pt-10 pb-8 md:pt-14 md:pb-12" style={{ background: 'var(--c-void, #0b0c0e)' }}>
+      <style>{FX_CSS}{CF_CSS}</style>
+      <h2 className="sr-only">{ui.heading}</h2>
+      <div aria-hidden="true" className="absolute inset-x-0 top-[34%] md:top-1/2 -translate-y-1/2 flex flex-col pointer-events-none">
+        <Row text={ui.rowA} />
+        <Row text={ui.rowB} rev />
+      </div>
+      <div aria-hidden="true" className="cf-glow" />
 
-        <div ref={track}
-          className={pin ? 'absolute inset-y-0 left-0 flex items-start gap-[clamp(180px,22vw,320px)]' : 'flex gap-5 overflow-x-auto snap-x snap-mandatory px-5 md:px-9 pb-4'}
-          style={pin ? { paddingTop: 'clamp(56px, 15svh, 160px)', paddingLeft: '110vw', paddingRight: 'calc(50vw - min(213px, 22.9svh, 41vw))', width: 'max-content', willChange: 'transform' } : { scrollbarWidth: 'none' }}>
-          {ORDER.map((o, i) => {
-            const it = ui.items[o];
-            const slug = SHOTS[o];
-            const to = slug ? demoPath(lang, slug) + (slug === 'demokafe' ? '?view=qr' : '') : pagePath(lang, 'services');
-            const M = MOCK_BY[o];
-            return (
-              <Link key={i} to={to} aria-label={it.title} className="group flex-none snap-center flex flex-col items-center cursor-pointer rounded-xl outline-offset-8 focus-visible:outline-2 focus-visible:outline" style={{ width: pin ? undefined : 'min(82vw, 340px)', outlineColor: 'var(--c-lilac, #85a6e9)' }}>
-                <div style={{ perspective: 1400 }} className={pin ? 'relative' : 'relative w-full'}>
-                  <div aria-hidden="true" className="absolute pointer-events-none transition-opacity duration-300 opacity-60 group-hover:opacity-100 group-focus-visible:opacity-100" style={{ inset: '-8% -12% -4%', filter: 'blur(48px)', background: 'radial-gradient(60% 60% at 50% 55%, color-mix(in srgb, var(--c-lilac, #85a6e9) 38%, transparent), transparent 70%)' }} />
-                  <div ref={(el) => { tilts.current[i] = el; }} className="fx-card cw-keep-dark relative" style={{ height: pin ? 'min(520px, 56svh, calc(82vw * 560 / 460))' : 420, aspectRatio: '460 / 560', transformStyle: 'preserve-3d' }}>
-                    <span className="absolute z-30 right-3 rounded-full pl-1.5 pr-3.5 py-1 flex items-center gap-2 transition-colors duration-300 group-hover:bg-[var(--c-lilac, #85a6e9)] group-hover:text-[var(--c-abyss, #0e111b)]" style={{ top: 8, transform: 'translateZ(60px)', fontSize: 12, fontWeight: 500, color: 'var(--c-quartz, #ffffff)', background: 'var(--c-abyss, #0e111b)', boxShadow: '0 6px 14px -8px color-mix(in srgb, var(--c-void, #0b0c0e) 70%, transparent)', border: '1px solid var(--c-hairline, #24375a)' }}>
-                        <span className="flex items-center justify-center rounded-full" style={{ width: 18, height: 18, background: 'var(--c-lilac, #85a6e9)' }}><svg width="7" height="8" viewBox="0 0 7 8" aria-hidden="true"><path d="M1 0.8L6.2 4L1 7.2Z" style={{ fill: 'var(--c-abyss, #0e111b)' }} /></svg></span>{ui.demo}
-                      </span>
-                    <div className="fx-shell absolute inset-0 rounded-xl overflow-hidden transition-transform duration-300 ease-out group-hover:scale-[1.03] group-hover:[transform:translateZ(40px)_scale(1.03)] group-focus-visible:scale-[1.03]"
-                      style={{ background: 'linear-gradient(160deg, var(--c-cobalt, #12244f) 0%, var(--c-deep-sea, #0d172b) 55%, var(--c-abyss, #0e111b) 100%)', border: '1px solid var(--c-hairline, #24375a)' }}>
-                      <div aria-hidden="true" className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-300 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 z-20" style={{ border: '2px solid var(--c-lilac, #85a6e9)', background: 'radial-gradient(90% 50% at 50% 0%, color-mix(in srgb, var(--c-lilac, #85a6e9) 22%, transparent), transparent 70%)' }} />
-                      <div aria-hidden="true" className="absolute inset-x-0 top-0 pointer-events-none" style={{ height: '45%', background: 'linear-gradient(180deg, color-mix(in srgb, var(--c-quartz, #ffffff) 12%, transparent), transparent)' }} />
-                      
-                      <FitBox>
-                        <div className="absolute inset-0 pt-4 px-5 pb-5 flex transition-transform duration-300 ease-out group-hover:-translate-y-2 group-hover:translate-x-1" style={{ perspective: 900 }}>
-                          <M m={ui.mock} s={ui.sim} x={ui.x} lang={lang} />
-                        </div>
-                      </FitBox>
-                    </div>
+      <div className="cf-stage" role="region" aria-roledescription="carousel" aria-label={ui.heading} tabIndex={0}
+        onKeyDown={onKey} onPointerDown={onDown} onPointerMove={onMoveP} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; }}
+        onMouseEnter={hold(true)} onMouseLeave={hold(false)} onFocus={hold(true)} onBlur={hold(false)}>
+        {ORDER.map((o, i) => {
+          const it = ui.items[o];
+          const slug = SHOTS[o];
+          const to = slug ? demoPath(lang, slug) + (slug === 'demokafe' ? '?view=qr' : '') : pagePath(lang, 'services');
+          const M = MOCK_BY[o];
+          let d = i - idx;
+          if (d > N / 2) d -= N; else if (d < -N / 2) d += N;
+          const dd = Math.max(-4, Math.min(4, d));
+          const near = Math.abs(d) <= 0;
+          const tag = it.title.split(/\s+[&·]\s+|,\s*/)[0];
+          return (
+            <div key={i} className="cf-card cw-keep-dark" data-d={dd} data-act={near ? '1' : '0'} aria-hidden={d === 0 ? undefined : true} style={{ zIndex: 100 - Math.abs(dd) * 10 }}>
+              <div className="cf-frame">
+                <span className="cf-tag">{tag}</span>
+                <FitBox>
+                  <div className="absolute inset-0 pt-2 px-5 pb-5 flex">
+                    <M m={ui.mock} s={ui.sim} x={ui.x} lang={lang} />
                   </div>
+                </FitBox>
+                <div aria-hidden="true" className="cf-over" />
+                <div className="cf-cap">
+                  <div className="min-w-0">
+                    <h3 className="cf-t">{it.title}</h3>
+                    <p className="cf-s">{it.text}</p>
+                  </div>
+                  {d === 0 && <Link to={to} draggable={false} className="cf-cta">{slug ? ui.cta.demo : ui.cta.more}</Link>}
                 </div>
-                <div ref={(el) => { caps.current[i] = el; }} className="flex flex-col items-center" style={{ maxWidth: 'min(420px, 86vw)' }}>
-                  <h3 className="mt-6 text-center" style={{ fontSize: 'clamp(22px, 2.1vw, 30px)', fontWeight: 500, color: 'var(--c-quartz, #ffffff)', letterSpacing: '-0.02em', lineHeight: 1.15 }}>{it.title}</h3>
-                  <span aria-hidden="true" className="flex items-center gap-1.5 mt-3"><i style={{ width: 40, height: 1, background: 'var(--c-hairline, #24375a)' }} /><i style={{ width: 4, height: 4, borderRadius: 999, background: 'var(--c-lilac, #85a6e9)' }} /><i style={{ width: 40, height: 1, background: 'var(--c-hairline, #24375a)' }} /></span>
-                  <p className="mt-3 text-center" style={{ fontSize: 15, lineHeight: 1.45, color: 'var(--c-ash, #abaebb)' }}>{it.text}</p>
-                  <span className="mt-3 inline-flex items-center transition-transform duration-300 group-hover:translate-x-1" style={{ fontSize: 14, fontWeight: 500, color: 'var(--c-lilac, #85a6e9)' }}>{slug ? ui.cta.demo : ui.cta.more}</span>
-                </div>
-              </Link>
-            );
-          })}
+              </div>
+              {d !== 0 && <button type="button" tabIndex={-1} aria-label={it.title} className="cf-hit" onClick={() => { if (!drag.current?.moved) go(i); }} />}
+            </div>
+          );
+        })}
+        <button type="button" className="cf-arrow cf-prev cw-keep-dark" aria-label="←" onClick={() => step(-1)}><Chev /></button>
+        <button type="button" className="cf-arrow cf-next cw-keep-dark" aria-label="→" onClick={() => step(1)}><Chev r /></button>
+      </div>
+
+      <div className="relative z-10 flex items-center justify-center gap-3 mt-6 md:mt-7 px-4" onMouseEnter={hold(true)} onMouseLeave={hold(false)}>
+        <button type="button" className="cf-btn cw-keep-dark" aria-label="←" onClick={() => step(-1)}><Chev /></button>
+        <div className="flex items-center justify-center flex-wrap" style={{ maxWidth: 'calc(100vw - 150px)' }}>
+          {ORDER.map((o, i) => (
+            <span key={i} className="cf-dotw"><button type="button" className="cf-dot" aria-label={ui.items[o].title} aria-current={i === idx} onClick={() => go(i)} /></span>
+          ))}
         </div>
+        <button type="button" className="cf-btn cw-keep-dark" aria-label="→" onClick={() => step(1)}><Chev r /></button>
       </div>
     </section>
   );
