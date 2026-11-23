@@ -40,6 +40,18 @@ const LIVE_SECONDS = 300;   // owner 2026-11-20: 5 minutes, complete conversatio
 const LANG_EN: Record<string, string> = { tr: 'Turkish', de: 'German', el: 'Greek', en: 'English' };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/** Elapsed call time mm:ss; mounted only while the call is live, one interval, cleared on unmount. */
+function CallClock({ label }: { label: string }) {
+  const [sec, setSec] = useState(0);
+  useEffect(() => {
+    const t0 = Date.now();
+    const id = setInterval(() => setSec(Math.floor((Date.now() - t0) / 1000)), 500);
+    return () => clearInterval(id);
+  }, []);
+  const mm = String(Math.floor(sec / 60)).padStart(2, '0'), ss = String(sec % 60).padStart(2, '0');
+  return <span aria-label={label} title={label} style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 12.5, color: 'var(--lq-silver)', border: '1px solid var(--lq-line)', borderRadius: 999, padding: '2px 10px' }}>{mm}:{ss}</span>;
+}
+
 export default function VoiceIntake({ lang }: { lang: Lang }) {
   const t = VOICE_UI[lang];
   const navigate = useNavigate();
@@ -861,6 +873,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
               <div aria-hidden style={{ width: 120, height: 4, borderRadius: 2, background: 'var(--lq-line)', overflow: 'hidden' }}>
                 <div style={{ width: `${liveSpeak ? 0 : Math.round(level * 100)}%`, height: '100%', background: 'var(--lq-gradient)', transition: 'width 120ms linear' }} />
               </div>
+              <CallClock label={t.callTime} />
               <span role="status" aria-live="polite" style={{ color: 'var(--lq-silver)', fontSize: 14 }}>{graceUi ? t.liveEnding : reconnecting ? t.reconnecting : liveSpeak ? t.liveSpeaking : t.liveListening}</span>
             </div>
           ) : typed ? (
