@@ -203,6 +203,7 @@ export default function PackagePage({ lang, id }: { lang: Lang; id: PackageId })
             <ul className="mt-6 flex flex-col gap-4" style={{ margin: '24px 0 0', padding: 0, listStyle: 'none' }}>
               {x.forWhom.map((w) => <li key={w} className="flex items-start gap-3" style={{ fontSize: 15, lineHeight: 1.5, color: 'var(--lq-silver)' }}><span aria-hidden="true" style={{ color: 'var(--c-lilac)' }}>→</span>{w}</li>)}
             </ul>
+              {x.note && <p className="mt-6" style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--lq-silver)', borderLeft: '2px solid var(--c-pulse)', paddingLeft: 12 }}>{x.note}</p>}
           </div>
         </div>
         <div className="lq-card lq-card--highlight mt-6 p-8 md:p-10 flex flex-col md:flex-row md:items-center gap-6 justify-between">

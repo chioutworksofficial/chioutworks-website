@@ -96,7 +96,7 @@ export default function IndustriesWheel({ lang }: { lang: Lang }) {
       mm.add('(prefers-reduced-motion: no-preference)', () => {   // same scroll-driven wheel on phones, tablets and desktop
         const tw = gsap.fromTo(st.current, { scroll: 0 }, {
           scroll: (n - 3) * a, ease: 'none', onUpdate: apply,
-          scrollTrigger: { trigger: root.current, start: 'top top', end: () => `+=${Math.round(window.innerHeight * (window.innerWidth >= 1280 ? 2.65 : 1.6))}`   /* phones/tablets: shorter scroll = quicker turn */, pin: true, scrub: SCRUB, invalidateOnRefresh: true },
+          scrollTrigger: { trigger: root.current, start: 'top top', end: () => `+=${Math.round(window.innerHeight * (window.innerWidth >= 1280 ? 3.4 : 2.1))}`   /* slower turn (owner, 2026-11-23; was 2.65 / 1.6); phones/tablets stay a bit shorter */, pin: true, scrub: SCRUB, invalidateOnRefresh: true },
         });
         trig.current = tw.scrollTrigger ?? null;
         return () => { trig.current = null; };

@@ -648,6 +648,10 @@ function QrMock({ s, lang, x }: P) {
 
 const MOCK_BY: ((p: P) => ReactNode)[] = [VoiceMock, CalMock, CrmMock, QueueMock, PriceMock, PropMock, ChatMock, DashMock, ReviewsMock, QuoteMock, LoyaltyMock, QrMock];
 
+// Scroll distance per card, in viewport heights (owner, 2026-11-23): the card run moves clearly slower than the rest of
+// the page so the eye can follow each card; was 0.468. Before and after the pinned run the page scrolls at normal speed.
+const CARD_PACE = 0.78;
+
 export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const ui = FEATURES_UI[lang];
   const root = useRef<HTMLElement>(null);
@@ -687,7 +691,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         defaults: { ease: 'none' },
         onUpdate: tilt,
         scrollTrigger: {
-          trigger: root.current, start: 'top top', end: () => { const l = (i: number) => tilts.current[i]!.parentElement!.parentElement as HTMLElement; return `+=${Math.round((dist() * 0.468 * vh) / (l(1).offsetLeft - l(0).offsetLeft))}`; }, pin: true, scrub: SCRUB, invalidateOnRefresh: true, onRefresh: tilt,
+          trigger: root.current, start: 'top top', end: () => { const l = (i: number) => tilts.current[i]!.parentElement!.parentElement as HTMLElement; return `+=${Math.round((dist() * CARD_PACE * vh) / (l(1).offsetLeft - l(0).offsetLeft))}`; }, pin: true, scrub: SCRUB * 1.25, invalidateOnRefresh: true, onRefresh: tilt,
           snap: DEV && location.search.includes('nosnap') ? undefined : {
             snapTo: (v: number) => {
               const d = dist();
