@@ -1050,6 +1050,21 @@ a, button, summary, [role='button'], input, select, textarea, label { touch-acti
   .site-nav-menu { font-size: 11px !important; letter-spacing: .08em !important; gap: 6px !important; }
   .site-nav-cta > span { padding: 7px 10px !important; font-size: 10px !important; letter-spacing: .05em !important; }
 }
+/* phones: short CTA label, toggle can never be pushed out of the header */
+.nav-cta-short { display: none; }
+@media (max-width: 430px) {
+  .nav-cta-long { display: none; }
+  .nav-cta-short { display: inline; }
+  .site-nav-right { min-width: 0; }
+  .site-nav-cta { min-width: 0; }
+  .site-nav-cta > span { white-space: nowrap; }
+  .cw-mode-toggle { flex-shrink: 0; }
+}
+/* very narrow: MENU word hidden visually (stays in the accessibility tree), + icon remains */
+@media (max-width: 339px) {
+  .site-nav-menu-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .site-nav-menu { position: relative; }
+}
 /* folded phones (< 300px): four items cannot fit; "get in touch" stays reachable in the menu */
 @media (max-width: 299px) { .site-nav-cta { display: none !important; } }
 

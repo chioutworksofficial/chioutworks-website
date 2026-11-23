@@ -80,15 +80,15 @@ export default function SiteNav({ lang }: { lang: Lang }) {
           <div className="site-nav-right flex items-center gap-3 md:gap-6">
             <button type="button" ref={toggleRef} onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="site-menu"
               className="site-nav-menu flex items-center gap-2.5 py-2" style={labelStyle}>
-              {open ? ui.close : ui.menu}
+              <span className="site-nav-menu-label">{open ? ui.close : ui.menu}</span>
               <span aria-hidden="true" className="relative w-3.5 h-3.5 inline-block transition-transform duration-300" style={{ transform: open ? 'rotate(135deg)' : 'none' }}>
                 <span className="absolute left-0 top-1/2 w-full h-[1.5px] -translate-y-1/2" style={{ background: 'var(--lq-white)' }} />
                 <span className="absolute left-1/2 top-0 h-full w-[1.5px] -translate-x-1/2"
                   style={{ background: 'var(--lq-white)', }} />
               </span>
             </button>
-            <Link to={pagePath(lang, 'contact')} className="site-nav-cta inline-flex shrink-0 items-center rounded-full transition-colors hover:[background:color-mix(in_srgb,var(--c-lilac)_14%,transparent)]" style={{ border: '1.5px solid var(--c-lilac)' }}>
-              <span className="rounded-full px-5 py-2.5" style={{ ...labelStyle, color: 'var(--c-quartz)' }}>{ui.getInTouch}</span>
+            <Link to={pagePath(lang, 'contact')} aria-label={ui.getInTouch} className="site-nav-cta inline-flex shrink-0 items-center rounded-full transition-colors hover:[background:color-mix(in_srgb,var(--c-lilac)_14%,transparent)]" style={{ border: '1.5px solid var(--c-lilac)' }}>
+              <span className="rounded-full px-5 py-2.5" style={{ ...labelStyle, color: 'var(--c-quartz)' }}><span className="nav-cta-long">{ui.getInTouch}</span><span className="nav-cta-short" aria-hidden="true">{ui.getInTouchShort}</span></span>
             </Link>
             <ModeToggle lang={lang} />
           </div>
