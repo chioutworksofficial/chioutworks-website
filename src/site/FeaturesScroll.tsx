@@ -319,7 +319,7 @@ function QueueMock({ m, s, lang, x }: P) {
         </div>
       </Float>
       <Float z={1} className="flex-1 min-h-0">
-        <div className="flex flex-col gap-1.5 h-full justify-end">
+        <div className="flex flex-col gap-1.5 h-full justify-end overflow-hidden">
           {st.rows.map((q) => (
             <div key={q.id} className="fx-enter flex items-center gap-2.5 px-3 py-2" style={{ ...panel, opacity: q.st === 2 ? 0.62 : 1 }}>
               <span style={{ ...mono, fontSize: 11, color: q.st === 1 ? LI : AS, width: 34 }}>{q.time}</span>
@@ -672,7 +672,7 @@ function QrMock({ s, lang, x }: P) {
         </div>
       </Float>
       <Float z={2} className="flex-1 min-h-0">
-        <div className="flex flex-col gap-2 h-full justify-end">
+        <div className="flex flex-col gap-2 h-full justify-end overflow-hidden">
           {st.list.map((o) => (
             <div key={o.id} className="fx-enter px-3 py-2.5" style={{ ...panel, opacity: o.st === 2 ? 0.65 : 1 }}>
               <div className="flex items-center justify-between"><p style={{ fontSize: 12, color: Q, fontWeight: 600 }}>{s.qrTable} {o.table} <span style={{ ...mono, fontWeight: 400, fontSize: 10, color: AS }}>#{1040 + o.id}</span></p><span style={{ fontSize: 10.5, color: AS }}>{ageText(o.at, s.now, s.ago)}</span></div>
