@@ -41,8 +41,10 @@ const loaders = {
   roi: () => import('./site/RoiCalculator'), partners: () => import('./site/PartnerStrip'),
   finale: () => import('./site/SiteFinale'), popular: () => import('./site/PopularPackages'),
 };
-const FeaturesScroll = lazy(loaders.features);
-const IndustriesWheel = lazy(loaders.industries);
+// Pinned sections stay eager (owner, 2026-11-23): a lazily created pin after an earlier-created pin broke the scroll
+// order and the next section slid over the cards. Only non-pinned sections are deferred.
+import FeaturesScroll from './site/FeaturesScroll';
+import IndustriesWheel from './site/IndustriesWheel';
 const RoiCalculator = lazy(loaders.roi);
 const PartnerStrip = lazy(loaders.partners);
 const SiteFinale = lazy(loaders.finale);
@@ -130,10 +132,10 @@ const PAGES: Record<SitePage, (lang: Lang) => ReactNode> = {
   home: (lang) => (
     <>
       <SiteHero lang={lang} />
-      <Defer id="features" minH="100vh"><FeaturesScroll lang={lang} /></Defer>
+      <FeaturesScroll lang={lang} />
       <StatementReveal lang={lang} />
       <Defer id="popular" minH="80vh"><PopularPackages lang={lang} /></Defer>
-      <Defer id="industries" minH="100vh"><IndustriesWheel lang={lang} /></Defer>
+      <IndustriesWheel lang={lang} />
       <Defer minH="40vh"><PartnerStrip lang={lang} /></Defer>
       <Defer id="roi" minH="100vh"><RoiCalculator lang={lang} /></Defer>
     </>
