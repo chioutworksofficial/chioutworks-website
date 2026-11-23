@@ -532,13 +532,19 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       onFinish: (reason) => {
         if (reason === 'closing') {   // thanks said, not the end: wait for the visitor; after ~8 s of silence ask for the short farewell
           if (closingTimer.current) clearInterval(closingTimer.current);
-          let quiet = 0;
+          let quiet = 0, asked = false;
+          const closingStart = Date.now();
+          // hard stops (owner 2026-11-23): 20 s of silence after the thanks ends the call; a goodbye ping-pong (e.g. a caller's own AI
+          // answering every farewell) ends after 45 s at the latest
+          const forceEnd = (why: string) => { if (closingTimer.current) clearInterval(closingTimer.current); closingTimer.current = null; endReasonRef.current ||= why; finishPending.current = true; drain(); };
           closingTimer.current = setInterval(() => {
             const c = callRef.current;
             if (!c || finishPending.current) { if (closingTimer.current) clearInterval(closingTimer.current); closingTimer.current = null; return; }
+            if (Date.now() - closingStart > 45000 && !c.busy()) { forceEnd('closing_cap'); return; }
             if (c.busy()) { quiet = 0; return; }
             quiet += 250;
-            if (quiet >= 8000) { if (closingTimer.current) clearInterval(closingTimer.current); closingTimer.current = null; c.sendText('The visitor stayed silent. Say your short farewell now, then call finish_conversation with reason done as your very last action.'); }
+            if (quiet >= 20000) { forceEnd('closing_silence'); return; }
+            if (quiet >= 8000 && !asked) { asked = true; c.sendText('The visitor stayed silent. Say your short farewell now, then call finish_conversation with reason done as your very last action.'); }
           }, 250);
           return;
         }

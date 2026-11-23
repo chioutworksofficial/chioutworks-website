@@ -60,7 +60,7 @@ export function shouldEnd(o: { turnDone: boolean; playing: boolean; lastAudioAgo
   return o.turnDone && o.lastAudioAgoMs >= END_QUIET_MS;
 }
 
-export const GRACE_MS = 9000, GRACE_REPLY_MS = 1000, GRACE_NOREPLY_MS = 8000, GRACE_CAP_MS = 30000;
+export const GRACE_MS = 20000, GRACE_REPLY_MS = 6000, GRACE_NOREPLY_MS = 8000, GRACE_CAP_MS = 40000;   // owner: wait up to 20 s for the visitor; ping-pong capped at 40 s
 /** Grace period after the farewell (mic live): ends after GRACE_MS of silence; if the visitor spoke, after the model's short reply
  *  finished (turnComplete + playback done + GRACE_REPLY_MS). Never a second grace; safety caps when no reply comes. */
 export function graceEnd(o: { inGraceMs: number; heard: boolean; sinceHeardMs: number; playing: boolean; turnDone: boolean; audioAfterHeard: boolean; lastAudioAgoMs: number }): boolean {
