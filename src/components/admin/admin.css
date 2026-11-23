@@ -150,11 +150,16 @@ button.adm-chip { cursor: pointer; }
 [data-src='demo'] { --c: var(--adm-src-demo); }
 [data-src='package'] { --c: var(--adm-src-package); }
 [data-src='manual'] { --c: var(--adm-src-manual); }
+[data-src='voice-agent'] { --c: var(--adm-src-voice); }
 [data-state='paid'] { --c: var(--adm-ok); }
 [data-state='bad'] { --c: var(--adm-bad); }
 [data-state='signed'], [data-state='accepted'] { --c: var(--adm-src-form); }
 [data-state='viewed'], [data-state='sent'] { --c: var(--adm-warn); }
 [data-state='draft'] { --c: var(--adm-src-manual); }
+[data-state='to_call'] { --c: var(--adm-src-manual); }
+[data-state='calling'] { --c: var(--adm-warn); }
+[data-state='booked'] { --c: var(--adm-ok); }
+[data-state='no_answer'] { --c: var(--adm-bad); }
 button.adm-chip[data-src][aria-pressed='true'] { background: color-mix(in srgb, var(--c) 34%, transparent); color: white; }
 
 /* ── Light mode: tokens come from theme.css (admin no longer carries data-mode-lock); only status colours and on-accent text need care. ── */

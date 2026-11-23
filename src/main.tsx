@@ -36,6 +36,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<RootRedirect />} />
         <Route
+          path="/admin/voice-agent"
+          element={
+            <Suspense fallback={null}>
+              <Admin />
+            </Suspense>
+          }
+        />
+        <Route
           path="/admin"
           element={
             <Suspense fallback={null}>

@@ -12,12 +12,13 @@ import IntakesView from '../components/admin/IntakesView';
 import OffersView from '../components/admin/OffersView';
 import ProjectsView from '../components/admin/ProjectsView';
 import ErrorsView from '../components/admin/ErrorsView';
+import VoiceAgentView from '../components/admin/VoiceAgentView';
 
 type Auth = 'checking' | 'out' | 'in' | 'unset';
-export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors';
+export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent';
 const GROUPS: { label: string; tabs: { key: Tab; label: string }[] }[] = [
   { label: 'Gelenler', tabs: [{ key: 'requests', label: 'Talepler' }, { key: 'intakes', label: 'Analiz formları' }, { key: 'voice', label: 'Sesli görüşmeler' }] },
-  { label: 'İşler', tabs: [{ key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' }, { key: 'calendar', label: 'Takvim' }, { key: 'appointments', label: 'Randevular' }] },
+  { label: 'İşler', tabs: [{ key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' }, { key: 'calendar', label: 'Takvim' }, { key: 'appointments', label: 'Randevular' }, { key: 'voiceAgent', label: 'Voice Agent' }] },
   { label: 'Site', tabs: [{ key: 'overview', label: 'Genel bakış' }, { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'errors', label: 'Hatalar ve e-posta' }] },
 ];
 
@@ -61,7 +62,7 @@ function Login({ unset, onDone }: { unset: boolean; onDone: () => void }) {
 
 export default function Admin() {
   const [auth, setAuth] = useState<Auth>(DEMO ? 'in' : 'checking');
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(() => (location.pathname.endsWith('/voice-agent') ? 'voiceAgent' : 'overview'));
   const [reqs, setReqs] = useState<Req[] | null>(null);
   const [sessions, setSessions] = useState<VoiceSession[] | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -151,6 +152,7 @@ export default function Admin() {
         {tab === 'calendar' && <AvailabilityPanel onSaved={setBlocked} />}
         {tab === 'analytics' && <AnalyticsView />}
         {tab === 'appointments' && <AppointmentsView />}
+        {tab === 'voiceAgent' && <VoiceAgentView reqs={reqs} />}
         {tab === 'errors' && <ErrorsView onMailSaved={setNotifyMail} />}
       </main>
     </div>

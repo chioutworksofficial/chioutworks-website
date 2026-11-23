@@ -87,3 +87,10 @@ Sahibin örnekleri: "e-postadaki linke tıkladı, başka pencereye sızdı", "gi
 - Anahtar, parola ve doğrulama kodu sohbete, koda, loga, belgeye yazılmaz; Claude değerleri yazdırmaz, yalnızca var/yok ve türünü kontrol eder.
 - Hata izleme (Sentry, AB bölgesi, 2026-11-23): yalnızca DSN varsa açık; replay, tracing ve geri bildirim kutusu kapalı. Gönderimden önce gövde, çerez, başlık, IP, sorgu dizesi, form içeriği, e-posta, telefon ve uzun anahtarlar temizlenir; yalnızca yöntem + yol (`:id`) ve maskeli mesaj/yığın gider. Web DSN çalışma anında `/api/public-config` ile gelir, derlemeye girmez.
 - OpenAI (ABD): `LLM_PROVIDER=openai` veya `OPENAI_API_KEY` açılmadan önce gizlilik politikasına tür + konum + aktarım güvencesiyle (ad olmadan) eklenir; admin LLM katmanı `server/llm.ts` istem/yanıt loglamaz.
+
+## 12. Voice Agent (telefonda arayan yapay zekâ; `server/voiceAgent.ts`)
+- **Token:** dış araçlar (n8n/Retell) için `cwva_` + 32 rastgele bayt; yalnızca SHA-256 özeti saklanır (`kv voiceAgent.tokenHash`), düz metin oluşturulurken bir kez gösterilir, iptal edilebilir; karşılaştırma sabit zamanlı; herkese açık uçlar yalnızca bu token ile (çerez yok), 120 istek/dk (token/IP başına).
+- **Retell anahtarı:** AES-256-GCM ile şifreli (anahtar `SETTINGS_ENC_KEY`, yoksa `ADMIN_TOKEN`'dan HKDF); admin arayüzüne yalnızca "kayıtlı + son 4 hane" döner.
+- **SSRF:** n8n adresi yalnızca https; localhost, 127.*, 10.*, 172.16-31.*, 192.168.*, 169.254.*, ::1 ve .local/.internal reddedilir; aramadan önce DNS çözülüp özel adrese gidiyorsa istek atılmaz; yönlendirme izlenmez, 8 sn zaman aşımı.
+- **Kişisel veri:** log'larda ad/telefon/token yok; listede telefon maskeli; tablolar (`va_customers`, `va_calls`, `va_appointments`) RLS açık, yalnızca sunucu anahtarı erişir.
+- **Canlı mod öncesi:** gizlilik politikasında telefon yapay zekâ sağlayıcısı tür + konum + aktarım güvencesiyle anılır; arama metni yapay zekâ olduğunu söyler; yalnızca belgelenmiş "makul sebep" olan firmalar aranır.

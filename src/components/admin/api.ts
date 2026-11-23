@@ -55,11 +55,11 @@ export const fmtDay = (ymd: string) => {
   return `${d}.${m}.${y}`;
 };
 
-export type Source = 'form' | 'voice' | 'chat' | 'calculator' | 'resources' | 'demo' | 'package' | 'manual';
+export type Source = 'voice-agent' | 'form' | 'voice' | 'chat' | 'calculator' | 'resources' | 'demo' | 'package' | 'manual';
 /** Where the request was sent from (filled by the server, also for older records). */
 export const SOURCE: Record<Source, string> = {
   form: 'Form', voice: 'Sesli', chat: 'Sohbet', calculator: 'Hesaplayıcı',
-  resources: 'Kaynaklar', demo: 'Demo', package: 'Paket', manual: 'Elle',
+  resources: 'Kaynaklar', demo: 'Demo', package: 'Paket', manual: 'Elle', 'voice-agent': 'Voice Agent',
 };
 export const TOPIC: Record<string, string> = { 'res-qr': 'QR kod', 'res-review': 'Google yorum', 'res-messages': 'Mesaj şablonları', 'res-legal': 'Yasal kontrol' };
 export const TAGS: { key: string; label: string }[] = (Object.keys(SOURCE) as Source[]).map((k) => ({ key: k, label: SOURCE[k] }));

@@ -24,6 +24,7 @@ import { registerStyles, saveChoice } from './styles.js';
 import { registerNewsletter } from './newsletter.js';
 import { registerAnalytics } from './analytics.js';
 import { registerAffiliates } from './affiliates.js';
+import { registerVoiceAgent } from './voiceAgent.js';
 import { registerPreview } from './preview.js';
 import { languageOk, SAFE_FALLBACK } from './languageGuard.js';
 import { ids as abuseIds, recordAbuse, voiceBlocked, chatState, recordStrike, blockedMsg, adminList, adminUnlock, rateOk, globalOk, textMsgAllowed, TEXT_SESSION_MAX, insult, abuseExempt, MSG as ABUSE_MSG } from './abuse.js';
@@ -733,7 +734,7 @@ function sanitizeRoi(raw: unknown) {
 }
 
 // ── POST /api/contact — contact form (kind 'contact' in the same store) ────
-type RequestSource = 'form' | 'voice' | 'chat' | 'calculator' | 'resources' | 'demo' | 'package' | 'manual';
+type RequestSource = 'voice-agent' | 'form' | 'voice' | 'chat' | 'calculator' | 'resources' | 'demo' | 'package' | 'manual';
 type LegacyReq = { createdAt: string; source?: RequestSource; kind?: string; voiceSessionId?: string; roiCalc?: unknown; topic?: string };
 /** Best guess for records saved before `source` existed (a form with an attached transcript counts as the assistant). */
 function legacySource(r: LegacyReq, sessions: Map<string, VoiceSession['kind']>): RequestSource {
@@ -1783,6 +1784,7 @@ registerNewsletter(app, { rateSkip: demoLimitSkip });
 // Cookieless visitor statistics with bot filtering (no IP stored)
 registerAnalytics(app, { requireAdmin, rateSkip: demoLimitSkip });
 registerAffiliates(app, { requireAdmin });
+registerVoiceAgent(app, { requireAdmin, saveRequest, deleteRequests, listRequests, readBlocked });
 // AI website preview after the intake is submitted (content only, rendered by our template)
 registerPreview(app, { getGroq, rateSkip: demoLimitSkip });
 
