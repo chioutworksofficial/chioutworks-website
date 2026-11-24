@@ -4,7 +4,7 @@ import { api } from './api';
 // Arama senaryosu (server/voiceScript.ts): dil başına adımlar, konuşma tarzı ve dallanmalar. Varsayılan metin sunucuda; düzenlenirse kv'de saklanır
 // ve n8n / Vapi için GET /api/voice-agent/script ile verilir. Sır ve fiyat içermez.
 type L = 'tr' | 'en' | 'de' | 'el';
-interface Script { steps: string; style: string; branches: string }
+interface Script { steps: string; style: string; branches: string; system?: string }
 interface Payload { script: Record<L, Script>; rules: Record<L, string[]>; afterCall: Record<L, string>; defaults: Record<L, Script> }
 const LANGS: L[] = ['tr', 'en', 'de', 'el'];
 const PARTS: [keyof Script, string][] = [['steps', 'Adımlar'], ['style', 'Konuşma tarzı'], ['branches', 'Özel durumlar']];
@@ -30,6 +30,10 @@ export default function CallScript() {
       <p className="adm-sub">Arayan yapay zekâ bu metni kullanır. n8n / Vapi bunu <code>GET /api/voice-agent/script</code> ile dil başına alır. Marka okunuşu: Şiut-vörks · Shee-oot works · Schiut-Works · Σιούτ-γουόρκς; yazıda Chioutworks.</p>
       <div className="adm-chips" role="tablist">{LANGS.map((l) => <button key={l} role="tab" aria-selected={lang === l} className="adm-chip" aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}</div>
       {msg && <div className="adm-banner" role="status">{msg}</div>}
+      {cur && <details className="adm-field"><summary className="adm-label" style={{ cursor: 'pointer' }}>Sistem talimatı ({cur.system?.length ?? 0} karakter, yaklaşık {Math.round((cur.system?.length ?? 0) / 2.5)} jeton)</summary>
+        {edit ? <><textarea id="cs-system" className="adm-input" rows={24} value={cur.system ?? ''} onChange={(e) => setDraft((d) => d && { ...d, [lang]: { ...d[lang], system: e.target.value } })} />
+          <button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setDraft((d) => d && { ...d, [lang]: { ...d[lang], system: p!.defaults[lang].system } })}>Varsayılana dön (bu dil, kaydetmek için Kaydet)</button></>
+          : <p style={{ whiteSpace: 'pre-line', margin: 0, fontSize: 13, lineHeight: 1.5 }}>{cur.system}</p>}</details>}
       {cur && PARTS.map(([k, label]) => (
         <div key={k} className="adm-field"><label className="adm-label" htmlFor={`cs-${k}`}>{label}</label>
           {edit ? <textarea id={`cs-${k}`} className="adm-input" rows={k === 'style' ? 8 : 12} value={cur[k]} onChange={(e) => setDraft((d) => d && { ...d, [lang]: { ...d[lang], [k]: e.target.value } })} />

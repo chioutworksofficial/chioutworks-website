@@ -2,7 +2,7 @@
 // stored in kv "voiceAgent.script", served to n8n / Vapi at GET /api/voice-agent/script. No secrets, no prices, no personal data.
 // Brand: spoken "Şiut-vörks" / "Shee-oot works" / "Schiut-Works" / "Σιούτ-γουόρκς", written "Chioutworks".
 export type ScriptLang = 'tr' | 'en' | 'de' | 'el';
-export interface Script { steps: string; style: string; branches: string }
+export interface Script { steps: string; style: string; branches: string; system?: string }   // system = full Vapi system prompt (server/voiceSystemPrompt.ts)
 
 export const SCRIPT_RULES: Record<ScriptLang, string[]> = {
   tr: ['Yalnızca tercih ettiği iletişim "Telefon" olan adaylar aranır, yalnızca bir kez.', 'Açılmazsa tekrar aranmaz; e-postayla devam edilir.', 'Aramanın başında yapay zekâ olduğu her zaman söylenir.', 'Fiyat, söz, garanti ve toplantı yok.', '"Aranmasın" diyenler bir daha aranmaz (doNotCall).'],
