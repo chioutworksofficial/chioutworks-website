@@ -6,7 +6,7 @@
   "functions": {
     "api/index.ts": {
       "maxDuration": 60,
-      "includeFiles": "{assistant-knowledge.md,assistant-persona.md}"
+      "includeFiles": "{assistant-knowledge.md,assistant-persona.md,server/fonts/**}"
     }
   },
   "rewrites": [

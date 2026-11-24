@@ -10,6 +10,7 @@ const DemoApp = lazy(() => import('../pages/DemoApp'));
 const SolutionDeck = lazy(() => import('../site/pages/SolutionDeck'));
 const IntakePage = lazy(() => import('../site/pages/IntakePage'));
 const OfferPage = lazy(() => import('../site/pages/OfferPage'));
+const ReportConfirmPage = lazy(() => import('../site/pages/ReportConfirmPage'));
 const ProjectPage = lazy(() => import('../site/pages/ProjectPage'));
 import NotFound from '../site/pages/NotFound';
 import { STYLE_SLUG, INTAKE_SLUG, OFFER_SLUG, PROJECT_SLUG, demoPath, isLang, pageFromSlug, pagePath, preferredLang, type PageKey } from '../lib/routes';
@@ -55,6 +56,7 @@ export function DemoRoute() {
   const { lang, page: pageSlug, slug } = useParams();
   if (!isLang(lang)) return <RootRedirect />;
   if (pageSlug === INTAKE_SLUG[lang]) return <NoReferrer><Lazy><IntakePage /></Lazy></NoReferrer>;
+  if (pageSlug === 'rapor' && slug === 'onay') return <NoReferrer><Lazy><ReportConfirmPage /></Lazy></NoReferrer>;   // report e-mail answer page, same slug in all languages
   if (pageSlug === OFFER_SLUG[lang]) return <NoReferrer><Lazy><OfferPage /></Lazy></NoReferrer>;
   if (pageSlug === PROJECT_SLUG[lang]) return <NoReferrer><Lazy><ProjectPage /></Lazy></NoReferrer>;
   if (pageSlug === STYLE_SLUG[lang]) return <NoReferrer><Lazy><StylePage /></Lazy></NoReferrer>;

@@ -9,10 +9,10 @@ import { fileURLToPath } from 'node:url';
 import { dbOn, kvGet, kvSet } from './db.js';
 import { rlStore } from './rateStore.js';
 
-export type EntrySource = 'voice' | 'chat' | 'form' | 'voice-agent';
+export type EntrySource = 'voice' | 'chat' | 'form' | 'voice-agent' | 'report';
 export type EntryKind = 'hot' | 'call' | 'remind' | 'send' | 'recall';
 export interface CalEntry { id: string; lk: string; kind: EntryKind; day: string; source: EntrySource; title: string; refTab: 'requests' | 'voice'; refId: string; preferredChannel: string; score: string; createdAt: string }
-const LABEL: Record<EntrySource, string> = { voice: 'Sesli asistan', chat: 'Sohbet', form: 'Form', 'voice-agent': 'Vapi görüşmesi' };
+const LABEL: Record<EntrySource, string> = { voice: 'Sesli asistan', chat: 'Sohbet', form: 'Form', 'voice-agent': 'Vapi görüşmesi', report: 'Rapor sonrası' };
 const TITLE: Record<EntryKind, string> = { hot: 'yazılı cevap ver (1 iş günü)', call: 'ara', remind: 'hatırlatma gönderildi mi?', send: 'yazılı çözüm listesini gönder', recall: 'geri ara?' };
 const FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '../data/calendar-entries.json');
 const KEY = 'calendar.entries';

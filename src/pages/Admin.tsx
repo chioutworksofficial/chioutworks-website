@@ -16,12 +16,13 @@ import MarketingView from '../components/admin/MarketingView';
 import NewsletterView from '../components/admin/NewsletterView';
 import LeadsView from '../components/admin/LeadsView';
 import TrendRadarView from '../components/admin/TrendRadarView';
+import ProvidersView from '../components/admin/ProvidersView';
 import TabHint from '../components/admin/TabHint';
 import { GROUP_ICON, GROUP_ID, HINTS, TAB_ICON } from '../components/admin/hints';
 import CalendarView, { type CalSection } from '../components/admin/CalendarView';
 
 type Auth = 'checking' | 'out' | 'in' | 'unset';
-export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent' | 'sales' | 'marketing' | 'newsletter' | 'leads' | 'trend';
+export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent' | 'sales' | 'marketing' | 'newsletter' | 'leads' | 'trend' | 'providers';
 export type Group = { label: string; desc: string; tabs: { key: Tab; label: string; desc: string }[] };
 // Navigation map (owner, 2026-11-24). 'appointments' is no longer a tab: it lives inside Takvim (ALIAS keeps old links working).
 export const GROUPS: Group[] = [
@@ -36,7 +37,8 @@ export const GROUPS: Group[] = [
   { label: 'Planlama', desc: 'Dolu günler, takip ve randevular', tabs: [{ key: 'calendar', label: 'Takvim', desc: 'Dolu günler, takip girdileri, randevular' }] },
   { label: 'Pazarlama', desc: 'Yapay zekâ taslakları', tabs: [{ key: 'marketing', label: 'Pazarlama araçları', desc: 'Denetim, metin, SEO, e-posta, sosyal plan' }, { key: 'trend', label: 'Trend Radar', desc: 'Son 30 gün: içerik fikri, görüşme hazırlığı, rakip' }] },
   { label: 'Site ve sistem', desc: 'Ziyaretler ve hatalar', tabs: [
-    { key: 'analytics', label: 'Ziyaret analizi', desc: 'Ziyaretçiler, ülkeler, sayfalar' }, { key: 'errors', label: 'Hatalar ve e-posta', desc: 'Hata kaydı ve bildirim e-postası' }] },
+    { key: 'analytics', label: 'Ziyaret analizi', desc: 'Ziyaretçiler, ülkeler, sayfalar' }, { key: 'errors', label: 'Hatalar ve e-posta', desc: 'Hata kaydı ve bildirim e-postası' },
+    { key: 'providers', label: 'Hesaplar ve API', desc: 'Anahtarlar, paketler, ücretler' }] },
 ];
 /** Old tab ids / deep links -> current place. */
 const ALIAS: Record<string, { tab: Tab; cal?: CalSection }> = {
@@ -237,6 +239,7 @@ export default function Admin() {
         {tab === 'trend' && <TrendRadarView />}
         {tab === 'leads' && <LeadsView go={go} />}
         {tab === 'newsletter' && <NewsletterView />}
+        {tab === 'providers' && <ProvidersView />}
         {tab === 'errors' && <ErrorsView onMailSaved={setNotifyMail} />}
       </main>
     </div>

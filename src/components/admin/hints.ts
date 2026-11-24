@@ -1,4 +1,4 @@
-import { AlertTriangle, BarChart3, BellRing, Briefcase, Calendar, CalendarDays, ClipboardList, FileText, FolderKanban, Inbox, LayoutDashboard, Mail, Megaphone, Mic, PhoneCall, Radar, Server, Sparkles, TrendingUp, Users, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, BarChart3, BellRing, Briefcase, Calendar, CalendarDays, ClipboardList, FileText, FolderKanban, Inbox, KeyRound, LayoutDashboard, Mail, Megaphone, Mic, PhoneCall, Radar, Server, Sparkles, TrendingUp, Users, type LucideIcon } from 'lucide-react';
 import type { Tab } from '../../pages/Admin';
 
 /** Per-tab help (owner, 2026-11-24): what it is for, when to look, what to try. Turkish only. */
@@ -26,6 +26,7 @@ export const HINTS: Record<Tab, Hint> = {
   trend: { what: 'Son 30 günün trendleri (Reddit, Hacker News, Polymarket, GitHub): içerik fikri, görüşme hazırlığı, rakip izleme.', when: 'Pazartesi sabahı', tips: ['Bir konu yazıp arayın; özet ve içerik fikirleri çıkar.', 'Beğendiğiniz raporu kaydedin; "Kayıtlı raporlar"dan açın.', 'Yalnızca sizin içindir; sitede görünmez.'] },
   analytics: { what: 'Sitenin gerçek ziyaret verisi: ziyaretçiler, ülkeler, sayfalar, ortak sitelere tıklamalar. Çerezsiz, IP saklanmaz.', when: 'Haftada bir', tips: ['Tarih aralığını değiştirip önceki haftayla karşılaştırın.', 'En çok bakılan sayfa, ne anlattığınızın işe yaradığını gösterir.'] },
   errors: { what: 'Sunucu ve tarayıcı hataları (son 200, 30 gün) ve hata bildirim e-postası ayarı.', when: 'Haftada bir; bildirim gelince hemen', tips: ['Bildirim e-postanızı bir kez girin; hata olunca haber gelir.', 'Aynı hata sayaçla birleşir; sayısı hızla artıyorsa önce onu inceleyin.'] },
+  providers: { what: 'Kullandığınız tüm hesap ve API\'ler: anahtar tanımlı mı, hangi paket, ne kadar ücret; maliyet kontrolü.', when: 'Ayda bir ve yenileme tarihi yaklaşınca', tips: ['Her kartta "Ücret bilgisini düzenle" ile paket, ücret ve yenileme tarihini girin.', 'ElevenLabs, Apify ve Resend için canlı kullanım okunur; diğerleri için "Faturalama sayfası"na gidin.', 'Anahtar değerleri burada görünmez; yalnızca son 4 karakter.'] },
 };
 
 export const WEEK: { day: string; text: string; tab: Tab }[] = [
@@ -38,6 +39,6 @@ export const WEEK: { day: string; text: string; tab: Tab }[] = [
 
 export const TAB_ICON: Record<Tab, LucideIcon> = {
   overview: LayoutDashboard, leads: Users, requests: Inbox, voice: Mic, intakes: ClipboardList, newsletter: Mail, offers: FileText, projects: FolderKanban,
-  sales: TrendingUp, voiceAgent: PhoneCall, calendar: Calendar, marketing: Megaphone, trend: Radar, analytics: BarChart3, errors: AlertTriangle, appointments: Calendar,
+  sales: TrendingUp, voiceAgent: PhoneCall, calendar: Calendar, marketing: Megaphone, trend: Radar, analytics: BarChart3, errors: AlertTriangle, appointments: Calendar, providers: KeyRound,
 };
 export const GROUP_ICON: Record<GroupId, LucideIcon> = { gen: LayoutDashboard, in: BellRing, biz: Briefcase, plan: CalendarDays, mkt: Sparkles, sys: Server };

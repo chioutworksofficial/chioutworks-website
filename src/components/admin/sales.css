@@ -47,3 +47,27 @@
   .sl-check { grid-template-columns: 64px 1fr; }
   .sl-btns .adm-btn { flex: 1 1 auto; text-align: center; }
 }
+/* Apollo URL paneli + rapor eylemleri */
+.ap-note { margin: 0 0 12px; }
+.ap-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.ap-row .adm-input { flex: 1 1 260px; width: auto; }
+.ap-sug { margin: 0 0 10px; }
+.ap-warn { border: 1px solid color-mix(in srgb, var(--adm-warn) 55%, transparent); background: color-mix(in srgb, var(--adm-warn) 10%, transparent); color: var(--c-quartz); border-radius: var(--r-input); padding: 10px 12px; font-size: 13px; margin-bottom: 10px; }
+.ap-toggle { margin: 4px 0 8px; }
+.ap-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-bottom: 12px; }
+.ap-grid[data-open='0'] { display: none; }
+.ap-f { display: grid; gap: 6px; align-content: start; }
+.ap-f .adm-input { width: 100%; }
+.ap-check { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--c-mist); }
+.ap-out { display: grid; gap: 10px; margin-top: 8px; }
+.ap-card { margin: 0; padding: 14px; border: 1px solid var(--c-hairline); border-radius: var(--r-card); background: var(--c-inkline); color: var(--c-mist); font: 13px/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ap-hist { display: grid; gap: 8px; margin-top: 8px; }
+.ap-h { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--c-edge); padding: 8px 0; }
+.sl-rep { display: grid; gap: 8px; border: 1px solid var(--c-hairline); border-radius: var(--r-card); padding: 12px; background: var(--c-inkline); }
+.sl-rep .adm-input { width: auto; padding: 4px 8px; font-size: 12px; }
+@media (max-width: 899px) {
+  .ap-row .adm-btn { flex: 1 1 100%; text-align: center; }
+  .ap-grid { grid-template-columns: 1fr; }
+  .ap-card { font-size: 12px; padding: 10px; }
+  .ap-h { flex-direction: column; align-items: stretch; }
+}

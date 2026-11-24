@@ -1,0 +1,38 @@
+/* Admin "Hesaplar ve API": yalnızca CSS değişkenleri. Masaüstü ve telefon ayrı düzen. */
+.pv { display: grid; gap: 20px; }
+.pv-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.pv-sum .adm-card { display: grid; gap: 6px; align-content: start; }
+.pv-sum b { font: 500 24px/1.2 var(--font-display); color: var(--c-quartz); }
+.pv-sum small, .pv-note { font-size: 12px; color: var(--c-ash); margin: 0; }
+.pv-sum ul { margin: 0; padding-left: 18px; color: var(--c-quartz); font-size: 14px; display: grid; gap: 4px; }
+.pv-sum .adm-card[data-w='warn'] { border-color: var(--adm-warn); }
+.pv-k { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--c-ash); }
+.pv-cath { font: 500 16px/1.2 var(--font-display); color: var(--c-quartz); margin: 0 0 12px; }
+.pv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+.pv-card { display: grid; gap: 10px; min-width: 0; }
+.pv-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pv-head h3 { font: 500 17px/1.2 var(--font-display); color: var(--c-quartz); margin: 0; }
+.pv-badge { padding: 2px 10px; border-radius: 9999px; font: 500 12px/1.4 var(--font-body); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c-quartz); white-space: nowrap; }
+.pv-badge[data-s='ok'] { --c: var(--adm-ok); } .pv-badge[data-s='off'] { --c: var(--c-hairline); } .pv-badge[data-s='err'] { --c: var(--adm-bad); }
+.pv-where, .pv-key, .pv-txt { margin: 0; font-size: 13px; color: var(--c-mist); display: grid; gap: 2px; }
+.pv-where span, .pv-key span { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--c-ash); }
+.pv-key code { font-family: var(--font-mono); color: var(--c-quartz); }
+.pv-txt a, .pv-foot a { color: var(--c-lilac); }
+.pv-bar { height: 8px; border-radius: 9999px; background: var(--c-inkline); border: 1px solid var(--c-edge); overflow: hidden; }
+.pv-bar i { display: block; height: 100%; background: var(--adm-ok); }
+.pv-bar i[data-w='warn'] { background: var(--adm-warn); } .pv-bar i[data-w='bad'] { background: var(--adm-bad); }
+.pv-use { display: grid; gap: 6px; } .pv-use small { font-size: 12px; color: var(--c-mist); }
+.pv-man { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+.pv-man dt { color: var(--c-ash); } .pv-man dd { margin: 0; color: var(--c-quartz); word-break: break-word; }
+.pv-form { display: grid; gap: 8px; } .pv-form label { display: grid; gap: 4px; font-size: 12px; color: var(--c-ash); }
+.pv-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pv-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; border-top: 1px solid var(--c-edge); padding-top: 10px; }
+@media (max-width: 760px) {
+  .pv-sum { grid-template-columns: 1fr; }
+  .pv-grid { grid-template-columns: 1fr; }
+  .pv-row2 { grid-template-columns: 1fr; }
+  .pv-form .adm-input { font-size: 16px; }
+  .pv-foot { flex-direction: column; align-items: stretch; }
+  .pv-foot .adm-btn { width: 100%; justify-content: center; min-height: 44px; }
+  .pv-foot a { text-align: center; padding: 8px 0; }
+}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ApiError, fmtDate } from './api';
 import { useNote } from './bulk';
 import SiteChecksPanel from './SiteChecksPanel';
+import ApolloPanel from './ApolloPanel';
 import './sales.css';
 
 type St = 'new' | 'to_call' | 'called' | 'interested' | 'not_interested' | 'won' | 'lost';
@@ -18,9 +19,13 @@ interface Scan {
 }
 interface Analysis { company: string; city: string; country: string; sector: string; summary: string; has: string[]; missing: string[]; reasonable_cause: string; grade: Grade; grade_reason: string; first_step: string; opener: string; score?: number; priority?: string }
 interface Signals { https: boolean; viewport: boolean; hasForm: boolean; booking: string[]; chat: string[]; whatsapp: boolean; hreflang: string[]; title: string; description: string; socials: string[] }
-interface Lead { id: string; createdAt: string; url: string; domain: string; analysis: Analysis; signals: Signals; scan?: Scan; history?: { at: string; score: number; grade: Grade }[]; phone?: string; email?: string; status: St; tags?: string[]; notes: { at: string; text: string }[]; analyzedAt?: string }
+interface Lead { id: string; createdAt: string; url: string; domain: string; analysis: Analysis; signals: Signals; scan?: Scan; history?: { at: string; score: number; grade: Grade }[]; phone?: string; email?: string; status: St; tags?: string[]; notes: { at: string; text: string }[]; analyzedAt?: string; canMail?: boolean; reportStop?: boolean; reportSends?: { id: string; at: string; lang: string }[]; reportAnswer?: { at: string; answer: 'yes' | 'no'; when?: string } }
+type RL = 'tr' | 'en' | 'de' | 'el';
+const RLS: RL[] = ['tr', 'en', 'de', 'el'];
+const COLD = 'Bu kişi analiz istemedi; yalnızca PDF indirebilirsiniz (soğuk e-posta yok).';
+const langOfLead = (l: Lead): RL => { const x = (l.scan?.facts.lang ?? '').slice(0, 2); return RLS.includes(x as RL) ? (x as RL) : /alman|germany/i.test(l.analysis.country) ? 'de' : /türk/i.test(l.analysis.country) ? 'tr' : /yunan|greece/i.test(l.analysis.country) ? 'el' : 'en'; };
 const msgOf = (x: unknown, d: string) => (x instanceof ApiError ? x.data?.message ?? (x.status === 401 ? 'Oturum süresi doldu, yeniden giriş yapın.' : d) : d);
-const TAG: Record<string, string> = { opt_in: 'izinli', marketing_ok: 'pazarlama izni' };
+const TAG: Record<string, string> = { opt_in: 'izinli', marketing_ok: 'pazarlama izni', call_ok: 'aranabilir', written_ok: 'yazılı yanıt istedi' };
 const yn = (b: boolean) => (b ? 'Evet' : 'Hayır');
 const PRIO = { 'İletişime değer': 0, Belki: 1, 'Gerek yok': 2 } as const;
 const STEPS = [[0, 'Sayfalar okunuyor'], [5, 'Kontroller yapılıyor'], [11, 'Hız ölçülüyor'], [20, 'Değerlendirme yazılıyor']] as const;
@@ -79,6 +84,8 @@ function Report({ l, onCopy }: { l: Lead; onCopy: (t: string) => void }) {
 
 export default function SalesView() {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [mailReady, setMailReady] = useState(true);
+  const [rlang, setRlang] = useState<Record<string, RL>>({});
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [f, setF] = useState({ st: '', gr: '', tag: '', prio: '', sector: '', cms: '', book: '', chat: '', where: '', date: '', min: '', max: '', q: '', sort: 'date' });
@@ -89,7 +96,7 @@ export default function SalesView() {
   const n = useNote();
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [k]: e.target.value }));
 
-  const load = useCallback(async () => { setLeads((await api<{ leads: Lead[] }>('/api/admin/sales/leads')).leads); }, []);
+  const load = useCallback(async () => { const r = await api<{ leads: Lead[]; mailReady?: boolean }>('/api/admin/sales/leads'); setLeads(r.leads); setMailReady(r.mailReady !== false); }, []);
   useEffect(() => { load().catch((x) => n.show({ ok: false, text: msgOf(x, 'Liste yüklenemedi.') })); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const analyze = async (u: string, key: string) => {
@@ -102,6 +109,7 @@ export default function SalesView() {
   const setSt = (id: string, status: St) => act(() => api(`/api/admin/sales/leads/${id}`, 'PATCH', { status }), 'Durum güncellendi.', 'Güncellenemedi.');
   const addNote = (id: string) => note.trim() && act(async () => { await api(`/api/admin/sales/leads/${id}`, 'PATCH', { note }); setNoteText(''); }, 'Not eklendi.', 'Not eklenemedi.');
   const del = (id: string) => { setConfirm(null); if (open === id) setOpen(null); return act(() => api(`/api/admin/sales/leads/${id}`, 'DELETE'), 'Silindi.', 'Silinemedi.'); };
+  const sendReport = (l: Lead, lang: RL) => act(async () => { const r = await api<{ ok: boolean; message: string }>(`/api/admin/sales/leads/${l.id}/send-report`, 'POST', { lang }); if (!r.ok) throw new ApiError(200, { message: r.message }); }, 'Rapor e-postayla gönderildi.', 'Gönderilemedi.');
   const toVa = (id: string) => act(() => api(`/api/admin/sales/leads/${id}/to-voice-agent`, 'POST'), 'Voice Agent kuyruğuna eklendi.', 'Eklenemedi.');
   const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); n.show({ ok: true, text: 'Kopyalandı.' }); } catch { n.show({ ok: false, text: 'Kopyalanamadı, elle seçin.' }); } };
 
@@ -187,6 +195,8 @@ export default function SalesView() {
             </div>))}</div></>}
       </div>
 
+      <ApolloPanel />
+
       <SiteChecksPanel />
 
       {cur && <>
@@ -199,6 +209,19 @@ export default function SalesView() {
             <button type="button" className="lq-btn-ghost adm-btn sm" disabled={!!why(cur)} title={why(cur) || 'Arama kuyruğuna ekle'} onClick={() => toVa(cur.id)}>Voice Agent kuyruğuna ekle</button>
           </div>
           {busy === cur.id && <Progress on />}
+          {cur.scan && (() => { const lg = rlang[cur.id] ?? langOfLead(cur); const ans = cur.reportAnswer; return (
+            <div className="sl-rep">
+              <div className="sl-row"><b>Müşteri raporu (PDF)</b>
+                <select className="adm-input" aria-label="Rapor dili" value={lg} onChange={(e) => setRlang((x) => ({ ...x, [cur.id]: e.target.value as RL }))}>{RLS.map((x) => <option key={x} value={x}>{x.toUpperCase()}</option>)}</select></div>
+              <div className="sl-btns">
+                <a className="lq-btn-ghost adm-btn sm adm-pri" href={`/api/admin/sales/leads/${cur.id}/report.pdf?lang=${lg}`} download>PDF indir</a>
+                <button type="button" className="lq-btn-ghost adm-btn sm" disabled={!cur.canMail || !mailReady} title={!cur.canMail ? COLD : !mailReady ? 'Mail alan adı doğrulanınca gider' : 'Raporu e-postayla gönder'} onClick={() => sendReport(cur, lg)}>Müşteriye e-postayla gönder</button>
+              </div>
+              {!cur.canMail && <span className="adm-meta">{cur.reportStop ? 'Bu kişi bu e-postaları artık almak istemiyor.' : COLD}</span>}
+              {cur.canMail && !mailReady && <span className="adm-meta">Mail alan adı doğrulanınca gider.</span>}
+              {(cur.reportSends?.length ?? 0) > 0 && <span className="adm-meta">Gönderildi: {cur.reportSends!.map((x) => `${fmtDate(x.at)} (${x.lang.toUpperCase()})`).join(', ')}</span>}
+              {ans && <span className="adm-meta"><b>Yanıt ({fmtDate(ans.at)}):</b> {ans.answer === 'yes' ? `arayın${ans.when ? ` (${ans.when})` : ''}, aranabilir izni kayıtlı` : 'e-posta yeterli, yazılı çözüm listesi bekliyor'}</span>}
+            </div>); })()}
           {cur.scan ? <Report l={cur} onCopy={copy} /> : <>
             <div><span className="adm-chip" data-state={`g${cur.analysis.grade}`}>Puan {cur.analysis.grade}</span> <span className="adm-meta">{cur.analysis.grade_reason}</span></div>
             <p className="adm-meta" style={{ margin: 0 }}>Eski analiz biçimi. Yeni ayrıntılı rapor için "Yeniden analiz et" düğmesini kullanın.</p>

@@ -35,6 +35,7 @@ import { registerVoiceAgent } from './voiceAgent.js';
 import { registerSales } from './sales.js';
 import { registerMarketing } from './marketing.js';
 import { registerTrendRadar } from './trendRadar.js';
+import { registerProviders } from './providers.js';
 import { registerActionRoutes } from './actions.js';
 import { registerPreview } from './preview.js';
 import { languageOk, SAFE_FALLBACK } from './languageGuard.js';
@@ -1873,6 +1874,7 @@ registerVoiceAgent(app, { requireAdmin, saveRequest, deleteRequests, listRequest
 registerSales(app, { requireAdmin });
 registerMarketing(app, { requireAdmin });
 registerTrendRadar(app, { requireAdmin });
+registerProviders(app, { requireAdmin });
 registerActionRoutes(app, { requireAdmin });
 // AI website preview after the intake is submitted (content only, rendered by our template)
 registerPreview(app, { getGroq, rateSkip: demoLimitSkip });

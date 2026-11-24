@@ -9,12 +9,12 @@ export const mailOn = () => Boolean(process.env.RESEND_API_KEY && process.env.DE
 export const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 export const originOf = (req: Request) => (process.env.PUBLIC_ORIGIN ?? '').split(',')[0].trim().replace(/\/$/, '') || `${req.protocol}://${req.get('host')}`;
 
-export async function sendMail(o: { to: string; subject: string; html: string; text: string; headers?: Record<string, string> }): Promise<boolean> {
+export async function sendMail(o: { to: string; subject: string; html: string; text: string; headers?: Record<string, string>; attachments?: { filename: string; content: string }[] }): Promise<boolean> {
   if (!mailOn()) return false;
   try {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST', headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: process.env.DEMO_EMAIL_FROM, to: [o.to], subject: o.subject, html: o.html, text: o.text, ...(o.headers ? { headers: o.headers } : {}) }),
+      body: JSON.stringify({ from: process.env.DEMO_EMAIL_FROM, to: [o.to], subject: o.subject, html: o.html, text: o.text, ...(o.headers ? { headers: o.headers } : {}), ...(o.attachments ? { attachments: o.attachments } : {}) }),
     });
     if (!r.ok) console.error('[mail] Resend refused', r.status);
     return r.ok;
