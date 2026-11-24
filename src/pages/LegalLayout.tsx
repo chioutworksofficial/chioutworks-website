@@ -1,6 +1,7 @@
 import { useLang } from '../hooks/useLang';
 import SiteNav from '../site/SiteNav';
 import SiteFooter from '../site/SiteFooter';
+import NewsletterBand from '../site/NewsletterBand';
 import Preloader from '../site/Preloader';
 
 interface Props { children: React.ReactNode; }
@@ -14,6 +15,7 @@ export default function LegalLayout({ children }: Props) {
       <Preloader lang={lang} />
       <SiteNav lang={lang} />
       <main style={{ paddingTop: 76 }}>{children}</main>
+      <NewsletterBand lang={lang} />
       <SiteFooter lang={lang} />
     </div>
   );

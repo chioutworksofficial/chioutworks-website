@@ -7,7 +7,7 @@ import Honeypot from '../components/Honeypot';
 import { Link } from 'react-router-dom';
 
 /** Newsletter opt-in: required consent box (unticked), honeypot + signed form token; the server mails a confirmation link (double opt-in). */
-export default function NewsletterBox({ lang, source }: { lang: Lang; source: string }) {
+export default function NewsletterBox({ lang, source, band }: { lang: Lang; source: string; band?: boolean }) {
   const u = SITE_CHECK_UI[lang]; const id = useId();
   const [mail, setMail] = useState(''); const [ok, setOk] = useState(false); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
   useEffect(() => { prefetchFormToken(); }, []);
@@ -23,14 +23,14 @@ export default function NewsletterBox({ lang, source }: { lang: Lang; source: st
     } catch { setErr(u.nlErr); }
     setBusy(false);
   };
-  const field: React.CSSProperties = { flex: '1 1 220px', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--lq-line)', background: 'var(--lq-deep)', color: 'var(--lq-white)', fontSize: 15, fontFamily: 'var(--lq-font)', outline: 'none' };
+  const field: React.CSSProperties = { flex: '1 1 220px', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--lq-line)', background: 'var(--lq-deep)', color: 'var(--lq-white)', fontSize: band ? 16 : 15, fontFamily: 'var(--lq-font)', outline: 'none' };
   return (
-    <div style={{ maxWidth: 520 }}>
-      <p style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 600, color: 'var(--lq-white)' }}>{u.nlTitle}</p>
+    <div className={band ? 'nl-form' : undefined} style={band ? undefined : { maxWidth: 520 }}>
+      {!band && <p style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 600, color: 'var(--lq-white)' }}>{u.nlTitle}</p>}
       {ok ? <p role="status" style={{ margin: 0, fontSize: 14, color: 'var(--lq-mist)' }}>{u.nlDone}</p> : (
         <form onSubmit={submit} className="relative" noValidate>
           <Honeypot />
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className={band ? 'nl-row' : undefined} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <label htmlFor={`${id}-m`} className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{u.nlEmail}</label>
             <input id={`${id}-m`} type="email" autoComplete="email" maxLength={254} required placeholder={u.nlEmail} value={mail} onChange={(e) => setMail(e.target.value)} style={field} />
             <button type="submit" className="lq-btn-ghost" disabled={busy || !mail.trim()} style={{ paddingBlock: 10 }}>{u.nlBtn}</button>

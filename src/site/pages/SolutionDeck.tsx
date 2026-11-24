@@ -11,6 +11,7 @@ import PackageBuilder from '../../components/demos/PackageBuilder';
 import DemoRequestModal from '../../components/demos/DemoRequestModal';
 import SiteNav from '../SiteNav';
 import SiteFinale from '../SiteFinale';
+import NewsletterBand from '../NewsletterBand';
 import BtnArrow from '../BtnArrow';
 import { SOLUTION_UI } from '../i18n/solutionDeck';
 import type { DemoSlug } from '../../data/demos';
@@ -346,6 +347,7 @@ export default function SolutionDeck() {
         <span className="p">{Math.round(pct * 100)}%</span>
       </div>
 
+      <NewsletterBand lang={lang} />
       <SiteFinale lang={lang} />
 
       {sheet === 'request' && <DemoRequestModal lang={lang} slug={meta.slug} email={access?.email ?? ''} onClose={() => setSheet(null)} />}

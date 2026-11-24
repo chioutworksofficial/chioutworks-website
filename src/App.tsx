@@ -43,6 +43,7 @@ const loaders = {
 // Pinned sections stay eager (owner, 2026-11-23): a lazily created pin after an earlier-created pin broke the scroll
 // order and the next section slid over the cards. Only non-pinned sections are deferred.
 import FeaturesScroll from './site/FeaturesScroll';
+import NewsletterBand from './site/NewsletterBand';
 import IndustriesWheel from './site/IndustriesWheel';
 const RoiCalculator = lazy(loaders.roi);
 const PartnerStrip = lazy(loaders.partners);
@@ -196,6 +197,7 @@ export default function App({ page = 'home', sub }: { page?: SitePage; sub?: str
       {page !== 'home' && page !== 'blog' && page !== 'faq' && page !== 'resources' && <div aria-hidden="true" style={{ height: 76 }} />}
       {/* Page change: the new page sharpens out of a short blur and rises slightly (lialive-style) */}
       <main id="main" tabIndex={-1} key={`${lang}-${page}-${sub ?? ''}`} className="cw-page-enter"><Suspense fallback={<div style={{ minHeight: '60vh' }} aria-busy="true" />}>{tool ? <ToolPage lang={lang} a={tool} /> : pkg ? <PackagePage lang={lang} id={pkg} /> : post ? <BlogArticle lang={lang} id={post} /> : PAGES[page](lang)}</Suspense></main>
+      <NewsletterBand lang={lang} />
       <Defer id="start" minH="calc(660px + clamp(240px, 30vw, 460px))"><SiteFinale key={mode} lang={lang} /></Defer>
       <SectionDots lang={lang} page={page} />
       <LateAssistants lang={lang} />

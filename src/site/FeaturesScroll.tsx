@@ -78,6 +78,26 @@ function Circuit() {
   );
 }
 
+/** Phone-only circuit (static): chip centred above the front card, short traces down the card sides. Sits inside the stage, behind the cards. */
+const TRP: number[][][] = [
+  [[128, 24], [60, 24], [60, 52], [12, 52], [12, 330]],
+  [[272, 24], [340, 24], [340, 52], [388, 52], [388, 330]],
+  [[128, 44], [90, 44], [90, 70], [40, 70]],
+  [[272, 44], [310, 44], [310, 70], [360, 70]],
+];
+const NODES_P: number[][] = [[12, 330], [388, 330], [40, 70], [360, 70], [60, 24], [340, 24]];
+function CircuitPhone() {
+  return (
+    <svg aria-hidden="true" className="cf-circp" viewBox="0 0 400 520" preserveAspectRatio="xMidYMin meet">
+      <rect className="cf-chip" x="150" y="6" width="100" height="60" rx="10" fill="none" strokeWidth="1.6" />
+      <rect className="cf-chip" x="168" y="21" width="64" height="30" rx="6" fill="none" strokeWidth="1.2" />
+      {[0, 1, 2, 3].map((i) => <path key={i} className="cf-ct" d={`M128 ${21 + i * 8}h22M250 ${21 + i * 8}h22`} fill="none" />)}
+      {TRP.map((t, i) => <path key={i} className="cf-ct" d={trace(t, 10)} fill="none" strokeWidth="1.2" />)}
+      {NODES_P.map(([x, y], i) => <circle key={i} className="cf-cn" cx={x} cy={y} r="3" />)}
+    </svg>
+  );
+}
+
 type Sim = (typeof FEATURES_UI)['en']['sim'];
 type P = { m: Mock; s: Sim; x: FX; lang: Lang };
 type FX = (typeof FEATURES_UI)['en']['x'];
@@ -784,8 +804,15 @@ html[data-mode='light'] .cf-tag{background:color-mix(in srgb,var(--c-abyss,#fff)
 .cf-dot[aria-current="true"]{width:22px;background:var(--c-signal,#2862d7)}
 .cf-dotw{display:flex;align-items:center;justify-content:center;min-width:14px;height:32px}
 .cf-card[data-act="0"] .fx,.cf-card[data-act="0"] .fx-dots i{animation-play-state:paused}
+.cf-circp{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:visible}
+.cf-circp *{animation:none!important}
+.cf-note{position:relative;z-index:1;margin:12px auto 0;padding:0 16px;max-width:560px;text-align:center;font-size:13.5px;line-height:1.45;color:var(--c-ash,#abaebb)}
 @media (max-width:767px),(pointer:coarse){
-  .cf-stage{margin-top:4px;--w:min(88vw,340px);--h:calc(var(--w)*1.2);--rx:.56;--rz:.89;--ty:.16;--top:calc(var(--h)/2 + 36px);perspective:1000px;height:calc(var(--h) + 80px)}
+  .cf-stage{margin-top:4px;--w:min(88vw,340px);--h:calc(var(--w)*1.2);--rx:.56;--rz:.89;--ty:.16;--top:calc(var(--h)/2 + 78px);perspective:none;height:calc(var(--h) + 122px)}
+  .cf-ring{transform-style:flat}
+  .cf-card::after{transition:none}
+  .cf-card .fx-root{transform-style:flat;transform:none;transition:none}
+  .cf-card .fx-z1,.cf-card .fx-z2{transform:none;transition:none}
   .cf-card,.cf-frame,.cf-hit{border-radius:16px}
   .cf-space{display:none}
   .cf-circ{opacity:.7}.cf-cx{display:none}
@@ -804,6 +831,9 @@ html[data-mode='light'] .cf-tag{background:color-mix(in srgb,var(--c-abyss,#fff)
 
 const N = ORDER.length;
 const CULL = 2.5; // cards further than this many slots from the front are hidden and render no mock
+const CULL_P = 1.5; // phone: only the front card and its two neighbours
+const PHONE_Q = '(pointer: coarse), (max-width: 767px)';
+const MOUSE_AMP = 1.7; // desktop mouse drag is amplified relative to 1:1
 
 export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const ui = FEATURES_UI[lang];
@@ -812,6 +842,10 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const cardEl = useRef<(HTMLDivElement | null)[]>([]);
   const [idx, setIdx] = useState(0);
   const [vis, setVis] = useState(true);
+  const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia(PHONE_Q).matches);
+  const phoneR = useRef(phone); phoneR.current = phone;
+  const calm = useRef(true); const calmT = useRef(0);
+  const wheelAcc = useRef(0); const wheelArm = useRef(true);
   const paused = useRef(false);
   const reduce = useRef(false);
   const touch = useRef(false);
@@ -821,7 +855,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const kick = useRef<() => void>(() => {});
   const smp = useRef<number[][]>([]);
   // pos: current ring position in card slots; target: where it eases to; pop: per-card hover pop 0..1
-  const S = useRef({ pos: 0, target: 0, hov: -1, pop: new Array<number>(N).fill(0), dx: null as number | null, dy: 0, start: 0, moved: false, cur: 0, k: 0.004, v: 0, fast: false });
+  const S = useRef({ pos: 0, target: 0, hov: -1, pop: new Array<number>(N).fill(0), dx: null as number | null, dy: 0, amp: 1, a: null as { f: number; t: number; t0: number } | null, start: 0, moved: false, cur: 0, k: 0.004, v: 0, fast: false });
 
   const go = useCallback((i: number) => {
     const s = S.current; let t = i;
@@ -837,7 +871,10 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     touch.current = window.matchMedia('(hover: none)').matches;
     const on = () => { reduce.current = mq.matches; };
     mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
+    const pq = window.matchMedia(PHONE_Q);
+    const onP = () => setPhone(pq.matches);
+    pq.addEventListener('change', onP);
+    return () => { mq.removeEventListener('change', on); pq.removeEventListener('change', onP); };
   }, []);
 
   // Off-screen: pause animations, the frame loop and auto-advance. Later pinned sections are measured once the layout is final.
@@ -875,11 +912,24 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
       const s = S.current;
       if (!stage.current || document.hidden) { last = 0; return; }
       const dt = Math.min(64, ts - (last || ts)); last = ts;
+      const ph = phoneR.current, cull = ph ? CULL_P : CULL;
       let moving = s.dx !== null;
       if (s.dx === null) {
         const diff = s.target - s.pos;
-        if (reduce.current || Math.abs(diff) < 0.001) s.pos = s.target; else { s.pos += diff * Math.min(1, dt / (s.fast ? 80 : 200)); moving = true; }
-      }
+        if (reduce.current || Math.abs(diff) < 0.001) { s.pos = s.target; s.a = null; }
+        else if (ph || s.fast) {
+          // snap: fixed 220 ms ease-out (transform only)
+          if (!s.a || s.a.t !== s.target) s.a = { f: s.pos, t: s.target, t0: ts };
+          const u = Math.min(1, (ts - s.a.t0) / 220);
+          s.pos = s.a.f + (s.a.t - s.a.f) * (1 - (1 - u) ** 3);
+          if (u < 1) moving = true; else { s.pos = s.target; s.a = null; }
+        } else { s.pos += diff * Math.min(1, dt / 200); moving = true; }
+      } else s.a = null;
+      if (ph) {
+        // phone: all mock animations stay paused while dragging/snapping; the front card resumes ~200 ms after settling
+        if (moving) { calm.current = false; window.clearTimeout(calmT.current); calmT.current = 0; }
+        else if (!calm.current && !calmT.current) calmT.current = window.setTimeout(() => { calmT.current = 0; calm.current = true; start(); }, 200);
+      } else calm.current = true;
       const cur = ((Math.round(s.pos) % N) + N) % N;
       const settled = !moving;
       for (let i = 0; i < N; i++) {
@@ -890,11 +940,15 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         const want = i === s.hov ? 1 : 0; const dp = want - s.pop[i];
         if (Math.abs(dp) < 0.004) s.pop[i] = want; else { s.pop[i] += dp * Math.min(1, dt / 120); moving = true; }
         const p = s.pop[i];
-        const fade = ad > CULL - 0.5 ? Math.max(0, 1 - (ad - (CULL - 0.5)) * 2) : 1;
+        const fade = ad > cull - 0.5 ? Math.max(0, 1 - (ad - (cull - 0.5)) * 2) : 1;
         if (fade === 0) { if (c.style.visibility !== 'hidden') { c.style.visibility = 'hidden'; c.style.willChange = ''; c.style.pointerEvents = 'none'; } continue; }
         const x = RX * sn * (1 - p * 0.25), z = RZ * co - RZ + p * 260, y = -TY * (1 - co) * (1 - p) + p * 10;
         const sc = (0.6 + 0.4 * (1 + co) / 2) * (1 - p) + 1.16 * p;
-        c.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,${z.toFixed(1)}px) rotateY(${(-sn * 22 * (1 - p)).toFixed(2)}deg) scale(${sc.toFixed(3)})`;
+        if (ph) {
+          // phone: flat 2D (same arrangement, perspective folded into the scale), no 3D compositing
+          const pf = 1000 / (1000 - z);
+          c.style.transform = `translate3d(${(x * pf).toFixed(1)}px,${(y * pf).toFixed(1)}px,0) scale(${(sc * pf).toFixed(3)})`;
+        } else c.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,${z.toFixed(1)}px) rotateY(${(-sn * 22 * (1 - p)).toFixed(2)}deg) scale(${sc.toFixed(3)})`;
         c.style.zIndex = String(Math.round(1000 + z));
         // cards stay opaque (the circuit background must never show through them); depth is a dark overlay instead
         c.style.opacity = String(fade);
@@ -904,7 +958,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         c.style.willChange = moving ? 'transform, opacity' : '';
         const lit = s.hov >= 0 ? i === s.hov : i === cur && settled;
         if (c.classList.contains('lit') !== lit) c.classList.toggle('lit', lit);
-        const act = i === cur || i === s.hov ? '1' : '0';
+        const act = (ph ? calm.current && i === cur : i === cur || i === s.hov) ? '1' : '0';
         if (c.dataset.act !== act) c.dataset.act = act;
       }
       if (cur !== s.cur) { s.cur = cur; setIdx(cur); }
@@ -917,13 +971,13 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     const onResize = () => { measure(); start(); };
     window.addEventListener('resize', onResize);
     document.addEventListener('visibilitychange', start);
-    return () => { cancelAnimationFrame(raf); raf = 0; kick.current = () => {}; window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', start); };
-  }, [vis]);
+    return () => { cancelAnimationFrame(raf); raf = 0; window.clearTimeout(calmT.current); calmT.current = 0; kick.current = () => {}; window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', start); };
+  }, [vis, phone]);
 
   const setHov = (i: number) => { S.current.hov = i; if (i >= 0) stage.current?.setAttribute('data-hov', '1'); else stage.current?.removeAttribute('data-hov'); kick.current(); };
   const onDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && (e.button !== 0)) return;
-    const s = S.current; s.dx = e.clientX; s.dy = e.clientY; s.start = s.pos; s.moved = false; s.v = 0; s.fast = false; smp.current = [[e.clientX, e.timeStamp]];
+    const s = S.current; s.dx = e.clientX; s.dy = e.clientY; s.a = null; s.amp = e.pointerType === 'mouse' ? MOUSE_AMP : 1; s.start = s.pos; s.moved = false; s.v = 0; s.fast = false; smp.current = [[e.clientX, e.timeStamp]];
     if (e.pointerType === 'touch') paused.current = true;
   };
   const onMoveP = (e: React.PointerEvent) => {
@@ -932,7 +986,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     // direction is decided after ~8 px: a clearly vertical gesture is left to the page (the browser then cancels the pointer)
     if (!s.moved && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(e.clientY - s.dy)) { s.moved = true; stage.current?.setPointerCapture(e.pointerId); stage.current?.setAttribute('data-drag', '1'); setHov(-1); }
     if (s.moved) {
-      s.pos = s.start - dx * s.k; s.target = s.pos;
+      s.pos = s.start - dx * s.k * s.amp; s.target = s.pos;
       smp.current.push([e.clientX, e.timeStamp]);
       while (smp.current.length > 2 && e.timeStamp - smp.current[0][1] > 120) smp.current.shift();
       kick.current();
@@ -946,8 +1000,8 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
       const a = smp.current[0], z = smp.current[smp.current.length - 1];
       s.v = z[1] > a[1] ? (z[0] - a[0]) / (z[1] - a[1]) : 0;
       const base = Math.round(s.start);
-      let t = Math.round(s.pos - s.v * s.k * 160);
-      if (t === base && (Math.abs(s.pos - s.start) / s.k > 40 || Math.abs(s.v) > 0.3)) t = base + (s.pos > s.start ? 1 : -1);
+      let t = Math.round(s.pos - s.v * s.k * s.amp * 160);
+      if (t === base && (Math.abs(s.pos - s.start) / (s.k * s.amp) > 35 || Math.abs(s.v) > 0.25)) t = base + (s.pos > s.start ? 1 : -1);
       s.target = Math.max(base - 3, Math.min(base + 3, t)); s.fast = true; kick.current();
       suppress.current = true; window.setTimeout(() => { suppress.current = false; }, 60); }
     if (e.pointerType === 'touch') window.setTimeout(() => { paused.current = false; }, 4000);
@@ -956,8 +1010,11 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const onWheel = (e: React.WheelEvent) => {
     const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
     if (Math.abs(dx) < 4 || (!e.shiftKey && Math.abs(e.deltaX) <= Math.abs(e.deltaY))) return;
-    const now = e.timeStamp; const fresh = now - wheelT.current > 350; wheelT.current = now;
-    if (fresh) step(dx > 0 ? 1 : -1);
+    // trackpad: one card per gesture (a gesture ends after 300 ms without events), trigger after ~25 px accumulated
+    const now = e.timeStamp;
+    if (now - wheelT.current > 300) { wheelAcc.current = 0; wheelArm.current = true; }
+    wheelT.current = now; wheelAcc.current += dx;
+    if (wheelArm.current && Math.abs(wheelAcc.current) > 25) { wheelArm.current = false; step(wheelAcc.current > 0 ? 1 : -1); }
   };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); } else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
@@ -968,12 +1025,12 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     <section ref={root} id="features" data-vis={vis ? '1' : '0'} className="relative overflow-hidden pt-3 pb-8 md:pt-5 md:pb-12" style={{ background: 'var(--c-void, #0b0c0e)' }}>
       <style>{FX_CSS}{CF_CSS}</style>
       <h2 className="sr-only">{ui.heading}</h2>
-      <Circuit />
+      {phone ? null : <Circuit />}
 
       <div ref={stage} className="cf-stage" role="region" aria-roledescription="carousel" aria-label={ui.heading} tabIndex={0}
         onKeyDown={onKey} onPointerDown={onDown} onPointerMove={onMoveP} onPointerUp={onUp} onPointerCancel={onCancel} onWheel={onWheel} onDragStart={(e) => e.preventDefault()} onClickCapture={(e) => { if (suppress.current) { e.preventDefault(); e.stopPropagation(); } }}
         onFocus={hold(true)} onBlur={hold(false)}>
-        <div aria-hidden="true" className="cf-space" />
+        {phone ? <CircuitPhone /> : <div aria-hidden="true" className="cf-space" />}
         <div className="cf-ring">
           {ORDER.map((o, i) => {
             const it = ui.items[o];
@@ -982,7 +1039,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
             const M = MOCK_BY[o];
             const tag = it.title.split(/\s+[&·]\s+|,\s*/)[0];
             const cur = i === idx;
-            const near = Math.min((i - idx + N) % N, (idx - i + N) % N) <= 2;
+            const near = Math.min((i - idx + N) % N, (idx - i + N) % N) <= (phone ? 1 : 2);
             return (
               <div key={i} ref={(el) => { cardEl.current[i] = el; }} className="cf-card" data-act={cur ? '1' : '0'} aria-hidden={cur ? undefined : true}
                 onMouseEnter={() => { if (!touch.current && S.current.dx === null) setHov(i); }} onMouseLeave={() => { if (S.current.hov === i) setHov(-1); }}>
@@ -1017,6 +1074,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
           ))}
         </div>
       </div>
+      <p className="cf-note">{ui.carouselNote}</p>
     </section>
   );
 }

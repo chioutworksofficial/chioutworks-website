@@ -9,7 +9,6 @@ import { SITE_UI } from './i18n';
 import { OUTRO_UI } from './i18n/outro';
 import { FAQ_PAGE_UI } from './i18n/faqPage';
 import Logo from './Logo';
-import NewsletterBox from './NewsletterBox';
 import { SITE_CHECK_UI } from './i18n/siteCheck';
 
 // text sits over the globe outline — a soft dark halo keeps it readable without a visible box
@@ -23,7 +22,7 @@ export default function SiteFooter({ lang, variant = 'default' }: { lang: Lang; 
   const ui = SITE_UI[lang];
   const o = OUTRO_UI[lang];
   const nav: readonly string[] = NAV[lang];
-  const pages: [PageKey, string][] = [['services', nav[0]], ['portfolio', nav[2]], ['resources', RESOURCES_NAV[lang]], ['tools', TOOLS_KICKER[lang]], ['demos', nav[3]], ['about', nav[1]], ['blog', ui.blogLabel], ['faq', FAQ_PAGE_UI[lang].nav], ['siteCheck', SITE_CHECK_UI[lang].word], ['contact', nav[4]]];
+  const pages: [PageKey, string][] = [['services', nav[0]], ['portfolio', nav[2]], ['resources', RESOURCES_NAV[lang]], ['tools', TOOLS_KICKER[lang]], ['demos', nav[3]], ['about', nav[1]], ['blog', ui.blogLabel], ['faq', FAQ_PAGE_UI[lang].nav], ['siteCheck', SITE_CHECK_UI[lang].wordShort], ['contact', nav[4]]];
   const legal: [PageKey, string][] = [['privacy', FOOTER_LEGAL[lang][0]], ['terms', FOOTER_LEGAL[lang][1]], ['docs', FOOTER_LEGAL[lang][2]]];
 
   return (
@@ -52,8 +51,6 @@ export default function SiteFooter({ lang, variant = 'default' }: { lang: Lang; 
             </ul>
           </nav>
         </div>
-
-        <div className="mt-8"><NewsletterBox lang={lang} source="footer" /></div>
 
         <div className="mt-10 pt-2 flex flex-wrap items-center justify-between gap-4">
           <p style={{ fontSize: 13, color: 'var(--c-mist)', textShadow: halo }}>© {new Date().getFullYear()} Chioutworks</p>
