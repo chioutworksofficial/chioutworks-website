@@ -20,11 +20,13 @@ const ResourcesPage = lazy(() => import('./site/pages/ResourcesPage'));
 const ToolsPage = lazy(() => import('./site/pages/ToolsPage'));
 const ToolPage = lazy(() => import('./site/pages/ToolsPage').then((m) => ({ default: m.ToolPage })));
 const PackagePage = lazy(() => import('./site/pages/PackagePage'));
+const SiteCheckPage = lazy(() => import('./site/pages/SiteCheckPage'));
 const BlogArticle = lazy(() => import('./site/pages/BlogArticle'));
 import { BLOG_IDS } from './data/blogIds.js';
 import { PACKAGE_IDS, type PackageId } from './site/i18n/packageIds.js';
 import { toolById } from './data/affiliates';
 import SectionDots from './site/SectionDots';
+import SiteCheckCta from './site/SiteCheckCta';
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
 import type { PageKey } from './lib/routes';
 import { initSmoothScroll, getLenis } from './lib/smoothScroll';
@@ -137,6 +139,7 @@ const PAGES: Record<SitePage, (lang: Lang) => ReactNode> = {
       <IndustriesWheel lang={lang} />
       <Defer minH="40vh"><PartnerStrip lang={lang} /></Defer>
       <Defer id="roi" minH="100vh"><RoiCalculator lang={lang} /></Defer>
+      <SiteCheckCta lang={lang} />
     </>
   ),
   services: (lang) => <ServicesPage lang={lang} />,
@@ -148,6 +151,7 @@ const PAGES: Record<SitePage, (lang: Lang) => ReactNode> = {
   resources: (lang) => <ResourcesPage lang={lang} />,
   contact: (lang) => <ContactPage lang={lang} />,
   tools: (lang) => <ToolsPage lang={lang} />,
+  siteCheck: (lang) => <SiteCheckPage lang={lang} />,
   packages: (lang) => <Defer id="popular" minH="80vh"><PopularPackages lang={lang} /></Defer>,
 };
 

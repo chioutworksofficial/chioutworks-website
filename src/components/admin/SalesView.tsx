@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, fmtDate } from './api';
 import { useNote } from './bulk';
+import SiteChecksPanel from './SiteChecksPanel';
 
 type St = 'new' | 'to_call' | 'called' | 'interested' | 'not_interested' | 'won' | 'lost';
 const ST: Record<St, string> = { new: 'Yeni', to_call: 'Aranacak', called: 'Arandı', interested: 'İlgili', not_interested: 'İlgisiz', won: 'Kazanıldı', lost: 'Kaybedildi' };
 interface Analysis { company: string; city: string; country: string; sector: string; summary: string; has: string[]; missing: string[]; reasonable_cause: string; grade: 'A' | 'B' | 'C' | 'D'; grade_reason: string; first_step: string; opener: string }
 interface Signals { https: boolean; viewport: boolean; hasForm: boolean; booking: string[]; chat: string[]; whatsapp: boolean; hreflang: string[]; title: string; description: string; socials: string[] }
-interface Lead { id: string; createdAt: string; url: string; domain: string; analysis: Analysis; signals: Signals; phone?: string; email?: string; status: St; notes: { at: string; text: string }[]; analyzedAt?: string }
+interface Lead { id: string; createdAt: string; url: string; domain: string; analysis: Analysis; signals: Signals; phone?: string; email?: string; status: St; tags?: string[]; notes: { at: string; text: string }[]; analyzedAt?: string }
 const msgOf = (x: unknown, d: string) => (x instanceof ApiError ? x.data?.message ?? (x.status === 401 ? 'Oturum süresi doldu, yeniden giriş yapın.' : d) : d);
+const TAG: Record<string, string> = { opt_in: 'izinli', marketing_ok: 'pazarlama izni' };
 const yn = (b: boolean) => (b ? 'Evet' : 'Hayır');
 
 export default function SalesView() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
-  const [fSt, setFSt] = useState(''); const [fGr, setFGr] = useState('');
+  const [fSt, setFSt] = useState(''); const [fGr, setFGr] = useState(''); const [fTag, setFTag] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [note, setNoteText] = useState('');
@@ -36,7 +38,7 @@ export default function SalesView() {
   const toVa = (id: string) => act(() => api(`/api/admin/sales/leads/${id}/to-voice-agent`, 'POST'), 'Voice Agent kuyruğuna eklendi.', 'Eklenemedi.');
   const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); n.show({ ok: true, text: 'Kopyalandı.' }); } catch { n.show({ ok: false, text: 'Kopyalanamadı, elle seçin.' }); } };
 
-  const shown = leads.filter((l) => (!fSt || l.status === fSt) && (!fGr || l.analysis.grade === fGr));
+  const shown = leads.filter((l) => (!fSt || l.status === fSt) && (!fGr || l.analysis.grade === fGr) && (!fTag || (l.tags ?? []).includes(fTag)));
   const cur = leads.find((l) => l.id === open);
   const why = (l: Lead) => (!l.analysis.reasonable_cause ? 'Makul sebep yok' : !l.phone ? 'Telefon bulunamadı' : '');
   const chips = (a: string[], empty: string) => (a.length ? <div className="adm-chips" style={{ marginBottom: 0 }}>{a.map((x) => <span key={x} className="adm-chip">{x}</span>)}</div> : <span className="adm-meta">{empty}</span>);
@@ -60,10 +62,11 @@ export default function SalesView() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <select className="adm-input" aria-label="Duruma göre filtre" style={{ width: 'auto' }} value={fSt} onChange={(e) => setFSt(e.target.value)}><option value="">Tüm durumlar</option>{(Object.keys(ST) as St[]).map((s) => <option key={s} value={s}>{ST[s]}</option>)}</select>
           <select className="adm-input" aria-label="Puana göre filtre" style={{ width: 'auto' }} value={fGr} onChange={(e) => setFGr(e.target.value)}><option value="">Tüm puanlar</option>{['A', 'B', 'C', 'D'].map((g) => <option key={g} value={g}>{g}</option>)}</select>
+          <select className="adm-input" aria-label="Etikete göre filtre" style={{ width: 'auto' }} value={fTag} onChange={(e) => setFTag(e.target.value)}><option value="">Tüm etiketler</option>{Object.entries(TAG).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>
         </div>
         {!shown.length ? <div className="adm-empty">Kayıt yok</div> : <div className="adm-table-wrap"><table className="adm-table"><thead><tr><th>Firma</th><th>Şehir</th><th>Sektör</th><th>Puan</th><th>Makul sebep</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>{shown.map((l) => (
           <tr key={l.id}>
-            <td>{l.analysis.company || l.domain}<div className="adm-meta">{l.domain}</div></td><td>{l.analysis.city || '-'}</td><td>{l.analysis.sector || '-'}</td>
+            <td>{l.analysis.company || l.domain}<div className="adm-meta">{l.domain}</div>{(l.tags ?? []).filter((t) => TAG[t]).map((t) => <span key={t} className="adm-chip" style={{ marginRight: 4 }}>{TAG[t]}</span>)}</td><td>{l.analysis.city || '-'}</td><td>{l.analysis.sector || '-'}</td>
             <td><span className="adm-chip" data-state={`g${l.analysis.grade}`}>{l.analysis.grade}</span></td>
             <td style={{ whiteSpace: 'normal', minWidth: 180, maxWidth: 280 }} title={l.analysis.reasonable_cause}>{l.analysis.reasonable_cause ? (l.analysis.reasonable_cause.length > 90 ? `${l.analysis.reasonable_cause.slice(0, 90)}…` : l.analysis.reasonable_cause) : '-'}</td>
             <td><select className="adm-input" aria-label="Durum" style={{ width: 'auto', padding: '4px 8px', fontSize: 12 }} value={l.status} onChange={(e) => setSt(l.id, e.target.value as St)}>{(Object.keys(ST) as St[]).map((s) => <option key={s} value={s}>{ST[s]}</option>)}</select></td>
@@ -75,6 +78,8 @@ export default function SalesView() {
                 <button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setConfirm(l.id)}>Sil</button></span>}</td>
           </tr>))}</tbody></table></div>}
       </div>
+
+      <SiteChecksPanel />
 
       {cur && <>
         <div className="adm-drawer-bg" onClick={() => setOpen(null)} />

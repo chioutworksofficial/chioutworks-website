@@ -1,4 +1,4 @@
-// Newsletter / e-mail campaign infrastructure (prepared, not yet shown on the site).
+// Newsletter / e-mail campaign infrastructure (live on the site: footer box + website-check thank-you page).
 // Rules (UWG §7, GDPR): separate unticked opt-in, double opt-in (confirmation link), proof of consent, one-click
 // unsubscribe in every mail (also RFC 8058 List-Unsubscribe-Post), and unsubscribed addresses are never mailed again.
 // Storage: data/newsletter.json. No campaign sending here yet: future senders must call canSend() and add the
@@ -9,7 +9,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { dbOn, dbSelect, dbUpsert } from './db.js';
+import { dbOn, dbSelect, dbUpsert, dbDelete } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORE = path.join(__dirname, '../data/newsletter.json');
@@ -43,6 +43,26 @@ const save = async (s: Subscriber) => {
   await dbUpsert(TABLE, { id: s.id, email: s.email, token: s.token, status: s.status, data: s }, 'id');
 };
 
+const all = async (): Promise<Subscriber[]> => (dbOn() ? (await dbSelect<{ data: Subscriber }>(TABLE, 'select=data')).map((r) => r.data) : read());
+const emailKey = (e: string) => e.trim().toLowerCase();
+/** Marketing consent proven elsewhere (double opt-in on the website-check form): subscriber becomes active. */
+export async function nlActivate(email: string, lang: L, source: string) {
+  const e = emailKey(email); const now = new Date().toISOString();
+  const s = (await find('email', e)) ?? { id: crypto.randomUUID(), email: e, lang, source, status: 'pending' as const, token: crypto.randomBytes(24).toString('base64url'), consentVersion: CONSENT_TEXT_VERSION, createdAt: now, confirmedAt: null, unsubscribedAt: null };
+  s.status = 'active'; s.confirmedAt = now; s.unsubscribedAt = null; await save(s);
+}
+/** Stop mailing an address for good (suppression entry: only the status stays). */
+export async function nlSuppress(email: string, lang: L = 'en') {
+  const e = emailKey(email); const now = new Date().toISOString();
+  const s = (await find('email', e)) ?? { id: crypto.randomUUID(), email: e, lang, source: 'suppress', status: 'unsubscribed' as const, token: crypto.randomBytes(24).toString('base64url'), consentVersion: CONSENT_TEXT_VERSION, createdAt: now, confirmedAt: null, unsubscribedAt: now };
+  s.status = 'unsubscribed'; s.unsubscribedAt ??= now; await save(s);
+}
+export async function nlDeleteByEmail(email: string) {
+  const s = await find('email', emailKey(email)); if (!s) return;
+  if (dbOn()) return dbDelete(TABLE, `id=eq.${encodeURIComponent(s.id)}`);
+  write(read().filter((x) => x.id !== s.id));
+}
+
 /** Only confirmed, not unsubscribed addresses may receive campaign mail. */
 export async function canSend(email: string): Promise<boolean> {
   const s = await find('email', email.trim().toLowerCase());
@@ -64,7 +84,7 @@ const PAGE: Record<L, { ok: string; okBody: string; out: string; outBody: string
 const html = (lang: L, title: string, body: string) => `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0c0e;color:#d7dceb;font:16px/1.6 system-ui,sans-serif}main{max-width:460px;padding:32px;border:1px solid #24375a;border-radius:12px;background:#0e111b}h1{margin:0 0 8px;font-size:22px;color:#fff}</style></head><body><main><h1>${title}</h1><p>${body}</p></main></body></html>`;
 
-interface Deps { rateSkip?: () => boolean; sendConfirm?: (to: string, lang: L, confirmUrl: string, unsubUrl: string) => Promise<boolean> }
+interface Deps { rateSkip?: () => boolean; onUnsubscribe?: (email: string) => Promise<void> | void; sendConfirm?: (to: string, lang: L, confirmUrl: string, unsubUrl: string) => Promise<boolean> }
 
 import { validate as v, z, s as str, bool, email } from './validate.js';
 const nlSubS = z.object({ website: str(2000), ft: str(500), email, consent: bool, lang: str(8), source: str(40) });
@@ -101,8 +121,29 @@ export function registerNewsletter(app: Express, d: Deps) {
     const s = await find('token', token);
     if (!s) return res.status(404).type('html').send(html('en', PAGE.en.bad, ''));
     if (s.status !== 'unsubscribed') { s.status = 'unsubscribed'; s.unsubscribedAt = new Date().toISOString(); await save(s); }
+    await Promise.resolve(d.onUnsubscribe?.(s.email)).catch(() => undefined);
     return res.type('html').send(html(s.lang, PAGE[s.lang].out, PAGE[s.lang].outBody));
   };
   app.get('/api/newsletter/unsubscribe', unsubscribe);
   app.post('/api/newsletter/unsubscribe', v(nlUnsubS), unsubscribe);
+}
+
+/** Admin: subscriber list (count, status, unsubscribe, delete). Tokens never leave the server. */
+export function registerNewsletterAdmin(app: Express, deps: { requireAdmin: (req: Request, res: Response) => Promise<boolean>; onUnsubscribe?: (email: string) => Promise<void> | void }) {
+  const A = '/api/admin/newsletter'; const onUnsub = deps.onUnsubscribe;
+  const guard = (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response) =>
+    deps.requireAdmin(req, res).then((ok) => (ok ? fn(req, res) : undefined)).catch(() => { if (!res.headersSent) res.status(500).json({ error: 'server', message: 'Sunucu hatası.' }); });
+  app.get(A, guard(async (_req, res) => {
+    const list = (await all()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(({ token, ...x }) => x);
+    return res.json({ subscribers: list });
+  }));
+  const byId = async (id: string) => (await all()).find((x) => x.id === id);
+  app.post(`${A}/:id/unsubscribe`, guard(async (req, res) => {
+    const s = await byId(String(req.params.id)); if (!s) return res.status(404).json({ error: 'not_found' });
+    await nlSuppress(s.email, s.lang); await Promise.resolve(onUnsub?.(s.email)).catch(() => undefined); return res.json({ ok: true });
+  }));
+  app.delete(`${A}/:id`, guard(async (req, res) => {
+    const s = await byId(String(req.params.id)); if (s) { await nlDeleteByEmail(s.email); await Promise.resolve(onUnsub?.(s.email)).catch(() => undefined); }
+    return res.json({ ok: true });
+  }));
 }

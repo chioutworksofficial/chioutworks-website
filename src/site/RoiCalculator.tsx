@@ -11,6 +11,7 @@ import {
   type RoiCalc, type RoiTask, type SectorKey,
 } from '../lib/roiModel';
 import { ROI_SECTORS, ROI_UI } from './i18n/roi';
+import { SITE_CHECK_UI } from './i18n/siteCheck';
 import BtnArrow from './BtnArrow';
 import { guardFields, prefetchFormToken } from '../lib/formGuard';
 
@@ -54,6 +55,9 @@ function Inner({ lang }: { lang: Lang }) {
   const [repName, setRepName] = useState('');
   const [repCompany, setRepCompany] = useState('');
   const [customSector, setCustomSector] = useState('');
+  const [repEmailConsent, setRepEmailConsent] = useState(false);
+  const [repEmailSent, setRepEmailSent] = useState(false);
+  const [repEmailErr, setRepEmailErr] = useState(false);
   const [repEmail, setRepEmail] = useState('');   // visitor's own industry when "other" is chosen
   const sectorName = (s: SectorKey) => (s === 'other' && customSector.trim() ? customSector.trim() : ROI_SECTORS[lang][s].label);
   const money = useCallback((v: number) => fmtMoney(lang, currency, v), [lang, currency]);
@@ -116,9 +120,12 @@ function Inner({ lang }: { lang: Lang }) {
   const download = () => {
     // Optional e-mail: kept with the calculation so the owner can reply (no newsletter); the PDF itself is made in the browser
     const mail = repEmail.trim();
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail)) {
+    if (mail && !repEmailConsent) { setRepEmailErr(true); return; }   // an e-mail needs its consent box
+    setRepEmailErr(false);
+    if (repEmailConsent && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail)) {
+      setRepEmailSent(true);
       void guardFields().then((g) => fetch('/api/roi-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
-        body: JSON.stringify({ email: mail, name: repName.trim(), company: repCompany.trim(), lang, page: window.location.pathname, roiCalc: calc(), ...g }) })).catch(() => {});
+        body: JSON.stringify({ email: mail, name: repName.trim(), company: repCompany.trim(), lang, page: window.location.pathname, roiCalc: calc(), consent: true, ...g }) })).catch(() => {});
     }
     const done = () => { document.body.classList.remove('roi-printing'); window.removeEventListener('afterprint', done); };
     document.body.classList.add('roi-printing');
@@ -241,6 +248,10 @@ function Inner({ lang }: { lang: Lang }) {
                 <label className="mt-3 flex flex-col gap-1 min-w-0" style={{ fontSize: 11, color: 'var(--lq-silver)', maxWidth: 360 }}>{ui.repEmail}
                   <input type="email" autoComplete="email" maxLength={254} value={repEmail} onChange={(e) => setRepEmail(e.target.value)} style={input} /></label>
                 <p className="mt-2" style={{ fontSize: 12, color: 'var(--lq-silver)' }}>{ui.repEmailNote}</p>
+                {repEmail.trim() && <label className="mt-2 flex gap-2 items-start" style={{ fontSize: 12.5, lineHeight: 1.45, color: 'var(--lq-silver)', maxWidth: 480 }}>
+                  <input type="checkbox" checked={repEmailConsent} onChange={(e) => setRepEmailConsent(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, flex: '0 0 auto', accentColor: 'var(--lq-g2)' }} /><span>{SITE_CHECK_UI[lang].roiConsent}</span></label>}
+                {repEmailErr && <p role="alert" className="mt-2" style={{ fontSize: 12.5, color: 'var(--lq-white)' }}>{SITE_CHECK_UI[lang].errConsent}</p>}
+                {repEmailSent && <p role="status" className="mt-2" style={{ fontSize: 12.5, color: 'var(--lq-mist)' }}>{SITE_CHECK_UI[lang].roiPending}</p>}
                 <button type="button" onClick={download} className="mt-3 lq-btn-ghost" style={{ lineHeight: 1.5, paddingBlock: 12 }}>{ui.download}<BtnArrow /></button>
               </details>
             </div>

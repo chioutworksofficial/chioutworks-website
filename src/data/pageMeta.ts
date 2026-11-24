@@ -20,6 +20,7 @@ export const PAGE_META: Record<Lang, Partial<Record<PageKey, Meta>>> = {
     docs: { title: 'Documentation & Imprint — Chioutworks', description: 'How Chioutworks works, FAQ and legal notice.' },
     tools: { title: 'Tools I use and recommend — Chioutworks', description: 'Hosting, banking and more: the tools I really use in my work, why, who they suit and their honest downsides.' },
     packages: { title: 'Most popular solutions — Chioutworks', description: 'CRM, business website, online booking, AI assistant, quote and invoice automation, QR menu: what is included and how it works.' },
+    siteCheck: { title: 'Free website check — Chioutworks', description: 'Enter your website and get scores in 6 areas and the 5 most important fixes by e-mail. Free, no call.' },
   },
   de: {
     home: { title: 'Chioutworks — Automatisierung, Webentwicklung & KI-Integration', description: 'Automatisierung, individuelle Webanwendungen, KI-Integration und digitale Strategie für kleine und mittlere Unternehmen.' },
@@ -36,6 +37,7 @@ export const PAGE_META: Record<Lang, Partial<Record<PageKey, Meta>>> = {
     docs: { title: 'Dokumentation & Impressum — Chioutworks', description: 'Arbeitsweise, häufige Fragen und Impressum von Chioutworks.' },
     tools: { title: 'Tools, die ich nutze und empfehle — Chioutworks', description: 'Hosting, Konto und mehr: die Tools, die ich in meiner Arbeit wirklich nutze, warum, für wen sie passen und ihre ehrlichen Schwächen.' },
     packages: { title: 'Die beliebtesten Lösungen — Chioutworks', description: 'CRM, Unternehmenswebsite, Online-Terminbuchung, KI-Assistent, Angebots- und Rechnungsautomatik, QR-Speisekarte: Inhalte und Ablauf.' },
+    siteCheck: { title: 'Kostenloser Website-Check — Chioutworks', description: 'Website-Adresse eingeben und Bewertungen in 6 Bereichen sowie die 5 wichtigsten Verbesserungen per E-Mail erhalten. Kostenlos, ohne Anruf.' },
   },
   tr: {
     home: { title: 'Chioutworks — Otomasyon, Web Geliştirme ve Yapay Zekâ Entegrasyonu', description: 'Küçük ve orta ölçekli işletmeler için iş otomasyonu, özel web uygulamaları, yapay zekâ entegrasyonu ve dijital strateji.' },
@@ -52,6 +54,7 @@ export const PAGE_META: Record<Lang, Partial<Record<PageKey, Meta>>> = {
     docs: { title: 'Belgeler ve Künye — Chioutworks', description: 'Çalışma şekli, sık sorulan sorular ve yasal bilgiler.' },
     tools: { title: 'Kullandığım ve önerdiğim araçlar — Chioutworks', description: 'Hosting, banka ve daha fazlası: işimde gerçekten kullandığım araçlar, neden kullandığım, kimin işine yaradığı ve dürüst eksileri.' },
     packages: { title: 'En çok tercih edilen çözümler — Chioutworks', description: 'CRM, kurumsal web sitesi, online randevu, yapay zekâ asistanı, teklif ve fatura otomasyonu, QR menü: neler dahil, nasıl çalışır.' },
+    siteCheck: { title: 'Ücretsiz web sitesi kontrolü — Chioutworks', description: 'Web sitenizin adresini yazın, 6 alanda puanları ve en önemli 5 düzeltmeyi e-postayla alın. Ücretsiz, telefon görüşmesi yok.' },
   },
   el: {
     home: { title: 'Chioutworks — Αυτοματισμός, Ανάπτυξη Ιστού & Τεχνητή Νοημοσύνη', description: 'Αυτοματισμός διαδικασιών, εφαρμογές ιστού κατά παραγγελία, ενσωμάτωση τεχνητής νοημοσύνης και ψηφιακή στρατηγική για μικρές και μεσαίες επιχειρήσεις.' },
@@ -68,5 +71,6 @@ export const PAGE_META: Record<Lang, Partial<Record<PageKey, Meta>>> = {
     docs: { title: 'Τεκμηρίωση & Νομικές πληροφορίες — Chioutworks', description: 'Τρόπος εργασίας, συχνές ερωτήσεις και νομικές πληροφορίες.' },
     tools: { title: 'Εργαλεία που χρησιμοποιώ και προτείνω — Chioutworks', description: 'Φιλοξενία, τράπεζα και άλλα: τα εργαλεία που χρησιμοποιώ πραγματικά στη δουλειά μου, γιατί, σε ποιον ταιριάζουν και τα ειλικρινή τους μειονεκτήματα.' },
     packages: { title: 'Οι πιο δημοφιλείς λύσεις — Chioutworks', description: 'CRM, επαγγελματική ιστοσελίδα, ηλεκτρονικά ραντεβού, βοηθός ΤΝ, αυτοματισμός προσφορών και τιμολογίων, κατάλογος QR: τι περιλαμβάνεται και πώς λειτουργεί.' },
+    siteCheck: { title: 'Δωρεάν έλεγχος ιστοσελίδας — Chioutworks', description: 'Γράψτε τη διεύθυνση της ιστοσελίδας σας και λάβετε με e-mail βαθμολογίες σε 6 τομείς και τις 5 σημαντικότερες βελτιώσεις. Δωρεάν, χωρίς τηλεφώνημα.' },
   },
 };

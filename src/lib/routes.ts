@@ -6,13 +6,13 @@ import type { Lang } from '../translations.js';
 
 export const LANGS: Lang[] = ['en', 'de', 'tr', 'el'];
 
-export type PageKey = 'home' | 'services' | 'about' | 'portfolio' | 'demos' | 'blog' | 'faq' | 'resources' | 'contact' | 'solutions' | 'privacy' | 'terms' | 'docs' | 'tools' | 'packages';
+export type PageKey = 'home' | 'services' | 'about' | 'portfolio' | 'demos' | 'blog' | 'faq' | 'resources' | 'contact' | 'solutions' | 'privacy' | 'terms' | 'docs' | 'tools' | 'packages' | 'siteCheck';
 
 export const SLUGS: Record<Lang, Record<PageKey, string>> = {
-  en: { home: 'home', services: 'services', about: 'about', portfolio: 'portfolio', demos: 'demos', blog: 'blog', faq: 'faq', resources: 'resources', contact: 'contact', solutions: 'solutions', privacy: 'privacy', terms: 'terms', docs: 'docs', tools: 'tools', packages: 'packages' },
-  de: { home: 'startseite', services: 'leistungen', about: 'ueber-mich', portfolio: 'portfolio', demos: 'demos', blog: 'blog', faq: 'faq', resources: 'ressourcen', contact: 'kontakt', solutions: 'loesungen', privacy: 'datenschutz', terms: 'agb', docs: 'dokumentation', tools: 'werkzeuge', packages: 'pakete' },
-  tr: { home: 'ana-sayfa', services: 'hizmetler', about: 'hakkimda', portfolio: 'portfoy', demos: 'demolar', blog: 'blog', faq: 'sss', resources: 'kaynaklar', contact: 'iletisim', solutions: 'cozumler', privacy: 'gizlilik', terms: 'kullanim-kosullari', docs: 'belgeler', tools: 'araclar', packages: 'paketler' },
-  el: { home: 'arxiki', services: 'ypiresies', about: 'schetika', portfolio: 'erga', demos: 'epideixeis', blog: 'arthra', faq: 'syxnes-erotiseis', resources: 'poroi', contact: 'epikoinonia', solutions: 'lyseis', privacy: 'aporrito', terms: 'oroi-xrisis', docs: 'tekmiriosi', tools: 'ergaleia', packages: 'paketa' },
+  en: { home: 'home', services: 'services', about: 'about', portfolio: 'portfolio', demos: 'demos', blog: 'blog', faq: 'faq', resources: 'resources', contact: 'contact', solutions: 'solutions', privacy: 'privacy', terms: 'terms', docs: 'docs', tools: 'tools', packages: 'packages', siteCheck: 'free-website-check' },
+  de: { home: 'startseite', services: 'leistungen', about: 'ueber-mich', portfolio: 'portfolio', demos: 'demos', blog: 'blog', faq: 'faq', resources: 'ressourcen', contact: 'kontakt', solutions: 'loesungen', privacy: 'datenschutz', terms: 'agb', docs: 'dokumentation', tools: 'werkzeuge', packages: 'pakete', siteCheck: 'kostenloser-website-check' },
+  tr: { home: 'ana-sayfa', services: 'hizmetler', about: 'hakkimda', portfolio: 'portfoy', demos: 'demolar', blog: 'blog', faq: 'sss', resources: 'kaynaklar', contact: 'iletisim', solutions: 'cozumler', privacy: 'gizlilik', terms: 'kullanim-kosullari', docs: 'belgeler', tools: 'araclar', packages: 'paketler', siteCheck: 'ucretsiz-site-kontrolu' },
+  el: { home: 'arxiki', services: 'ypiresies', about: 'schetika', portfolio: 'erga', demos: 'epideixeis', blog: 'arthra', faq: 'syxnes-erotiseis', resources: 'poroi', contact: 'epikoinonia', solutions: 'lyseis', privacy: 'aporrito', terms: 'oroi-xrisis', docs: 'tekmiriosi', tools: 'ergaleia', packages: 'paketa', siteCheck: 'dorean-elegxos-istoselidas' },
 };
 
 /** Private client intake form: /:lang/<slug>/:token (noindex, not in sitemap, not a PageKey) */

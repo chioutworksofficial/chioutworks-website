@@ -21,7 +21,9 @@ import { registerOffers } from './offers.js';
 import { registerBilling } from './billing.js';
 import { registerProjects } from './projects.js';
 import { registerStyles, saveChoice } from './styles.js';
-import { registerNewsletter } from './newsletter.js';
+import { registerNewsletter, registerNewsletterAdmin } from './newsletter.js';
+import { registerSiteCheck, stripMarketingTag } from './siteCheck.js';
+import { confirmMail } from './mail.js';
 import { registerAnalytics } from './analytics.js';
 import { registerAffiliates } from './affiliates.js';
 import { registerVoiceAgent } from './voiceAgent.js';
@@ -345,7 +347,7 @@ const demoReqS = z.object({ email, name: s(80), phone: s(60), demo: s(40), lang:
 const demoVerS = z.object({ code: s(16) });
 const quoteS = z.object({ ...WS, email, name: s(80), business: s(100), message: s(1000), demo: s(40), lang: LANG.nullish(), kind: s(20), modules: z.array(z.string().max(30)).max(20).nullish() });
 const loginS = z.object({ password: s(500), remember: bool });
-const roiS = z.object({ ...WS, email, name: s(80), company: s(100), lang: LANG.nullish(), page: s(200), roiCalc: z.any().optional() });
+const roiS = z.object({ ...WS, email, consent: bool, name: s(80), company: s(100), lang: LANG.nullish(), page: s(200), roiCalc: z.any().optional() });
 const consentS = z.object({ id: z.string().regex(/^[0-9a-f-]{36}$/i), v: z.number().int(), functional: bool, statistics: bool.optional() });
 const availS = z.object({ blocked: z.array(z.string().max(10)).max(1000) });
 const wizS = z.object({ site: s(200), contactWhen: z.enum(['', 'morning', 'afternoon', 'evening', 'any']).nullish(), startWhen: z.enum(['', 'asap', '1m', '3m', 'explore']).nullish(),
@@ -646,11 +648,12 @@ app.get('/api/rates', async (_req, res) => {
 });
 
 // Savings calculator: optional e-mail left when downloading the PDF report → request in admin (source "calculator").
-// Stored only to reply in writing; no newsletter (marketing needs a separate double opt-in, see server/newsletter.ts).
+// E-mail is stored (as a request) only after an explicit consent box AND the double opt-in click (server/siteCheck.ts); no newsletter.
 app.post('/api/roi-report', quoteLimiter, botGate, v(roiS), async (req, res) => {
   const str = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
   const email = str(req.body?.email, 254).toLowerCase();
   if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
+  if (req.body?.consent !== true) return res.status(400).json({ error: 'consent_required' });
   const roiCalc = sanitizeRoi(req.body?.roiCalc);
   const rec = {
     id: crypto.randomUUID(), createdAt: new Date().toISOString(), kind: 'contact', source: 'calculator' as RequestSource,
@@ -660,7 +663,7 @@ app.post('/api/roi-report', quoteLimiter, botGate, v(roiS), async (req, res) => 
     ...(roiCalc ? { roiCalc } : {}),
   };
   try {
-    await saveRequest(rec);
+    await siteCheck.startRoiOptIn(req, rec);   // saved as a request only after the confirmation click
     return res.json({ ok: true });
   } catch (err) {
     void recordError('roi-report/save-failed', err); console.error('[roi-report] save failed', err);
@@ -1781,8 +1784,11 @@ registerStyles(app, {
   },
 });
 
-// Newsletter infrastructure (double opt-in + one-click unsubscribe); not shown on the site yet, confirmation mails need a verified domain
-registerNewsletter(app, { rateSkip: demoLimitSkip });
+// Newsletter (double opt-in + one-click unsubscribe), shown in the footer; confirmation mails need a verified sending domain, otherwise the address stays pending
+registerNewsletter(app, { rateSkip: demoLimitSkip, onUnsubscribe: stripMarketingTag, sendConfirm: (to, lang, confirmUrl, unsubUrl) => confirmMail('nl', to, lang, confirmUrl, unsubUrl) });
+registerNewsletterAdmin(app, { requireAdmin, onUnsubscribe: stripMarketingTag });
+// Free website check + calculator e-mail double opt-in (nothing is analysed or mailed before the confirm click)
+const siteCheck = registerSiteCheck(app, { requireAdmin, rateSkip: demoLimitSkip, saveRequest });
 // Cookieless visitor statistics with bot filtering (no IP stored)
 registerAnalytics(app, { requireAdmin, rateSkip: demoLimitSkip });
 registerAffiliates(app, { requireAdmin });
