@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -802,7 +802,7 @@ html[data-mode='light'] .cf-frame{box-shadow:0 16px 36px -14px color-mix(in srgb
 html[data-mode='light'] .cf-tag{background:color-mix(in srgb,var(--c-abyss,#fff) 90%,transparent);border-color:var(--c-hairline,#bccbe3)}
 .cf-tag{position:absolute;top:3cqw;left:50%;transform:translateX(-50%);z-index:4;border-radius:9999px;padding:.5em 1.35em;font-size:clamp(12.5px,2.4cqw,18px);font-weight:700;letter-spacing:.02em;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-void,#0b0c0e) 78%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 14%,transparent);max-width:84%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
 .cf-hit:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
-.cf-card[data-act="0"] .fx,.cf-card[data-act="0"] .fx-dots i{animation-play-state:paused}
+.cf-card[data-act="0"] .fx,.cf-card[data-act="0"] .fx-dots i,.cf-stage[data-mov="1"] .cf-card .fx,.cf-stage[data-mov="1"] .cf-card .fx-dots i{animation-play-state:paused}
 .cf-circp{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:visible}
 .cf-circp .cf-cn,.cf-circp .cf-ct{animation:none}
 .cf-circp .cf-cp{stroke-width:2.4;animation-duration:4.6s}
@@ -813,7 +813,9 @@ html[data-mode='light'] .cf-tag{background:color-mix(in srgb,var(--c-abyss,#fff)
 @media (max-width:767px),(pointer:coarse){
   .cf-stage{margin-top:4px;--w:min(88vw,340px);--h:calc(var(--w)*1.2);--rx:.56;--rz:.89;--ty:.16;--top:calc(var(--h)/2 + 78px);perspective:none;height:calc(var(--h) + 122px)}
   .cf-ring{transform-style:flat}
-  .cf-card::after{transition:none}
+  .cf-card::before,.cf-card::after{transition:none}
+  .cf-cta{opacity:0;transform:none;transition:none}
+  .cf-card.lit .cf-cta{opacity:1}
   .cf-card .fx-root{transform-style:flat;transform:none;transition:none}
   .cf-card .fx-z1,.cf-card .fx-z2{transform:none;transition:none}
   .cf-card,.cf-frame,.cf-hit{border-radius:16px}
@@ -837,6 +839,41 @@ const CULL = 2.5; // cards further than this many slots from the front are hidde
 const CULL_P = 1.5; // phone: only the front card and its two neighbours
 const PHONE_Q = '(pointer: coarse), (max-width: 767px)';
 
+type UI = (typeof FEATURES_UI)['en'];
+type CardP = { i: number; o: number; ui: UI; lang: Lang; cur: boolean; near: boolean; reg: (i: number, el: HTMLDivElement | null) => void; setHov: (i: number) => void; touch: { current: boolean }; go: (i: number) => void; hov: { current: { hov: number } } };
+// memoised with stable props: a front change re-renders only the cards whose cur/near flag flipped
+const Card = memo(function Card({ i, o, ui, lang, cur, near, reg, setHov, touch, go, hov }: CardP) {
+  const it = ui.items[o];
+  const slug = SHOTS[o];
+  const to = slug ? demoPath(lang, slug) + (slug === 'demokafe' ? '?view=qr' : '') : pagePath(lang, 'services');
+  const M = MOCK_BY[o];
+  const tag = it.title.split(/\s+[&·]\s+|,\s*/)[0];
+  const rf = useCallback((el: HTMLDivElement | null) => reg(i, el), [reg, i]);
+  return (
+    <div ref={rf} className="cf-card" data-act={cur ? '1' : '0'} aria-hidden={cur ? undefined : true}
+      onMouseEnter={() => { if (!touch.current) setHov(i); }} onMouseLeave={() => { if (hov.current.hov === i) setHov(-1); }}>
+      <div className="cf-frame">
+        <span className="cf-tag">{tag}</span>
+        <FitBox>
+          <div className="absolute inset-0 pt-2 px-5 pb-5 flex">
+            {near ? <M m={ui.mock} s={ui.sim} x={ui.x} lang={lang} /> : null}
+          </div>
+        </FitBox>
+        <div aria-hidden="true" className="cf-over" />
+        <div className="cf-cap">
+          <div className="min-w-0">
+            <h3 className="cf-t">{it.title}</h3>
+            <p className="cf-s">{it.text}</p>
+          </div>
+          <span className="cf-cta">{slug ? ui.cta.demo : ui.cta.more}</span>
+        </div>
+      </div>
+      <Link to={to} draggable={false} tabIndex={cur ? 0 : -1} aria-label={it.title} className="cf-hit"
+        onClick={(e) => { if (touch.current && !cur) { e.preventDefault(); go(i); } }} />
+    </div>
+  );
+});
+
 export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const ui = FEATURES_UI[lang];
   const root = useRef<HTMLElement>(null);
@@ -852,7 +889,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const kick = useRef<() => void>(() => {});
   const trig = useRef<ScrollTrigger | null>(null);
   // pos: current ring position in card slots; target: set by page scroll; pop: per-card hover pop 0..1
-  const S = useRef({ pos: 0, target: 0, hov: -1, pop: new Array<number>(N).fill(0), cur: 0 });
+  const S = useRef({ pos: 0, target: 0, hov: -1, pop: new Array<number>(N).fill(0), cur: 0, fr: 0 });
 
   // scroll the page so that card i becomes the front card
   const go = useCallback((i: number) => {
@@ -925,7 +962,11 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         if (moving) { calm.current = false; window.clearTimeout(calmT.current); calmT.current = 0; stage.current.dataset.mov = '1'; }
         else if (!calm.current && !calmT.current) calmT.current = window.setTimeout(() => { calmT.current = 0; calm.current = true; stage.current?.removeAttribute('data-mov'); start(); }, 200);
       } else calm.current = true;
-      const cur = ((Math.round(s.pos) % N) + N) % N;
+      const near = ((Math.round(s.pos) % N) + N) % N;
+      // phone: stable front with hysteresis (changes only once the position is 0.15 past the half-way point), so lit/CTA/idx never flicker
+      let df = s.pos - s.fr; df -= Math.round(df / N) * N;
+      if (!ph || Math.abs(df) > 0.65) s.fr = near;
+      const cur = s.fr;
       const settled = !moving;
       for (let i = 0; i < N; i++) {
         const c = cardEl.current[i]; if (!c) continue;
@@ -951,9 +992,9 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         if (c.style.visibility !== 'visible') c.style.visibility = 'visible';
         c.style.pointerEvents = fade < 0.5 ? 'none' : '';
         c.style.willChange = moving ? 'transform, opacity' : '';
-        const lit = s.hov >= 0 ? i === s.hov : i === cur && settled;
+        const lit = s.hov >= 0 ? i === s.hov : i === cur && (ph || settled);
         if (c.classList.contains('lit') !== lit) c.classList.toggle('lit', lit);
-        const act = (ph ? calm.current && i === cur : i === cur || i === s.hov) ? '1' : '0';
+        const act = (ph ? i === cur : i === cur || i === s.hov) ? '1' : '0';
         if (c.dataset.act !== act) c.dataset.act = act;
       }
       if (cur !== s.cur) { s.cur = cur; setIdx(cur); }
@@ -969,7 +1010,8 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     return () => { cancelAnimationFrame(raf); raf = 0; window.clearTimeout(calmT.current); calmT.current = 0; kick.current = () => {}; window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', start); };
   }, [vis, phone]);
 
-  const setHov = (i: number) => { S.current.hov = i; if (i >= 0) stage.current?.setAttribute('data-hov', '1'); else stage.current?.removeAttribute('data-hov'); kick.current(); };
+  const reg = useCallback((i: number, el: HTMLDivElement | null) => { cardEl.current[i] = el; }, []);
+  const setHov = useCallback((i: number) => { S.current.hov = i; if (i >= 0) stage.current?.setAttribute('data-hov', '1'); else stage.current?.removeAttribute('data-hov'); kick.current(); }, []);
 
   return (
     <section ref={root} id="features" data-vis={vis ? '1' : '0'} className="relative overflow-hidden pt-3 pb-8 md:pt-5 md:pb-12 cf-sec" style={{ background: 'var(--c-void, #0b0c0e)' }}>
@@ -981,36 +1023,9 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         {phone ? <CircuitPhone /> : <div aria-hidden="true" className="cf-space" />}
         <div className="cf-ring">
           {ORDER.map((o, i) => {
-            const it = ui.items[o];
-            const slug = SHOTS[o];
-            const to = slug ? demoPath(lang, slug) + (slug === 'demokafe' ? '?view=qr' : '') : pagePath(lang, 'services');
-            const M = MOCK_BY[o];
-            const tag = it.title.split(/\s+[&·]\s+|,\s*/)[0];
             const cur = i === idx;
             const near = Math.min((i - idx + N) % N, (idx - i + N) % N) <= (phone ? 1 : 2);
-            return (
-              <div key={i} ref={(el) => { cardEl.current[i] = el; }} className="cf-card" data-act={cur ? '1' : '0'} aria-hidden={cur ? undefined : true}
-                onMouseEnter={() => { if (!touch.current) setHov(i); }} onMouseLeave={() => { if (S.current.hov === i) setHov(-1); }}>
-                <div className="cf-frame">
-                  <span className="cf-tag">{tag}</span>
-                  <FitBox>
-                    <div className="absolute inset-0 pt-2 px-5 pb-5 flex">
-                      {near ? <M m={ui.mock} s={ui.sim} x={ui.x} lang={lang} /> : null}
-                    </div>
-                  </FitBox>
-                  <div aria-hidden="true" className="cf-over" />
-                  <div className="cf-cap">
-                    <div className="min-w-0">
-                      <h3 className="cf-t">{it.title}</h3>
-                      <p className="cf-s">{it.text}</p>
-                    </div>
-                    <span className="cf-cta">{slug ? ui.cta.demo : ui.cta.more}</span>
-                  </div>
-                </div>
-                <Link to={to} draggable={false} tabIndex={cur ? 0 : -1} aria-label={it.title} className="cf-hit"
-                  onClick={(e) => { if (touch.current && !cur) { e.preventDefault(); go(i); } }} />
-              </div>
-            );
+            return <Card key={i} i={i} o={o} ui={ui} lang={lang} cur={cur} near={near} reg={reg} setHov={setHov} touch={touch} go={go} hov={S} />;
           })}
         </div>
       </div>
