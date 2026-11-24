@@ -159,6 +159,8 @@ export default function Admin() {
 
   const logout = async () => { try { await api('/api/admin/logout', 'POST'); } catch { /* ignore */ } if (DEMO) return; setReqs(null); setSessions(null); setAuth('out'); };
 
+  const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
+
   if (auth === 'checking') return <div data-site-theme="liquid" className="adm-login" />;
   if (auth !== 'in') return <div data-site-theme="liquid"><Login unset={auth === 'unset'} onDone={() => setAuth('in')} /></div>;
 
@@ -172,7 +174,6 @@ export default function Admin() {
     if (!location.pathname.endsWith('/voice-agent')) history.replaceState(null, '', `${location.pathname}${location.search}#${target}`);
     window.scrollTo(0, 0);
   };
-  const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
   const showTip = (e: React.SyntheticEvent<HTMLElement>, text: string) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text, top: r.top + r.height / 2, left: r.right + 10 }); };
   const nav = (sheet: boolean) => GROUPS.map((g) => {
     const sum = g.tabs.reduce((n, t) => n + (badges[t.key] ?? 0), 0);

@@ -932,17 +932,17 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     // One card per gesture: wheel/touch/keys step exactly one card; inertia is swallowed; ends release the page.
     let until = 0, cap = 0, tween: gsap.core.Tween | null = null;
     const pos = (i: number) => (i <= 0 ? st.start + 1 : i >= N - 1 ? st.end - 1 : st.start + ((st.end - st.start) * i) / (N - 1));
-    const jump = (y: number) => { tween?.kill(); tween = null; window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); until = performance.now() + 350; cap = until + 300; };
+    const jump = (y: number) => { tween?.kill(); tween = null; window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); until = performance.now() + 250; cap = until + 150; };
     const step = (dir: 1 | -1) => {
       const now = performance.now();
       // swallow the rest of the same gesture (trackpad/fling inertia), but never longer than `cap` so the next intentional swipe is not blocked
-      if (now < until) { until = Math.min(cap, Math.max(until, now + 120)); return; }
+      if (now < until) { until = Math.min(cap, Math.max(until, now + 90)); return; }
       const i = Math.round(((window.scrollY - st.start) / (st.end - st.start)) * (N - 1));
       const n = i + dir;
       if (n < 0 || n > N - 1) { act(false); window.scrollTo({ top: dir > 0 ? st.end + 2 : st.start - 2, behavior: 'instant' as ScrollBehavior }); return; }
-      const d = reduce.current ? 0 : phone ? 0.32 : 0.38;
+      const d = reduce.current ? 0 : phone ? 0.26 : 0.3;
       const pr = { y: window.scrollY };
-      until = now + d * 1000 + 120; cap = now + d * 1000 + 520;
+      until = now + d * 1000 + 60; cap = now + d * 1000 + 280;
       tween?.kill();
       tween = gsap.to(pr, { y: pos(n), duration: d, ease: 'power2.out', onUpdate: () => { window.scrollTo({ top: pr.y, behavior: 'instant' as ScrollBehavior }); }, onComplete: () => { until = Math.min(cap, Math.max(until, performance.now() + 80)); } });
     };
