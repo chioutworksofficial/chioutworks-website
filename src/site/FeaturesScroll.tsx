@@ -758,7 +758,7 @@ html[data-mode='light'] .cf-cstars circle{fill:var(--c-signal,#2459c8);opacity:.
 .cf-stage[data-hov="1"] .cf-space{opacity:1;visibility:visible;transition-delay:0s}
 .cf-ring{position:absolute;left:50%;top:var(--top);width:0;height:0;transform-style:preserve-3d}
 .cf-card{position:absolute;left:calc(var(--w)/-2);top:calc(var(--h)/-2);width:var(--w);height:var(--h);container-type:inline-size;border-radius:18px;contain:layout style}
-.cf-card::before,.cf-card::after{content:"";position:absolute;inset:0;border-radius:18px;pointer-events:none;opacity:0;transition:opacity .45s}
+.cf-card::before,.cf-card::after{content:"";position:absolute;inset:0;border-radius:18px;pointer-events:none;opacity:calc(var(--depth,0) * .9);transition:opacity .45s}
 .cf-card::before{z-index:-1;visibility:hidden;transition:opacity .45s,visibility 0s .45s;box-shadow:0 0 0 1px color-mix(in srgb,var(--c-lilac,#85a6e9) 55%,transparent),0 30px 90px color-mix(in srgb,var(--c-signal,#2862d7) 55%,transparent)}
 .cf-card::after{z-index:6;background:var(--c-void,#0b0c0e)}
 .cf-stage[data-hov="1"] .cf-card.lit::before{opacity:1;visibility:visible;transition-delay:0s}
@@ -896,7 +896,9 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
         const sc = (0.6 + 0.4 * (1 + co) / 2) * (1 - p) + 1.16 * p;
         c.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,${z.toFixed(1)}px) rotateY(${(-sn * 22 * (1 - p)).toFixed(2)}deg) scale(${sc.toFixed(3)})`;
         c.style.zIndex = String(Math.round(1000 + z));
-        c.style.opacity = String(Math.min(1, Math.max(0.35, 0.55 + 0.45 * co + p)) * fade);
+        // cards stay opaque (the circuit background must never show through them); depth is a dark overlay instead
+        c.style.opacity = String(fade);
+        c.style.setProperty('--depth', (1 - Math.min(1, Math.max(0.35, 0.55 + 0.45 * co + p))).toFixed(3));
         if (c.style.visibility !== 'visible') c.style.visibility = 'visible';
         c.style.pointerEvents = fade < 0.5 ? 'none' : '';
         c.style.willChange = moving ? 'transform, opacity' : '';
