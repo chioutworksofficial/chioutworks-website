@@ -71,3 +71,10 @@
   .ap-card { font-size: 12px; padding: 10px; }
   .ap-h { flex-direction: column; align-items: stretch; }
 }
+
+/* Derin araştırma (Apify) */
+.sl-rsp { display: grid; gap: 10px; }
+.sl-rs { display: grid; gap: 12px; margin-top: 4px; }
+.sl-confirm { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--c-signal); border-radius: var(--r-input); background: var(--c-deep-sea); font-size: 13px; }
+.sl-rs a { overflow-wrap: anywhere; }
+@media (max-width: 640px) { .sl-rsp .sl-btns { display: grid; grid-template-columns: 1fr; } .sl-rsp .sl-btns > * { width: 100%; text-align: center; } }

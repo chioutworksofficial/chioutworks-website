@@ -6,11 +6,12 @@ import http from 'node:http';
 import https from 'node:https';
 import zlib from 'node:zlib';
 import { privateIp, hostBad } from './voiceAgent.js';
+import { runCrawler, type CrawlItem } from './apify.js';
 
 // ── fetching layer ──
 export interface FetchedDoc { url: string; finalUrl: string; status: number; headers: Record<string, string>; body: string; bytes: number; ms: number; redirects: number }
 export interface GetOpts { maxBytes: number; timeoutMs: number; html: boolean }
-/** Fetching is replaceable: set SITE_FETCHER=apify later and implement ApifyFetcher (same interface). Implementations must keep the SSRF rules. */
+/** Fetching is replaceable per run (DefaultFetcher, ApifyFetcher: same interface). Implementations must keep the SSRF rules. */
 export interface SiteFetcher { name: string; get(url: string, o: GetOpts): Promise<FetchedDoc> }
 
 const guardedLookup = ((host: string, opts: any, cb: any) => {
@@ -74,11 +75,38 @@ class DefaultFetcher implements SiteFetcher {
     throw new Error('too_many_redirects');
   }
 }
-let warned = false;
-export function pickFetcher(): SiteFetcher {
-  if ((process.env.SITE_FETCHER ?? '') === 'apify' && !warned) { warned = true; console.warn('[scan] SITE_FETCHER=apify is not implemented yet; using default fetcher'); }
-  return new DefaultFetcher();
+/** Static, SSRF-safe fetcher (default). The browser-rendered Apify fetcher is chosen per run (owner-triggered), see createApifyFetcher. */
+export function pickFetcher(): SiteFetcher { return new DefaultFetcher(); }
+
+const pageKey = (u: string) => { try { const x = new URL(u); x.hash = ''; return `${x.protocol}//${x.hostname.replace(/^www\./, '').toLowerCase()}${x.pathname.replace(/\/+$/, '')}${x.search}`; } catch { return u; } };
+const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** Serves pages from one Apify crawl (browser-rendered HTML). Everything it does not hold (robots.txt, sitemap, uncrawled pages) falls back to the default fetcher, which keeps the SSRF rules. */
+export class ApifyFetcher implements SiteFetcher {
+  name = 'apify';
+  private docs = new Map<string, FetchedDoc>();
+  private fallback = new DefaultFetcher();
+  constructor(items: CrawlItem[]) {
+    for (const it of items) {
+      const body = it.html || `<html><head><title>${escHtml(it.title)}</title></head><body>${it.text.split(/\n+/).map((l) => `<p>${escHtml(l)}</p>`).join('')}</body></html>`;
+      const doc: FetchedDoc = { url: it.url, finalUrl: it.loadedUrl, status: it.status, headers: it.headers, body, bytes: Buffer.byteLength(body), ms: 0, redirects: 0 };
+      this.docs.set(pageKey(it.loadedUrl), doc); this.docs.set(pageKey(it.url), doc);
+    }
+  }
+  get pageCount() { return new Set(this.docs.values()).size; }
+  async get(url: string, o: GetOpts): Promise<FetchedDoc> {
+    if (scanUrlProblem(url)) throw new Error('blocked_url');
+    const d = o.html ? this.docs.get(pageKey(url)) : undefined;
+    return d ? { ...d, url } : this.fallback.get(url, o);
+  }
 }
+/** One Apify run (playwright, 3 pages, same domain), then a SiteFetcher over its results. `run` is injectable for tests. Budget is checked inside runCrawler. */
+export async function createApifyFetcher(url: string, run: typeof runCrawler = runCrawler): Promise<ApifyFetcher> {
+  const { items } = await run({ startUrl: url, crawler: 'playwright:firefox', maxPages: 3, maxDepth: 1, timeoutSecs: 55, kind: 'render-scan' });
+  return new ApifyFetcher(items);
+}
+
+/** For local REA browser capture by the owner's assistant: renders a page in a real local browser. NOT wired to anything (REA is a local tool, not available on the server). */
+export async function renderedProbe(_url: string): Promise<FetchedDoc> { throw new Error('not_wired: local REA capture only'); }
 
 // ── model ──
 export type Status = 'pass' | 'partial' | 'fail' | 'na' | 'unknown';

@@ -3,6 +3,7 @@ import { api, ApiError, fmtDate } from './api';
 import { useNote } from './bulk';
 import SiteChecksPanel from './SiteChecksPanel';
 import ApolloPanel from './ApolloPanel';
+import ResearchPanel from './ResearchPanel';
 import './sales.css';
 
 type St = 'new' | 'to_call' | 'called' | 'interested' | 'not_interested' | 'won' | 'lost';
@@ -15,7 +16,7 @@ interface Opp { id: string; title: string; what: string; why: string; impact: st
 interface Scan {
   version: number; fetcher: string; at: string; pages: { url: string; status: number }[]; psi: { score: number | null; note?: string }; score: number; rawScore: number; grade: Grade; capped: string[];
   categories: { key: string; label: string; weight: number; score: number | null; n: number }[]; checks: Check[]; opportunities: Opp[]; noNeed: { label: string; reason: string }[]; unmeasured: { label: string; reason: string }[];
-  priority: 'İletişime değer' | 'Belki' | 'Gerek yok'; summary: string; facts: { cms: string; lang: string; country: string; booking: string[]; chat: string[]; whatsapp: boolean; hreflang: string[]; socials: string[]; forms: number };
+  priority: 'İletişime değer' | 'Belki' | 'Gerek yok'; summary: string; facts: { cms: string; lang: string; country: string; booking: string[]; chat: string[]; whatsapp: boolean; hreflang: string[]; socials: string[]; forms: number; jsShell?: boolean; spa?: boolean };
 }
 interface Analysis { company: string; city: string; country: string; sector: string; summary: string; has: string[]; missing: string[]; reasonable_cause: string; grade: Grade; grade_reason: string; first_step: string; opener: string; score?: number; priority?: string }
 interface Signals { https: boolean; viewport: boolean; hasForm: boolean; booking: string[]; chat: string[]; whatsapp: boolean; hreflang: string[]; title: string; description: string; socials: string[] }
@@ -209,6 +210,7 @@ export default function SalesView() {
             <button type="button" className="lq-btn-ghost adm-btn sm" disabled={!!why(cur)} title={why(cur) || 'Arama kuyruğuna ekle'} onClick={() => toVa(cur.id)}>Voice Agent kuyruğuna ekle</button>
           </div>
           {busy === cur.id && <Progress on />}
+          <ResearchPanel leadId={cur.id} url={cur.url} needsRender={!!cur.scan && !!(cur.scan.facts.jsShell || cur.scan.facts.spa) && cur.scan.fetcher !== 'apify'} onRescanned={load} />
           {cur.scan && (() => { const lg = rlang[cur.id] ?? langOfLead(cur); const ans = cur.reportAnswer; return (
             <div className="sl-rep">
               <div className="sl-row"><b>Müşteri raporu (PDF)</b>

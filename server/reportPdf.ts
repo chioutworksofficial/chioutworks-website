@@ -4,6 +4,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import fs from 'node:fs';
 import type { Scan, Opp } from './siteScan.js';
+import type { ResearchReport, TechCat } from './deepResearch.js';
 
 export type RL = 'tr' | 'en' | 'de' | 'el';
 export const RLANGS: RL[] = ['tr', 'en', 'de', 'el'];
@@ -210,5 +211,101 @@ export async function buildReportPdf(inp: ReportInput, lang: RL, o: { contactUrl
 
   const n = pages.length;
   pages.forEach((p, i) => { const t = `${u.page} ${i + 1}/${n}`; p.drawText(t, { x: W - M - reg.widthOfTextAtSize(t, 8.5), y: 26, size: 8.5, font: reg, color: MUTE }); p.drawText('Chioutworks', { x: M, y: 26, size: 8.5, font: reg, color: MUTE }); });
+  return doc.save();
+}
+
+// ── deep company research PDF (internal meeting brief; same fonts/colours as the site report) ──
+type R4 = Record<RL, string>;
+const RT: Record<string, R4> = {
+  title: { tr: 'Derin şirket araştırması', en: 'Deep company research', de: 'Tiefenrecherche zum Unternehmen', el: 'Εις βάθος έρευνα εταιρείας' },
+  date: { tr: 'Tarih', en: 'Date', de: 'Datum', el: 'Ημερομηνία' }, page: { tr: 'Sayfa', en: 'Page', de: 'Seite', el: 'Σελίδα' },
+  profile: { tr: 'Ne yapıyor, kime satıyor', en: 'What they do and who they sell to', de: 'Was sie tun und an wen sie verkaufen', el: 'Τι κάνουν και σε ποιον πουλούν' },
+  sells: { tr: 'Sunduğu', en: 'Offer', de: 'Angebot', el: 'Προσφορά' }, customers: { tr: 'Hedef müşteri', en: 'Target customers', de: 'Zielkunden', el: 'Πελάτες-στόχος' }, pricing: { tr: 'Fiyat sinyalleri', en: 'Pricing signals', de: 'Preissignale', el: 'Ενδείξεις τιμών' },
+  team: { tr: 'Ekip büyüklüğü sinyalleri', en: 'Team size signals', de: 'Signale zur Teamgröße', el: 'Ενδείξεις μεγέθους ομάδας' }, locations: { tr: 'Konumlar', en: 'Locations', de: 'Standorte', el: 'Τοποθεσίες' }, languages: { tr: 'Diller', en: 'Languages', de: 'Sprachen', el: 'Γλώσσες' },
+  hiring: { tr: 'İşe alım sinyali', en: 'Hiring signal', de: 'Einstellungssignal', el: 'Ένδειξη προσλήψεων' }, news: { tr: 'Blog ve haber temposu', en: 'Blog and news cadence', de: 'Blog- und Nachrichtenrhythmus', el: 'Ρυθμός blog και ειδήσεων' }, socials: { tr: 'Sosyal hesaplar', en: 'Social accounts', de: 'Social-Media-Konten', el: 'Λογαριασμοί κοινωνικών μέσων' },
+  tech: { tr: 'Kullandığı teknoloji (ölçüldü)', en: 'Technology in use (measured)', de: 'Eingesetzte Technik (gemessen)', el: 'Τεχνολογία που χρησιμοποιούν (μετρήθηκε)' },
+  spend: { tr: 'Tahmini aylık araç gideri (tahmin)', en: 'Estimated monthly tool spend (estimate)', de: 'Geschätzte monatliche Tool-Kosten (Schätzung)', el: 'Εκτιμώμενο μηνιαίο κόστος εργαλείων (εκτίμηση)' },
+  spendNote: { tr: 'Herkese açık liste fiyatlarından kabaca aralık; gerçek plan, indirim ve kullanım bilinmiyor. Gerçek değil, tahmindir.', en: 'Rough range from public list prices; the actual plan, discounts and usage are unknown. An estimate, not a fact.', de: 'Grobe Spanne aus öffentlichen Listenpreisen; tatsächlicher Tarif, Rabatte und Nutzung sind unbekannt. Eine Schätzung, keine Tatsache.', el: 'Πρόχειρο εύρος από δημόσιες τιμές καταλόγου· το πραγματικό πακέτο, οι εκπτώσεις και η χρήση είναι άγνωστα. Εκτίμηση, όχι γεγονός.' },
+  unpriced: { tr: 'Fiyat aralığı tanımlı değil', en: 'No price range defined', de: 'Keine Preisspanne hinterlegt', el: 'Χωρίς καθορισμένο εύρος τιμής' },
+  ads: { tr: 'Reklam etkinliği', en: 'Ad activity', de: 'Werbeaktivität', el: 'Διαφημιστική δραστηριότητα' }, pixels: { tr: 'Reklam pikselleri (ölçüldü)', en: 'Ad pixels (measured)', de: 'Werbe-Pixel (gemessen)', el: 'Διαφημιστικά pixel (μετρήθηκε)' },
+  noPixels: { tr: 'Sitede reklam pikseli bulunamadı.', en: 'No ad pixel found on the site.', de: 'Kein Werbe-Pixel auf der Website gefunden.', el: 'Δεν βρέθηκε διαφημιστικό pixel στον ιστότοπο.' },
+  unmeasured: { tr: 'Ölçülemedi', en: 'Not measured', de: 'Nicht gemessen', el: 'Δεν μετρήθηκε' }, none: { tr: 'Bulunamadı', en: 'None found', de: 'Nichts gefunden', el: 'Δεν βρέθηκε' },
+  weak: { tr: 'Zayıf yönler (kanıtlı)', en: 'Weaknesses (with evidence)', de: 'Schwächen (mit Belegen)', el: 'Αδυναμίες (με τεκμήρια)' }, opps: { tr: 'Fırsatlar ve Chioutworks paketleri', en: 'Opportunities and Chioutworks packages', de: 'Chancen und Chioutworks-Pakete', el: 'Ευκαιρίες και πακέτα Chioutworks' },
+  openers: { tr: 'Konuşma açılışları', en: 'Conversation openers', de: 'Gesprächseinstiege', el: 'Ανοίγματα συζήτησης' }, questions: { tr: 'Toplantıda sorulacak sorular', en: 'Questions to ask in the meeting', de: 'Fragen für das Gespräch', el: 'Ερωτήσεις για τη συνάντηση' }, risks: { tr: 'Riskler', en: 'Risks', de: 'Risiken', el: 'Κίνδυνοι' },
+  sources: { tr: 'Kaynak sayfalar', en: 'Source pages', de: 'Quellseiten', el: 'Σελίδες πηγών' }, impact: { tr: 'Etki', en: 'Impact', de: 'Wirkung', el: 'Επίδραση' }, src: { tr: 'Kanıt', en: 'Evidence', de: 'Beleg', el: 'Τεκμήριο' },
+  foot: { tr: 'Bu rapor iç hazırlık içindir; müşteriye gönderilmez.', en: 'This report is for internal preparation; it is not sent to the prospect.', de: 'Dieser Bericht dient der internen Vorbereitung und wird nicht an den Interessenten gesendet.', el: 'Η αναφορά είναι για εσωτερική προετοιμασία και δεν στέλνεται στον υποψήφιο πελάτη.' },
+  measured: { tr: 'Ölçülen', en: 'Measured', de: 'Gemessen', el: 'Μετρήθηκε' }, estimated: { tr: 'Tahmin', en: 'Estimated', de: 'Geschätzt', el: 'Εκτίμηση' },
+};
+const RPARTS: Record<string, R4> = {
+  pages: { tr: 'okunan sayfalar', en: 'pages read', de: 'gelesene Seiten', el: 'σελίδες που διαβάστηκαν' }, tech: { tr: 'teknoloji izleri', en: 'technology fingerprints', de: 'Technik-Fingerabdrücke', el: 'ίχνη τεχνολογίας' }, pixels: { tr: 'reklam pikselleri', en: 'ad pixels', de: 'Werbe-Pixel', el: 'διαφημιστικά pixel' },
+  socials: { tr: 'sosyal bağlantılar', en: 'social links', de: 'Social-Links', el: 'σύνδεσμοι κοινωνικών μέσων' }, langs: { tr: 'site dilleri', en: 'site languages', de: 'Website-Sprachen', el: 'γλώσσες ιστότοπου' },
+  spend: { tr: 'aylık araç gideri aralıkları', en: 'monthly tool spend ranges', de: 'monatliche Kostenspannen', el: 'εύρη μηνιαίου κόστους' }, profile: { tr: 'YZ ile çıkarılan profil, zayıf yönler, fırsatlar ve sorular', en: 'AI-derived profile, weaknesses, opportunities and questions', de: 'KI-abgeleitetes Profil, Schwächen, Chancen und Fragen', el: 'προφίλ, αδυναμίες, ευκαιρίες και ερωτήσεις από ΤΝ' },
+  metaads: { tr: 'Meta reklam kitaplığı', en: 'Meta ad library', de: 'Meta-Werbebibliothek', el: 'Βιβλιοθήκη διαφημίσεων Meta' }, rendered: { tr: 'tarayıcıyla görüntüleme', en: 'browser rendering', de: 'Browser-Darstellung', el: 'απόδοση με πρόγραμμα περιήγησης' }, llm: { tr: 'içerik analizi', en: 'content analysis', de: 'Inhaltsanalyse', el: 'ανάλυση περιεχομένου' },
+};
+const CATN: Record<TechCat, R4> = {
+  cms: { tr: 'Site altyapısı', en: 'Site platform', de: 'Website-Plattform', el: 'Πλατφόρμα ιστότοπου' }, shop: { tr: 'Mağaza', en: 'Shop', de: 'Shop', el: 'Κατάστημα' }, booking: { tr: 'Randevu', en: 'Booking', de: 'Buchung', el: 'Κρατήσεις' }, chat: { tr: 'Sohbet', en: 'Chat', de: 'Chat', el: 'Συνομιλία' },
+  analytics: { tr: 'Analitik', en: 'Analytics', de: 'Analyse', el: 'Αναλυτικά' }, tagmanager: { tr: 'Etiket yöneticisi', en: 'Tag manager', de: 'Tag-Manager', el: 'Tag manager' }, ads: { tr: 'Reklam', en: 'Advertising', de: 'Werbung', el: 'Διαφήμιση' }, crm: { tr: 'CRM / e-posta', en: 'CRM / e-mail', de: 'CRM / E-Mail', el: 'CRM / email' },
+  payment: { tr: 'Ödeme', en: 'Payment', de: 'Zahlung', el: 'Πληρωμές' }, hosting: { tr: 'Barındırma / CDN', en: 'Hosting / CDN', de: 'Hosting / CDN', el: 'Hosting / CDN' }, consent: { tr: 'Çerez onayı', en: 'Cookie consent', de: 'Cookie-Einwilligung', el: 'Συναίνεση cookies' }, framework: { tr: 'Yazılım çatısı', en: 'Framework', de: 'Framework', el: 'Framework' },
+};
+const PKGN: Record<string, R4> = { automation: { tr: 'Otomasyon', en: 'Automation', de: 'Automatisierung', el: 'Αυτοματισμός' }, webapps: { tr: 'Web uygulaması', en: 'Web application', de: 'Webanwendung', el: 'Εφαρμογή ιστού' }, ai: { tr: 'YZ entegrasyonu', en: 'AI integration', de: 'KI-Integration', el: 'Ενσωμάτωση ΤΝ' }, strategy: { tr: 'Dijital strateji', en: 'Digital strategy', de: 'Digitalstrategie', el: 'Ψηφιακή στρατηγική' } };
+export const RESEARCH_LABELS = { RT, RPARTS, CATN, PKGN };
+
+export async function buildResearchPdf(rep: ResearchReport, lang: RL, o: { now?: Date } = {}): Promise<Uint8Array> {
+  const t = (k: string) => RT[k][lang]; const now = o.now ?? new Date();
+  const doc = await PDFDocument.create(); doc.registerFontkit(fontkit);
+  const reg = await doc.embedFont(fontBytes('Regular'), { subset: true }); const bold = await doc.embedFont(fontBytes('Bold'), { subset: true });
+  doc.setTitle(`${t('title')}: ${rep.domain}`); doc.setAuthor('Chioutworks'); doc.setProducer('Chioutworks'); doc.setCreator('Chioutworks'); doc.setLanguage(lang); doc.setCreationDate(now);
+  const pages: PDFPage[] = []; let page!: PDFPage; let y = 0;
+  const fresh = () => { page = doc.addPage([W, H]); pages.push(page); y = H - M; if (pages.length > 1) { page.drawText('Chioutworks', { x: M, y: H - 30, size: 9, font: bold, color: NAVY }); page.drawText(rep.domain, { x: W - M - reg.widthOfTextAtSize(rep.domain, 9), y: H - 30, size: 9, font: reg, color: MUTE }); y = H - 56; } };
+  const need = (h: number) => { if (y - h < M + 24) fresh(); };
+  const text = (s: string, size: number, o2: { font?: PDFFont; color?: ReturnType<typeof rgb>; x?: number; gap?: number } = {}) => {
+    const f = o2.font ?? reg; const x = o2.x ?? M; const lh = size * 1.45;
+    for (const l of wrap(f, s, size, W - M - x)) { need(lh); y -= lh; page.drawText(l, { x, y: y + size * 0.3, size, font: f, color: o2.color ?? INK }); }
+    y -= o2.gap ?? 0;
+  };
+  const h2 = (s: string) => { need(60); y -= 12; text(s, 13.5, { font: bold, color: NAVY, gap: 5 }); };
+  const kv = (k: string, v: string | string[]) => { const s = Array.isArray(v) ? v.join('; ') : v; if (s) text(`${k}: ${s}`, 10.5, { gap: 2 }); };
+  const list = (a: string[]) => a.forEach((s) => text(`- ${s}`, 10.5, { x: M + 8, gap: 2 }));
+
+  fresh();
+  page.drawRectangle({ x: 0, y: H - 200, width: W, height: 200, color: NAVY });
+  page.drawText('Chioutworks', { x: M, y: H - 64, size: 18, font: bold, color: rgb(1, 1, 1) });
+  page.drawText(wrap(bold, t('title'), 24, W - 2 * M)[0], { x: M, y: H - 112, size: 24, font: bold, color: rgb(1, 1, 1) });
+  page.drawText(wrap(bold, rep.company, 16, W - 2 * M)[0], { x: M, y: H - 146, size: 16, font: bold, color: rgb(0.75, 0.85, 1) });
+  page.drawText(`${rep.domain} · ${t('date')}: ${new Intl.DateTimeFormat(({ tr: 'tr-TR', en: 'en-GB', de: 'de-DE', el: 'el-GR' } as R4)[lang], { dateStyle: 'long', timeZone: 'Europe/Berlin' }).format(now)}`, { x: M, y: H - 172, size: 10.5, font: reg, color: rgb(0.85, 0.9, 1) });
+  y = H - 215;
+
+  h2(t('profile')); const p = rep.profile;
+  kv(t('sells'), p.sells); kv(t('customers'), p.customers); kv(t('pricing'), p.pricing); kv(t('team'), p.team); kv(t('locations'), p.locations); kv(t('languages'), [...new Set([...p.languages, ...rep.siteLangs])]); kv(t('hiring'), p.hiring); kv(t('news'), p.news); kv(t('socials'), rep.socials);
+
+  h2(t('tech'));
+  if (!rep.tech.length) text(t('none'), 10.5, { color: MUTE });
+  const cats = [...new Set(rep.tech.map((x) => x.cat))]; cats.forEach((c) => kv(CATN[c][lang], rep.tech.filter((x) => x.cat === c).map((x) => x.name)));
+  h2(t('spend'));
+  if (rep.spend.items.length) { text(`≈ ${rep.spend.lo}-${rep.spend.hi} EUR / ${lang === 'tr' ? 'ay' : lang === 'de' ? 'Monat' : lang === 'el' ? 'μήνα' : 'month'}`, 12, { font: bold, gap: 3 }); list(rep.spend.items.map((i) => `${i.name}: ≈ ${i.lo}-${i.hi} EUR`)); }
+  else text(t('none'), 10.5, { color: MUTE });
+  if (rep.spend.unpriced.length) kv(t('unpriced'), rep.spend.unpriced);
+  text(t('spendNote'), 9.5, { color: MUTE });
+
+  h2(t('ads'));
+  text(rep.ads.pixels.length ? `${t('pixels')}: ${rep.ads.pixels.join(', ')}` : t('noPixels'), 10.5, { gap: 2 });
+  if (rep.ads.meta.status === 'unmeasured') text(`Meta: ${t('unmeasured')}`, 10.5, { color: MUTE }); else list(rep.ads.meta.items.map((i) => `${i.page}: ${i.title}${i.date ? ` (${i.date.slice(0, 10)})` : ''}`));
+
+  h2(t('weak'));
+  if (!rep.weaknesses.length) text(t('none'), 10.5, { color: MUTE });
+  rep.weaknesses.forEach((w) => { text(w.title, 11, { font: bold, gap: 1 }); text(w.detail, 10.5, { gap: 1 }); text(`${t('src')}: ${w.src.join(' ')}`, 9, { color: MUTE, gap: 6 }); });
+  h2(t('opps'));
+  if (!rep.opportunities.length) text(t('none'), 10.5, { color: MUTE });
+  rep.opportunities.forEach((q) => { text(`${PKGN[q.pkg][lang]}${q.offer ? ` / ${q.offer}` : ''}: ${q.title}`, 11, { font: bold, gap: 1 }); text(q.why, 10.5, { gap: 1 }); text(`${t('impact')}: ${q.impact} · ${t('src')}: ${q.src.join(' ')}`, 9, { color: MUTE, gap: 6 }); });
+  if (rep.openers.length) { h2(t('openers')); list(rep.openers); }
+  if (rep.questions.length) { h2(t('questions')); list(rep.questions); }
+  if (rep.risks.length) { h2(t('risks')); list(rep.risks); }
+
+  h2(t('sources')); rep.pages.forEach((q, i) => text(`P${i + 1}  ${q.url}`, 8.5, { color: MUTE }));
+  y -= 10; const part = (a: string[]) => a.map((k) => RPARTS[k]?.[lang] ?? k).join(', ');
+  text(`${t('measured')}: ${part(rep.measured)}. ${t('estimated')}: ${part(rep.estimated)}. ${t('unmeasured')}: ${rep.unmeasured.length ? part(rep.unmeasured) : '-'}.`, 9, { color: MUTE, gap: 3 });
+  text(t('foot'), 9, { color: MUTE });
+  const n = pages.length;
+  pages.forEach((pg, i) => { const s = `${t('page')} ${i + 1}/${n}`; pg.drawText(s, { x: W - M - reg.widthOfTextAtSize(s, 8.5), y: 26, size: 8.5, font: reg, color: MUTE }); pg.drawText('Chioutworks', { x: M, y: 26, size: 8.5, font: reg, color: MUTE }); });
   return doc.save();
 }
