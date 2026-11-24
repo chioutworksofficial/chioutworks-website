@@ -27,7 +27,22 @@
 .pv-form { display: grid; gap: 8px; } .pv-form label { display: grid; gap: 4px; font-size: 12px; color: var(--c-ash); }
 .pv-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pv-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; border-top: 1px solid var(--c-edge); padding-top: 10px; }
+/* bakiye */
+.pv-bal { display: grid; gap: 6px; padding: 12px; border-radius: var(--r-card); border: 1px solid var(--c-edge); background: var(--c-inkline); }
+.pv-bal small { font-size: 12px; color: var(--c-mist); } .pv-bal .pv-why { color: var(--adm-warn); }
+.pv-big { font: 500 28px/1.1 var(--font-display); color: var(--c-quartz); }
+.pv-bal[data-t='ok'] { border-color: var(--adm-ok); } .pv-bal[data-t='warn'] { border-color: var(--adm-warn); } .pv-bal[data-t='bad'] { border-color: var(--adm-bad); }
+.pv-bal[data-t='bad'] .pv-big { color: var(--adm-bad); } .pv-bal[data-t='warn'] .pv-big { color: var(--adm-warn); } .pv-bal[data-t='ok'] .pv-big { color: var(--adm-ok); }
+.pv-strip { display: grid; gap: 8px; }
+.pv-strip ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.pv-strip li { position: relative; display: grid; gap: 2px; padding: 8px 10px 12px; border: 1px solid var(--c-edge); border-radius: var(--r-input); overflow: hidden; }
+.pv-strip li span { font-size: 12px; color: var(--c-ash); } .pv-strip li b { font: 500 17px/1.2 var(--font-display); color: var(--c-quartz); } .pv-strip li em { font-style: normal; font-size: 11px; color: var(--c-ash); }
+.pv-strip li i { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--adm-ok); }
+.pv-strip li[data-t='warn'] i { background: var(--adm-warn); } .pv-strip li[data-t='bad'] i { background: var(--adm-bad); }
+.pv-strip small { font-size: 12px; color: var(--c-mist); }
 @media (max-width: 760px) {
+  .pv-bal .adm-btn { width: 100%; justify-content: center; min-height: 44px; }
+  .pv-strip ul { grid-template-columns: 1fr 1fr; }
   .pv-sum { grid-template-columns: 1fr; }
   .pv-grid { grid-template-columns: 1fr; }
   .pv-row2 { grid-template-columns: 1fr; }
