@@ -78,7 +78,7 @@ function Circuit() {
   );
 }
 
-/** Phone-only circuit (static): chip centred above the front card, short traces down the card sides. Sits inside the stage, behind the cards. */
+/** Phone-only circuit (2 light pulses + softly glowing chip, CSS only): chip centred above the front card, short traces down the card sides. Sits inside the stage, behind the cards. */
 const TRP: number[][][] = [
   [[128, 24], [60, 24], [60, 52], [12, 52], [12, 330]],
   [[272, 24], [340, 24], [340, 52], [388, 52], [388, 330]],
@@ -94,6 +94,8 @@ function CircuitPhone() {
       {[0, 1, 2, 3].map((i) => <path key={i} className="cf-ct" d={`M128 ${21 + i * 8}h22M250 ${21 + i * 8}h22`} fill="none" />)}
       {TRP.map((t, i) => <path key={i} className="cf-ct" d={trace(t, 10)} fill="none" strokeWidth="1.2" />)}
       {NODES_P.map(([x, y], i) => <circle key={i} className="cf-cn" cx={x} cy={y} r="3" />)}
+      {[0, 1].map((i) => <path key={`p${i}`} className="cf-cp" d={trace(TRP[i], 10)} pathLength={100} fill="none" strokeLinecap="round" style={{ animationDelay: `${-i * 2.3}s` }} />)}
+      <rect className="cf-pglow" x="150" y="6" width="100" height="60" rx="10" />
     </svg>
   );
 }
@@ -767,8 +769,8 @@ html[data-mode='light'] .cf-cstars circle{fill:var(--c-signal,#2459c8);opacity:.
 #features[data-vis="0"] .cf-cp,#features[data-vis="0"] .cf-ch,#features[data-vis="0"] .cf-cn,#features[data-vis="0"] .cf-cglow,#features[data-vis="0"] .cf-cstars circle{animation-play-state:paused}
 @keyframes cf-star{to{background-position:320px 220px}}
 .cf-stage{overscroll-behavior-x:contain;touch-action:pan-y}
-.cf-stage{margin-top:44px;--w:min(620px,41vw,calc((100svh - 300px)*1.6));--h:calc(var(--w)/1.6);--rx:1.08;--rz:.91;--ty:.17;--top:calc(var(--h)*.62);position:relative;height:calc(var(--h)*1.5);perspective:1800px;perspective-origin:50% 30%;z-index:1;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;outline:none}
-.cf-stage[data-drag="1"],.cf-stage[data-drag="1"] *{cursor:grabbing!important}
+.cf-stage{margin-top:44px;--w:min(620px,41vw,calc((100svh - 300px)*1.6));--h:calc(var(--w)/1.6);--rx:1.08;--rz:.91;--ty:.17;--top:calc(var(--h)*.62);position:relative;height:calc(var(--h)*1.5);perspective:1800px;perspective-origin:50% 30%;z-index:1;touch-action:pan-y;user-select:none;-webkit-user-select:none;outline:none}
+.cf-sec{min-height:100svh;display:flex;flex-direction:column;justify-content:center}
 .cf-space{position:absolute;inset:0;z-index:0;opacity:0;visibility:hidden;transition:opacity .7s ease,visibility 0s .7s;pointer-events:none;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);background:radial-gradient(ellipse 60% 70% at 50% 55%,color-mix(in srgb,var(--c-signal,#2862d7) 45%,var(--c-deep-sea,#0d172b)) 0%,var(--c-deep-sea,#0d172b) 45%,var(--c-void,#0b0c0e) 80%)}
 .cf-space::before,.cf-space::after{content:"";position:absolute;inset:0;background-repeat:repeat}
 .cf-space::before{background-image:radial-gradient(1.2px 1.2px at 20px 30px,var(--c-quartz,#fff),transparent),radial-gradient(1px 1px at 90px 140px,var(--c-mist,#c7c9d1),transparent),radial-gradient(1.4px 1.4px at 160px 60px,var(--c-quartz,#fff),transparent),radial-gradient(1px 1px at 230px 190px,var(--c-lilac,#85a6e9),transparent),radial-gradient(1.1px 1.1px at 300px 100px,var(--c-quartz,#fff),transparent);background-size:320px 220px;opacity:.75;animation:cf-star 60s linear infinite}
@@ -799,13 +801,14 @@ html[data-mode='light'] .cf-stage[data-hov="1"] .cf-card:not(.lit)::after{opacit
 html[data-mode='light'] .cf-frame{box-shadow:0 16px 36px -14px color-mix(in srgb,var(--c-signal,#2459c8) 30%,transparent)}
 html[data-mode='light'] .cf-tag{background:color-mix(in srgb,var(--c-abyss,#fff) 90%,transparent);border-color:var(--c-hairline,#bccbe3)}
 .cf-tag{position:absolute;top:3cqw;left:50%;transform:translateX(-50%);z-index:4;border-radius:9999px;padding:.5em 1.35em;font-size:clamp(12.5px,2.4cqw,18px);font-weight:700;letter-spacing:.02em;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-void,#0b0c0e) 78%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 14%,transparent);max-width:84%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
-.cf-dot:focus-visible,.cf-hit:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
-.cf-dot{height:8px;width:8px;border-radius:9999px;border:0;padding:0;cursor:pointer;background:var(--c-hairline,#24375a);transition:width .3s,background .3s}
-.cf-dot[aria-current="true"]{width:22px;background:var(--c-signal,#2862d7)}
-.cf-dotw{display:flex;align-items:center;justify-content:center;min-width:14px;height:32px}
+.cf-hit:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
 .cf-card[data-act="0"] .fx,.cf-card[data-act="0"] .fx-dots i{animation-play-state:paused}
 .cf-circp{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:visible}
-.cf-circp *{animation:none!important}
+.cf-circp .cf-cn,.cf-circp .cf-ct{animation:none}
+.cf-circp .cf-cp{stroke-width:2.4;animation-duration:4.6s}
+.cf-circp .cf-pglow{fill:var(--c-signal,#2862d7);opacity:.04;animation:cf-pg 3.6s ease-in-out infinite}
+@keyframes cf-pg{0%,100%{opacity:.04}50%{opacity:.2}}
+#features[data-vis="0"] .cf-pglow,.cf-stage[data-mov="1"] .cf-circp .cf-cp,.cf-stage[data-mov="1"] .cf-circp .cf-pglow{animation-play-state:paused}
 .cf-note{position:relative;z-index:1;margin:12px auto 0;padding:0 16px;max-width:560px;text-align:center;font-size:13.5px;line-height:1.45;color:var(--c-ash,#abaebb)}
 @media (max-width:767px),(pointer:coarse){
   .cf-stage{margin-top:4px;--w:min(88vw,340px);--h:calc(var(--w)*1.2);--rx:.56;--rz:.89;--ty:.16;--top:calc(var(--h)/2 + 78px);perspective:none;height:calc(var(--h) + 122px)}
@@ -825,7 +828,7 @@ html[data-mode='light'] .cf-tag{background:color-mix(in srgb,var(--c-abyss,#fff)
   .cf-cta{font-size:13px;padding:.55em 1em}
   .cf-tag{top:12px;font-size:12.5px;max-width:86%}
 }
-@media (prefers-reduced-motion: reduce){.cf-space{transition:none}.cf-space::before,.cf-space::after,.cf-cp,.cf-ch,.cf-cn,.cf-cglow,.cf-cstars circle{animation:none}.cf-dot{transition:none}}
+@media (prefers-reduced-motion: reduce){.cf-space{transition:none}.cf-space::before,.cf-space::after,.cf-cp,.cf-ch,.cf-cn,.cf-cglow,.cf-cstars circle,.cf-pglow{animation:none}}
 `;
 
 
@@ -833,7 +836,6 @@ const N = ORDER.length;
 const CULL = 2.5; // cards further than this many slots from the front are hidden and render no mock
 const CULL_P = 1.5; // phone: only the front card and its two neighbours
 const PHONE_Q = '(pointer: coarse), (max-width: 767px)';
-const MOUSE_AMP = 1.7; // desktop mouse drag is amplified relative to 1:1
 
 export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const ui = FEATURES_UI[lang];
@@ -845,25 +847,18 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia(PHONE_Q).matches);
   const phoneR = useRef(phone); phoneR.current = phone;
   const calm = useRef(true); const calmT = useRef(0);
-  const wheelAcc = useRef(0); const wheelArm = useRef(true);
-  const paused = useRef(false);
   const reduce = useRef(false);
   const touch = useRef(false);
-  const suppress = useRef(false);
-  const wheelT = useRef(0);
-  const scrollT = useRef(-1e9);
   const kick = useRef<() => void>(() => {});
-  const smp = useRef<number[][]>([]);
-  // pos: current ring position in card slots; target: where it eases to; pop: per-card hover pop 0..1
-  const S = useRef({ pos: 0, target: 0, hov: -1, pop: new Array<number>(N).fill(0), dx: null as number | null, dy: 0, amp: 1, a: null as { f: number; t: number; t0: number } | null, start: 0, moved: false, cur: 0, k: 0.004, v: 0, fast: false });
+  const trig = useRef<ScrollTrigger | null>(null);
+  // pos: current ring position in card slots; target: set by page scroll; pop: per-card hover pop 0..1
+  const S = useRef({ pos: 0, target: 0, hov: -1, pop: new Array<number>(N).fill(0), cur: 0 });
 
+  // scroll the page so that card i becomes the front card
   const go = useCallback((i: number) => {
-    const s = S.current; let t = i;
-    while (t - s.pos > N / 2) t -= N;
-    while (s.pos - t > N / 2) t += N;
-    s.target = t; kick.current();
+    const t = trig.current; if (!t) return;
+    window.scrollTo({ top: t.start + ((t.end - t.start) * i) / (N - 1), behavior: reduce.current ? 'auto' : 'smooth' });
   }, []);
-  const step = useCallback((d: number) => { S.current.fast = false; S.current.target = Math.round(S.current.target) + d; kick.current(); }, []);
 
   useLayoutEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -877,25 +872,34 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     return () => { mq.removeEventListener('change', on); pq.removeEventListener('change', onP); };
   }, []);
 
-  // Off-screen: pause animations, the frame loop and auto-advance. Later pinned sections are measured once the layout is final.
+  // Page scroll drives the ring: the section pins and progress maps to ring position 0..N-1 (snapped to whole cards).
+  useLayoutEffect(() => {
+    const el = root.current; if (!el) return;
+    const s = S.current;
+    const per = phone ? 0.45 : 0.6;
+    const tw = gsap.fromTo(s, { target: 0 }, {
+      target: N - 1, ease: 'none', onUpdate: () => kick.current(),
+      scrollTrigger: {
+        trigger: el, start: 'top top', end: () => `+=${Math.round(window.innerHeight * per * (N - 1))}`, pin: true, anticipatePin: 1, invalidateOnRefresh: true,
+        scrub: phone ? true : 0.6,
+        snap: { snapTo: 1 / (N - 1), inertia: false, duration: { min: 0.2, max: 0.45 }, delay: 0.1, ease: 'power2.out' },
+      },
+    });
+    trig.current = tw.scrollTrigger ?? null;
+    const t = window.setTimeout(() => ScrollTrigger.refresh(), 400);
+    return () => { window.clearTimeout(t); trig.current = null; tw.scrollTrigger?.kill(); tw.kill(); s.target = 0; };
+  }, [phone]);
+
+  // Off-screen: pause animations and the frame loop.
   useEffect(() => {
     const el = root.current;
     if (!el) return;
     const io = new IntersectionObserver(([e]) => setVis(e.isIntersecting), { rootMargin: '80px' });
     io.observe(el);
-    const t = window.setTimeout(() => ScrollTrigger.refresh(), 400);
-    const onScroll = () => { scrollT.current = performance.now(); };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => { io.disconnect(); window.clearTimeout(t); window.removeEventListener('scroll', onScroll); };
+    return () => io.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (!vis) return;
-    const id = window.setInterval(() => { if (!paused.current && S.current.hov < 0 && S.current.dx === null && !reduce.current && !document.hidden && performance.now() - scrollT.current > 800) step(1); }, 6000);
-    return () => window.clearInterval(id);
-  }, [vis, step]);
-
-  // Frame loop: runs ONLY while something moves (ring easing, dragging, hover pop); stops when settled, off-screen or tab hidden.
+  // Frame loop: runs ONLY while something moves (ring easing, hover pop); stops when settled, off-screen or tab hidden.
   // Transforms go straight to element.style, no React state per frame (idx changes only when the front card changes).
   useEffect(() => {
     if (!vis) return;
@@ -905,7 +909,6 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
       const cs = getComputedStyle(st);
       const w = cardEl.current[0]?.offsetWidth || 400;
       RX = (parseFloat(cs.getPropertyValue('--rx')) || 1) * w; RZ = (parseFloat(cs.getPropertyValue('--rz')) || 0.9) * w; TY = (parseFloat(cs.getPropertyValue('--ty')) || 0.17) * w;
-      S.current.k = 1 / ((parseFloat(cs.getPropertyValue('--rx')) || 1) * w * 0.866); // 1:1 drag: one slot = distance between neighbouring cards
     };
     const tick = (ts: number) => {
       raf = 0;
@@ -913,22 +916,14 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
       if (!stage.current || document.hidden) { last = 0; return; }
       const dt = Math.min(64, ts - (last || ts)); last = ts;
       const ph = phoneR.current, cull = ph ? CULL_P : CULL;
-      let moving = s.dx !== null;
-      if (s.dx === null) {
-        const diff = s.target - s.pos;
-        if (reduce.current || Math.abs(diff) < 0.001) { s.pos = s.target; s.a = null; }
-        else if (ph || s.fast) {
-          // snap: fixed 220 ms ease-out (transform only)
-          if (!s.a || s.a.t !== s.target) s.a = { f: s.pos, t: s.target, t0: ts };
-          const u = Math.min(1, (ts - s.a.t0) / 220);
-          s.pos = s.a.f + (s.a.t - s.a.f) * (1 - (1 - u) ** 3);
-          if (u < 1) moving = true; else { s.pos = s.target; s.a = null; }
-        } else { s.pos += diff * Math.min(1, dt / 200); moving = true; }
-      } else s.a = null;
+      let moving = false;
+      const diff = s.target - s.pos;
+      if (reduce.current || ph || Math.abs(diff) < 0.001) { moving = Math.abs(diff) > 0.001; s.pos = s.target; }
+      else { s.pos += diff * Math.min(1, dt / 90); moving = true; }
       if (ph) {
-        // phone: all mock animations stay paused while dragging/snapping; the front card resumes ~200 ms after settling
-        if (moving) { calm.current = false; window.clearTimeout(calmT.current); calmT.current = 0; }
-        else if (!calm.current && !calmT.current) calmT.current = window.setTimeout(() => { calmT.current = 0; calm.current = true; start(); }, 200);
+        // phone: all mock animations and the chip pulses stay paused while the ring moves; the front card resumes ~200 ms after settling
+        if (moving) { calm.current = false; window.clearTimeout(calmT.current); calmT.current = 0; stage.current.dataset.mov = '1'; }
+        else if (!calm.current && !calmT.current) calmT.current = window.setTimeout(() => { calmT.current = 0; calm.current = true; stage.current?.removeAttribute('data-mov'); start(); }, 200);
       } else calm.current = true;
       const cur = ((Math.round(s.pos) % N) + N) % N;
       const settled = !moving;
@@ -975,61 +970,14 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
   }, [vis, phone]);
 
   const setHov = (i: number) => { S.current.hov = i; if (i >= 0) stage.current?.setAttribute('data-hov', '1'); else stage.current?.removeAttribute('data-hov'); kick.current(); };
-  const onDown = (e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse' && (e.button !== 0)) return;
-    const s = S.current; s.dx = e.clientX; s.dy = e.clientY; s.a = null; s.amp = e.pointerType === 'mouse' ? MOUSE_AMP : 1; s.start = s.pos; s.moved = false; s.v = 0; s.fast = false; smp.current = [[e.clientX, e.timeStamp]];
-    if (e.pointerType === 'touch') paused.current = true;
-  };
-  const onMoveP = (e: React.PointerEvent) => {
-    const s = S.current; if (s.dx === null) return;
-    const dx = e.clientX - s.dx;
-    // direction is decided after ~8 px: a clearly vertical gesture is left to the page (the browser then cancels the pointer)
-    if (!s.moved && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(e.clientY - s.dy)) { s.moved = true; stage.current?.setPointerCapture(e.pointerId); stage.current?.setAttribute('data-drag', '1'); setHov(-1); }
-    if (s.moved) {
-      s.pos = s.start - dx * s.k * s.amp; s.target = s.pos;
-      smp.current.push([e.clientX, e.timeStamp]);
-      while (smp.current.length > 2 && e.timeStamp - smp.current[0][1] > 120) smp.current.shift();
-      kick.current();
-    }
-  };
-  const onUp = (e: React.PointerEvent) => {
-    const s = S.current; if (s.dx === null) return;
-    s.dx = null; stage.current?.removeAttribute('data-drag');
-    if (s.moved) {
-      smp.current.push([e.clientX, e.timeStamp]);
-      const a = smp.current[0], z = smp.current[smp.current.length - 1];
-      s.v = z[1] > a[1] ? (z[0] - a[0]) / (z[1] - a[1]) : 0;
-      const base = Math.round(s.start);
-      let t = Math.round(s.pos - s.v * s.k * s.amp * 160);
-      if (t === base && (Math.abs(s.pos - s.start) / (s.k * s.amp) > 35 || Math.abs(s.v) > 0.25)) t = base + (s.pos > s.start ? 1 : -1);
-      s.target = Math.max(base - 3, Math.min(base + 3, t)); s.fast = true; kick.current();
-      suppress.current = true; window.setTimeout(() => { suppress.current = false; }, 60); }
-    if (e.pointerType === 'touch') window.setTimeout(() => { paused.current = false; }, 4000);
-  };
-  const onCancel = () => { const s = S.current; if (s.dx === null) return; s.dx = null; stage.current?.removeAttribute('data-drag'); s.target = Math.round(s.pos); s.fast = true; kick.current(); };
-  const onWheel = (e: React.WheelEvent) => {
-    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
-    if (Math.abs(dx) < 4 || (!e.shiftKey && Math.abs(e.deltaX) <= Math.abs(e.deltaY))) return;
-    // trackpad: one card per gesture (a gesture ends after 300 ms without events), trigger after ~25 px accumulated
-    const now = e.timeStamp;
-    if (now - wheelT.current > 300) { wheelAcc.current = 0; wheelArm.current = true; }
-    wheelT.current = now; wheelAcc.current += dx;
-    if (wheelArm.current && Math.abs(wheelAcc.current) > 25) { wheelArm.current = false; step(wheelAcc.current > 0 ? 1 : -1); }
-  };
-  const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); } else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
-  };
-  const hold = (v: boolean) => () => { paused.current = v; };
 
   return (
-    <section ref={root} id="features" data-vis={vis ? '1' : '0'} className="relative overflow-hidden pt-3 pb-8 md:pt-5 md:pb-12" style={{ background: 'var(--c-void, #0b0c0e)' }}>
+    <section ref={root} id="features" data-vis={vis ? '1' : '0'} className="relative overflow-hidden pt-3 pb-8 md:pt-5 md:pb-12 cf-sec" style={{ background: 'var(--c-void, #0b0c0e)' }}>
       <style>{FX_CSS}{CF_CSS}</style>
       <h2 className="sr-only">{ui.heading}</h2>
       {phone ? null : <Circuit />}
 
-      <div ref={stage} className="cf-stage" role="region" aria-roledescription="carousel" aria-label={ui.heading} tabIndex={0}
-        onKeyDown={onKey} onPointerDown={onDown} onPointerMove={onMoveP} onPointerUp={onUp} onPointerCancel={onCancel} onWheel={onWheel} onDragStart={(e) => e.preventDefault()} onClickCapture={(e) => { if (suppress.current) { e.preventDefault(); e.stopPropagation(); } }}
-        onFocus={hold(true)} onBlur={hold(false)}>
+      <div ref={stage} className="cf-stage" role="region" aria-roledescription="carousel" aria-label={ui.heading}>
         {phone ? <CircuitPhone /> : <div aria-hidden="true" className="cf-space" />}
         <div className="cf-ring">
           {ORDER.map((o, i) => {
@@ -1042,7 +990,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
             const near = Math.min((i - idx + N) % N, (idx - i + N) % N) <= (phone ? 1 : 2);
             return (
               <div key={i} ref={(el) => { cardEl.current[i] = el; }} className="cf-card" data-act={cur ? '1' : '0'} aria-hidden={cur ? undefined : true}
-                onMouseEnter={() => { if (!touch.current && S.current.dx === null) setHov(i); }} onMouseLeave={() => { if (S.current.hov === i) setHov(-1); }}>
+                onMouseEnter={() => { if (!touch.current) setHov(i); }} onMouseLeave={() => { if (S.current.hov === i) setHov(-1); }}>
                 <div className="cf-frame">
                   <span className="cf-tag">{tag}</span>
                   <FitBox>
@@ -1060,20 +1008,13 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
                   </div>
                 </div>
                 <Link to={to} draggable={false} tabIndex={cur ? 0 : -1} aria-label={it.title} className="cf-hit"
-                  onFocus={() => go(i)} onClick={(e) => { if (touch.current && !cur) { e.preventDefault(); go(i); } }} />
+                  onClick={(e) => { if (touch.current && !cur) { e.preventDefault(); go(i); } }} />
               </div>
             );
           })}
         </div>
       </div>
 
-      <div className="relative z-10 flex items-center justify-center gap-3 mt-4 md:mt-5 px-4" onMouseEnter={hold(true)} onMouseLeave={hold(false)}>
-        <div className="flex items-center justify-center flex-wrap" style={{ maxWidth: 'calc(100vw - 48px)' }}>
-          {ORDER.map((o, i) => (
-            <span key={i} className="cf-dotw"><button type="button" className="cf-dot" aria-label={ui.items[o].title} aria-current={i === idx} onClick={() => go(i)} /></span>
-          ))}
-        </div>
-      </div>
       <p className="cf-note">{ui.carouselNote}</p>
     </section>
   );
