@@ -30,6 +30,12 @@ export const DEMO = import.meta.env.DEV && typeof location !== 'undefined' && ne
 
 export class ApiError extends Error { constructor(public status: number, public data?: { message?: string }) { super(String(status)); } }
 
+export const SESSION_LOST = 'cw-admin-session-lost';
+/** Tell Admin the session is gone (401 from an /api/admin call). Login and /me are handled by their callers. */
+export function sessionLost(path: string, status: number) {
+  if ((status === 401 || status === 419) && path.startsWith('/api/admin') && path !== '/api/admin/login' && path !== '/api/admin/me') window.dispatchEvent(new Event(SESSION_LOST));
+}
+
 export async function api<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
   if (import.meta.env.DEV && DEMO) {
     const m = await import('./demoData');
@@ -41,7 +47,7 @@ export async function api<T = unknown>(path: string, method = 'GET', body?: unkn
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new ApiError(r.status, data);
+  if (!r.ok) { sessionLost(path, r.status); throw new ApiError(r.status, data); }
   return data as T;
 }
 

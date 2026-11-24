@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, fmtDate } from './api';
+import { api, sessionLost, fmtDate } from './api';
 
 // Admin side of the live project page: stages, test-site link, screenshots/files, messages and change requests.
 type StageKey = 'planning' | 'design' | 'build' | 'test' | 'launch';
@@ -108,6 +108,7 @@ export default function ProjectsView({ onUnread }: { onUnread?: (n: number) => v
     try {
       const r = await fetch(`/api/admin/projects/${p.id}/files?name=${encodeURIComponent(f.name)}${asShot.current ? '&preview=1' : ''}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' }, body: f });
       const j = await r.json().catch(() => ({}));
+      if (!r.ok) sessionLost('/api/admin', r.status);
       if (!r.ok) setMsg({ ok: false, text: j.error === 'type_not_allowed' ? 'Yalnızca görsel, PDF ve ZIP yüklenebilir.' : 'Dosya yüklenemedi.' });
       else { setMsg({ ok: true, text: asShot.current ? 'Ekran görüntüsü eklendi; müşteri "sitenizin şu anki hali" bölümünde görüyor.' : 'Dosya eklendi.' }); loadOne(p.id); }
     } finally { setBusy(null); asShot.current = false; if (fileRef.current) fileRef.current.value = ''; }

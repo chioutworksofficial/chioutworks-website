@@ -1,7 +1,7 @@
 // Admin "Trend Radar": manual 30-day market scan. Kaynak fikir: last30days (MIT, Copyright 2026 Matt Van Horn).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './trend.css';
-import { api, ApiError, fmtDate } from './api';
+import { api, sessionLost, ApiError, fmtDate } from './api';
 import { useNote } from './bulk';
 import { SECTOR_KEYS, SECTOR_LABEL } from '../../data/intakeSectors';
 
@@ -77,6 +77,7 @@ export default function TrendRadarView() {
     setProg(Object.fromEntries([...on].map((k) => [k, 'run' as const])));
     try {
       const r = await fetch('/api/admin/trend/scan', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q: q.trim(), mode, lang, sources: [...on] }) });
+      if (!r.ok) sessionLost('/api/admin', r.status);
       if (!r.ok || !r.body) throw new ApiError(r.status, await r.json().catch(() => ({})));
       const rd = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
       for (;;) {

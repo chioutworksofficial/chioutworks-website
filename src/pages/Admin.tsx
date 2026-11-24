@@ -1,7 +1,7 @@
 import ModeToggle from '../site/ModeToggle';
 import { useCallback, useEffect, useState } from 'react';
 import '../components/admin/admin.css';
-import { api, ApiError, DEMO, type Req, type Usage, type VoiceSession } from '../components/admin/api';
+import { api, ApiError, DEMO, SESSION_LOST, type Req, type Usage, type VoiceSession } from '../components/admin/api';
 import Overview from '../components/admin/Overview';
 import RequestsView from '../components/admin/RequestsView';
 import VoiceView from '../components/admin/VoiceView';
@@ -53,7 +53,7 @@ function fromUrl(): { tab: Tab; cal: CalSection } {
   return { tab: (TAB_KEYS as string[]).includes(id) ? (id as Tab) : 'overview', cal: 'blocked' };
 }
 
-function Login({ unset, onDone }: { unset: boolean; onDone: () => void }) {
+function Login({ unset, note, onDone }: { unset: boolean; note?: boolean; onDone: () => void }) {
   const [pw, setPw] = useState('');
   const [remember, setRemember] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -83,6 +83,7 @@ function Login({ unset, onDone }: { unset: boolean; onDone: () => void }) {
               <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
                 <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Bu cihazda 30 gün açık kalsın
               </label>
+              {note && !err && <div className="adm-banner" role="alert" style={{ margin: 0 }}>Oturum sona erdi, lütfen tekrar giriş yapın.</div>}
               {err && <div className="adm-banner" role="alert" style={{ margin: 0 }}>{err}</div>}
               <button type="submit" className="lq-btn-ghost lq-btn-block" disabled={busy || !pw} style={{ justifyContent: 'center' }}>{busy ? 'Giriş yapılıyor…' : 'Giriş yap'}</button>
             </>}
@@ -102,6 +103,7 @@ export default function Admin() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
   const [openReq, setOpenReq] = useState<string | null>(null);
   const [openVoice, setOpenVoice] = useState<string | null>(null);
   const [openOffer, setOpenOffer] = useState<string | null>(null);
@@ -117,6 +119,23 @@ export default function Admin() {
     document.head.appendChild(m);
     return () => { m.remove(); };
   }, []);
+
+  // Session lost (401 from any admin call, or failed re-check): drop all loaded data and show the login screen
+  const lost = useCallback(() => {
+    setReqs(null); setSessions(null); setUsage(null); setBlocked([]); setErr(null);
+    setOpenReq(null); setOpenVoice(null); setOpenOffer(null); setOfferUnread(0); setProjectUnread(0); setNotifyMail(null);
+    setMenuOpen(false); setExpired(true); setAuth('out');
+  }, []);
+  useEffect(() => { window.addEventListener(SESSION_LOST, lost); return () => window.removeEventListener(SESSION_LOST, lost); }, [lost]);
+  // Re-validate on focus, tab visible, hash change and every 5 minutes
+  useEffect(() => {
+    if (auth !== 'in' || DEMO) return;
+    const re = () => { api('/api/admin/me').catch((x) => { if (x instanceof ApiError && x.status === 401) lost(); }); };
+    const vis = () => { if (document.visibilityState === 'visible') re(); };
+    window.addEventListener('focus', re); window.addEventListener('hashchange', re); document.addEventListener('visibilitychange', vis);
+    const t = window.setInterval(re, 5 * 60 * 1000);
+    return () => { window.removeEventListener('focus', re); window.removeEventListener('hashchange', re); document.removeEventListener('visibilitychange', vis); window.clearInterval(t); };
+  }, [auth, lost]);
 
   const check = useCallback(() => {
     api('/api/admin/me').then(() => setAuth('in')).catch((x) => setAuth(x instanceof ApiError && x.status === 503 ? 'unset' : 'out'));
@@ -134,11 +153,11 @@ export default function Admin() {
       api<Usage>('/api/admin/tts-usage').then(setUsage).catch(() => setUsage(null));
       api<{ blocked: string[] }>('/api/availability').then((a) => setBlocked(a.blocked)).catch(() => setBlocked([]));
     } catch (x) {
-      if (x instanceof ApiError && x.status === 401) { setAuth('out'); return; }
+      if (x instanceof ApiError && x.status === 401) { lost(); return; }
       setErr('Kayıtlar yüklenemedi. Sayfayı yenileyip tekrar deneyin.');
       setReqs((p) => p ?? []); setSessions((p) => p ?? []);
     }
-  }, []);
+  }, [lost]);
   useEffect(() => { if (auth === 'in') load(); }, [auth, load]);
   // Badge for client messages / acceptances on offers (refreshed when switching tabs)
   useEffect(() => {
@@ -164,7 +183,7 @@ export default function Admin() {
   const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
 
   if (auth === 'checking') return <div data-site-theme="liquid" className="adm-login" />;
-  if (auth !== 'in') return <div data-site-theme="liquid"><Login unset={auth === 'unset'} onDone={() => setAuth('in')} /></div>;
+  if (auth !== 'in') return <div data-site-theme="liquid"><Login unset={auth === 'unset'} note={expired} onDone={() => { setExpired(false); setAuth('in'); }} /></div>;
 
   const unread = (reqs ?? []).filter((r) => !r.read).length;
   const badges: Partial<Record<Tab, number>> = { requests: unread, offers: offerUnread, projects: projectUnread };
