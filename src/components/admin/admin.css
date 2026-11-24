@@ -323,13 +323,9 @@ html[data-mode='light'] .adm .adm-badge, html[data-mode='light'] .adm .adm-group
 html[data-mode='light'] [data-site-theme='liquid'].adm { --adm-g-in: #1747b5; --adm-g-biz: #086655; --adm-g-plan: #7a4b00; --adm-g-mkt: #a8360a; --adm-g-sys: #3a4d6e; --adm-g-gen: #1747b5; }
 html[data-mode='light'] .adm .adm-nav[aria-current='page'] { background: color-mix(in srgb, var(--g) 16%, #fff); }
 html[data-mode='light'] .adm-pchip { background: color-mix(in srgb, var(--g) 12%, #fff); }
-/* beats theme.css pill rule (specificity 0,4,1) via the id-weight :not(#_) */
-[data-site-theme='liquid'] .adm button:is(.adm-nav, .adm-row, .adm-todo-b, .adm-hint-head, .adm-rowmain):not(#_) { border-radius: 8px !important; }
-[data-site-theme='liquid'] .adm button.adm-nav:not(#_) { border-radius: 6px !important; }
-[data-site-theme='liquid'] .adm button.adm-hint-head:not(#_) { border-radius: 8px !important; }
-/* rectangular rows, radius 8px (owner 2026-11-24); badges/dots/bars stay round */
-[data-site-theme='liquid'] .adm button:is(.adm-nav, .adm-row, .adm-todo-b):not(#_),
-[data-site-theme='liquid'] .adm .adm-nav[aria-current='page']:not(#_),
-[data-site-theme='liquid'] .adm .adm-row.plain:not(#_) { border-radius: 8px !important; }
-.adm .adm-nav, .adm .adm-nav[aria-current='page'] { border-radius: 8px !important; }
+/* theme.css pill rule is (0,4,1) !important. NOTE: .adm itself carries data-site-theme, so '[data-site-theme] .adm ...' never matches; id-weight :not(#_) beats it */
+.adm button:is(.adm-nav, .adm-row, .adm-todo-b, .adm-hint-head, .adm-rowmain):not(#_) { border-radius: 8px !important; }
+.adm button.adm-nav:not(#_) { border-radius: 6px !important; }
 .adm .adm-areacard .adm-row, .adm .adm-todo-b { border-left-width: 3px; border-left-style: solid; }
+
+.adm :is(button,a,span).adm-pchip:not(#_) { border-radius: 6px !important }
