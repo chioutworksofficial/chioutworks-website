@@ -168,14 +168,15 @@ export default function Admin() {
 
   const unread = (reqs ?? []).filter((r) => !r.read).length;
   const badges: Partial<Record<Tab, number>> = { requests: unread, offers: offerUnread, projects: projectUnread };
-  const go = (t: Tab, id?: string) => {
+  const go = (t: Tab, id?: string, smooth = false) => {
     const al = ALIAS[t]; const target = al ? al.tab : t;
     if (al?.cal) setCalSec(al.cal);
     setTab(target); setMenuOpen(false);
     if (target === 'requests') setOpenReq(id ?? null); if (target === 'voice') setOpenVoice(id ?? null); if (target === 'offers') setOpenOffer(id ?? null);
     if (!location.pathname.endsWith('/voice-agent')) history.replaceState(null, '', `${location.pathname}${location.search}#${target}`);
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: smooth && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto' });
   };
+  const home = () => { setTip(null); go('overview', undefined, true); };
   const showTip = (e: React.SyntheticEvent<HTMLElement>, text: string) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text, top: r.top + r.height / 2, left: r.right + 10 }); };
   const nav = (sheet: boolean) => GROUPS.map((g) => {
     const sum = g.tabs.reduce((n, t) => n + (badges[t.key] ?? 0), 0);
@@ -198,7 +199,7 @@ export default function Admin() {
   return (
     <div data-site-theme="liquid" className="adm">
       <aside className="adm-side" aria-label="Yönetim menüsü">
-        <div className="adm-logo">Chioutworks<small>Yönetim</small></div>
+        <button type="button" className="adm-logo adm-logo-btn" aria-label="Genel bakışa git" onClick={home}>Chioutworks<small>Yönetim</small></button>
         <nav className="adm-navlist">{nav(false)}</nav>
         {tip && <div id="adm-tip" role="tooltip" className="adm-tip" style={{ top: tip.top, left: tip.left }}>{tip.text}</div>}
         <div className="adm-sidefoot">
@@ -216,7 +217,7 @@ export default function Admin() {
       {menuOpen && <>
         <div className="adm-sheet-bg" onClick={() => setMenuOpen(false)} />
         <div id="adm-sheet" className="adm-sheet" role="dialog" aria-modal="true" aria-label="Menü">
-          <div className="adm-sheet-head"><div className="adm-logo" style={{ padding: 0 }}>Chioutworks<small>Yönetim</small></div><button className="lq-btn-ghost adm-btn sm" onClick={() => setMenuOpen(false)}>Kapat</button></div>
+          <div className="adm-sheet-head"><button type="button" className="adm-logo adm-logo-btn" style={{ padding: 0 }} aria-label="Genel bakışa git" onClick={home}>Chioutworks<small>Yönetim</small></button><button className="lq-btn-ghost adm-btn sm" onClick={() => setMenuOpen(false)}>Kapat</button></div>
           <nav className="adm-navlist">{nav(true)}</nav>
           <button className="adm-nav" onClick={logout}>Çıkış</button>
         </div>

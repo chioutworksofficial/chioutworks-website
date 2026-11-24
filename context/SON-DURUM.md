@@ -1,3 +1,11 @@
+## 2026-11-25 — yayında
+- Voice Agent (Vapi): sekmeler Aranacaklar / Gelen aramalar / Arama kayıtları (transkript, kayıt varsa dinle-indir, CSV) / Randevular / Senaryo; Ayarlar en altta. 4 dilde sistem talimatı (context/vapi-asistan-talimati.md). Vapi asistanının talimat alanına `{{system_prompt}}` yazılmalı.
+- Satış: Apollo→LeadMash URL üretici; derin analiz + PDF; izinli kişilere rapor e-postası; Apify website-content-crawler ile "Tam tara" ve "Derin araştırma" (aylık 1,50 $ tavan). APIFY_TOKEN bekleniyor.
+- Hesaplar ve API: anahtar durumu, ücretler, canlı bakiyeler (fal.ai canlı; ElevenLabs/Apify/Stripe anahtar bekliyor). YOUTUBE_API_KEY bekleniyor.
+- Sesli asistan: (Silence) notları susturuldu, telefonda yarı çift yön (yankı), İngilizce kayma koruması, 3. turdan sonra kart, marka modele yalnızca söylenişle gider, kapanış bir kez. Koruma: `node scripts/voice-guard.mjs`.
+- Admin: renkli gruplar, ikonlar, köşeli satırlar, Bugün ne yapmalıyım, sekme ipuçları, logo → Genel bakış.
+- Sahibe sorulanlar: rapor e-postasında "arayayım/arayalım", "teklif linki gelecek" sözü, form/asistan kişilerine rapor, gizlilik ekleri; fal.ai Trend Radar'da A seçeneği mi.
+
 > **KARAR — otonom satış motoru yalnızca altyapı (sahip, 2026-11-24):** n8n + Apify (Google Maps, Website Content Crawler, perplexity-search-scraper) + Vapi + WhatsApp Business akışı hazır tutulacak ama ÇALIŞTIRILMAYACAK. Öncelik bitmeyen işler; alan adı eklense bile Voice Agent/otomasyon kapalı, sesli asistan normal devam. İlk birkaç müşteri mevcut sistemle bulunacak; canlıya alma kararı sahipte. Ayrıntı: kararlar.md 2026-11-24.
 
 ## 2026-11-24 (akşam) — yayına hazır, "deploy et" bekleniyor

@@ -145,6 +145,7 @@ const scriptNow = async (): Promise<Record<ScriptLang, Script>> => {
   return Object.fromEntries(SCRIPT_LANGS.map((l) => [l, { ...DEFAULT_SCRIPT[l], system: VAPI_SYSTEM_PROMPT[l], ...(st[l] ?? {}) }])) as Record<ScriptLang, Script>;
 };
 const pub = (c: Row) => ({ id: c.id, name: c.name, phone: c.phone, notes: c.notes ?? '', sector: c.sector ?? 'Genel', status: c.status, preferred_time: c.preferred_time ?? 'any', doNotCall: c.doNotCall === true });
+const maskTail = (p: string) => (p.replace(/\D/g, '').length >= 4 ? `${'•'.repeat(6)}${p.replace(/\D/g, '').slice(-3)}` : '');
 const bad = (res: Response, message: string, code = 400) => res.status(code).json({ ok: false, error: 'invalid', message });
 const HM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const scheduleS = z.object({ days: z.array(z.number().int().min(0).max(6)).min(1).max(7), start: z.string().regex(HM), end: z.string().regex(HM), slotMinutes: z.number().int().min(5).max(240), buffer: z.number().int().min(0).max(120) })
@@ -233,13 +234,13 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
       const abuse = ABUSE.test(summary);   // set by the summary prompt when the caller probed/attacked the assistant
       const base: Row = rec ?? { id: rid('call'), createdAt: new Date().toISOString(), customer_id: cust?.id ?? '', customer_name: cust?.name ?? '', callId, appointmentStart: '', simulated: false };
       const booked = cust?.status === 'booked';
-      Object.assign(base, { summary: abuse && !summary.startsWith('[abuse_suspected]') ? `[abuse_suspected] ${summary}` : summary, outcome: abuse ? 'abuse_suspected' : undefined, durationSec: secs, endedReason: ended, recordingUrl: rUrl.startsWith('https://') && rUrl.length <= 500 ? rUrl : '', status: booked ? 'booked' : noAns ? 'no_answer' : (cust?.status === 'calling' ? 'to_call' : base.status ?? 'to_call') });
+      Object.assign(base, { direction: m.call?.type === 'inboundPhoneCall' ? 'in' : 'out', transcript: String(m.artifact?.transcript ?? '').slice(0, 20000), callerMasked: m.call?.type === 'inboundPhoneCall' ? maskTail(String(m.call?.customer?.number ?? '')) : base.callerMasked, summary: abuse && !summary.startsWith('[abuse_suspected]') ? `[abuse_suspected] ${summary}` : summary, outcome: abuse ? 'abuse_suspected' : undefined, durationSec: secs, endedReason: ended, recordingUrl: rUrl.startsWith('https://') && rUrl.length <= 500 ? rUrl : '', status: booked ? 'booked' : noAns ? 'no_answer' : (cust?.status === 'calling' ? 'to_call' : base.status ?? 'to_call') });
       await tPut('calls', base);
       if (cust && cust.status === 'calling') { cust.status = booked ? 'booked' : noAns ? 'no_answer' : 'to_call'; await tPut('customers', cust); }
       if (cust && !base.signalled) {   // idempotent per call id: a Vapi retry of the same report does not repeat the calendar/score work
         base.signalled = true; await tPut('calls', base);
         const txt = `${summary} ${String(m.artifact?.transcript ?? '').slice(0, 3000)}`;
-        if (NOT_INTERESTED.test(txt) && !booked) { cust.doNotCall = true; await tPut('customers', cust); await dncSet(cust.phone, true); }
+        if (NOT_INTERESTED.test(txt) && !booked) { cust.doNotCall = true; await tPut('customers', cust); await dncSet(cust.phone, true); base.notInterested = true; await tPut('calls', base); }
         else if (noAns || CALLBACK.test(txt)) await addCalendarEntry({ kind: 'recall', source: 'voice-agent', phone: cust.phone, refTab: 'voice', refId: cust.id, preferredChannel: 'phone', score: 'kararsız', inDays: 1 });
         else if (!abuse && (booked || secs >= 30)) {
           const score = booked ? 'sıcak' : leadScore({ hasContact: true, submitted: false, text: summary || txt });
@@ -424,14 +425,71 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
   }));
   app.patch(`${A}/queue/:id`, admin(async (req, res) => {
     const b = z.object({ status: z.enum(STATUS).optional(), name: z.string().trim().min(1).max(80).optional(), phone: z.string().trim().max(40).optional(), notes: z.string().max(500).optional(),
-      sector: z.string().max(60).optional(), preferred_time: z.enum(['morning', 'afternoon', 'any']).optional() }).safeParse(req.body ?? {});
+      sector: z.string().max(60).optional(), preferred_time: z.enum(['morning', 'afternoon', 'any']).optional(), doNotCall: z.boolean().optional() }).safeParse(req.body ?? {});
     const c = IDP.test(req.params.id) ? (await tList('customers')).find((x) => x.id === req.params.id) : null;
     if (!b.success || !c) return b.success ? res.status(404).json({ error: 'not_found' }) : bad(res, 'geçersiz istek');
-    Object.assign(c, b.data); await tPut('customers', c); return res.json({ ok: true, customer: c });
+    Object.assign(c, b.data); if (b.data.doNotCall !== undefined) await dncSet(c.phone, b.data.doNotCall); await tPut('customers', c); return res.json({ ok: true, customer: c });
   }));
   app.delete(`${A}/queue/:id`, admin(async (req, res) => { if (IDP.test(req.params.id)) await tDel('customers', req.params.id); return res.json({ ok: true }); }));
 
-  app.get(`${A}/calls`, admin(async (_req, res) => res.json({ calls: (await tList('calls')).reverse().slice(0, 300) })));
+  // ── read-only call log views (list with paging/filters, summary, detail, recording proxy) ──
+  type Outcome = 'booked' | 'interested' | 'not_interested' | 'no_answer' | 'abuse_suspected' | 'calling' | 'simulated' | 'open';
+  const outcomeOf = (c: Row): Outcome => c.outcome === 'abuse_suspected' ? 'abuse_suspected' : c.simulated ? 'simulated' : c.status === 'calling' ? 'calling' : c.status === 'booked' ? 'booked'
+    : c.status === 'no_answer' ? 'no_answer' : c.notInterested ? 'not_interested' : Number(c.durationSec ?? 0) >= 30 ? 'interested' : 'open';
+  const OUTCOMES: Outcome[] = ['booked', 'interested', 'not_interested', 'no_answer', 'abuse_suspected', 'calling', 'simulated', 'open'];
+  /** Vapi recordings only: https, no credentials, *.vapi.ai, not a private host. Anything else is linked, never fetched by the server. */
+  const recHostOk = (u: string) => { try { const p = new URL(u); return p.protocol === 'https:' && !p.username && !p.password && !p.port && (p.hostname === 'vapi.ai' || p.hostname.endsWith('.vapi.ai')) && !hostBad(p.hostname); } catch { return false; } };
+  const listRow = (c: Row, cu: Row | undefined) => ({ id: c.id, createdAt: c.createdAt, direction: c.direction === 'in' ? 'in' : 'out', person: c.customer_name || c.callerMasked || '', business: cu?.business || cu?.sector || '', phoneMasked: cu?.phone ? maskTail(String(cu.phone)) : c.callerMasked ?? '',
+    durationSec: Number(c.durationSec ?? 0), outcome: outcomeOf(c), summary: String(c.summary ?? ''), simulated: c.simulated === true, hasRecording: !!c.recordingUrl, hasTranscript: !!c.transcript, appointmentStart: c.appointmentStart ?? '' });
+  app.get(`${A}/calls`, admin(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const q = z.object({ page: z.coerce.number().int().min(1).max(10000).default(1), limit: z.coerce.number().int().min(1).max(1000).default(25), from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      outcome: z.enum(OUTCOMES as [Outcome, ...Outcome[]]).optional(), direction: z.enum(['in', 'out']).optional(), recording: z.enum(['1']).optional(), q: z.string().trim().max(80).optional() }).safeParse(req.query);
+    if (!q.success) return bad(res, 'geçersiz filtre');
+    const f = q.data; const cust = new Map((await tList('customers')).map((c) => [c.id, c])); const needle = f.q?.toLowerCase();
+    const rows = (await tList('calls')).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((c) => listRow(c, cust.get(c.customer_id))).filter((r) => {
+      const d = berlinParts(Date.parse(r.createdAt)).date;
+      return (!f.from || d >= f.from) && (!f.to || d <= f.to) && (!f.outcome || r.outcome === f.outcome) && (!f.direction || r.direction === f.direction) && (!f.recording || r.hasRecording)
+        && (!needle || `${r.person} ${r.business} ${r.summary}`.toLowerCase().includes(needle));
+    });
+    return res.json({ calls: rows.slice((f.page - 1) * f.limit, f.page * f.limit), total: rows.length, page: f.page, pageSize: f.limit });
+  }));
+  app.get(`${A}/summary`, admin(async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const s = await getSettings(); const all = (await tList('calls')).map((c) => ({ c, o: outcomeOf(c) }));
+    const today = berlinParts(Date.now()).date; const weekAgo = berlinParts(Date.now() - 6 * 864e5).date;
+    const dateOf = (c: Row) => berlinParts(Date.parse(c.createdAt)).date;
+    const real = all.filter((x) => !x.c.simulated);
+    const talked = real.filter((x) => Number(x.c.durationSec ?? 0) > 0 && x.o !== 'no_answer');
+    const answered = real.filter((x) => ['booked', 'interested', 'not_interested', 'open'].includes(x.o));
+    const positive = answered.filter((x) => x.o === 'booked' || x.o === 'interested').length;
+    const keyReady = !!(s.vapiKeyEnc && s.vapiAssistantId && s.vapiPhoneNumberId && s.vapiSecretHash);
+    return res.json({ mode: s.mode, vapiConnected: keyReady, liveReady: s.mode === 'live' && keyReady, today: all.filter((x) => dateOf(x.c) === today).length, week: all.filter((x) => dateOf(x.c) >= weekAgo).length,
+      avgDurationSec: talked.length ? Math.round(talked.reduce((n, x) => n + Number(x.c.durationSec ?? 0), 0) / talked.length) : 0, positiveRate: answered.length ? Math.round((positive / answered.length) * 100) : null, answered: answered.length,
+      doNotCall: (await dncList()).size, inbound: all.filter((x) => x.c.direction === 'in').length });
+  }));
+  app.get(`${A}/calls/:id`, admin(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const c = IDP.test(req.params.id) ? (await tList('calls')).find((x) => x.id === req.params.id) : null;
+    if (!c) return res.status(404).json({ error: 'not_found' });
+    const cu = c.customer_id ? (await tList('customers')).find((x) => x.id === c.customer_id) : undefined;
+    const appts = c.customer_id ? (await tList('appointments')).filter((a) => a.customer_id === c.customer_id).map((a) => ({ id: a.id, start: a.start, end: a.end, notes: a.notes ?? '' })) : [];
+    const ru = String(c.recordingUrl ?? '');
+    return res.json({ call: { ...listRow(c, cu), transcript: String(c.transcript ?? ''), endedReason: c.endedReason ?? '', callId: c.callId ?? '' }, customer: cu ? { id: cu.id, name: cu.name, phoneMasked: maskTail(String(cu.phone ?? '')), sector: cu.sector ?? '', sourceLeadId: cu.sourceLeadId ?? '', sourceRequestId: cu.sourceRequestId ?? '', doNotCall: cu.doNotCall === true } : null,
+      appointments: appts, recording: ru ? { proxy: recHostOk(ru), url: recHostOk(ru) ? '' : ru } : null });
+  }));
+  app.get(`${A}/calls/:id/recording`, admin(async (req, res) => {
+    const c = IDP.test(req.params.id) ? (await tList('calls')).find((x) => x.id === req.params.id) : null;
+    const u = String(c?.recordingUrl ?? '');
+    if (!c || !u) return res.status(404).json({ error: 'not_found' });
+    if (!recHostOk(u) || !(await safeFetchUrl(u))) return res.status(400).json({ error: 'not_proxied' });
+    const r = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(20000) }).catch(() => null);
+    const type = r?.headers.get('content-type') ?? '';
+    if (!r || !r.ok || !r.body || !/^audio\//i.test(type) || Number(r.headers.get('content-length') ?? 0) > 60e6) return res.status(502).json({ error: 'upstream' });
+    res.set({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': `inline; filename="${c.id}.${/mpeg|mp3/.test(type) ? 'mp3' : /wav/.test(type) ? 'wav' : 'audio'}"` });
+    const buf = Buffer.from(await r.arrayBuffer()); if (buf.length > 60e6) return res.status(502).json({ error: 'upstream' });
+    return res.send(buf);
+  }));
   app.get(`${A}/appointments`, admin(async (_req, res) => res.json({ appointments: (await tList('appointments')).sort((a, b) => b.start.localeCompare(a.start)) })));
   app.delete(`${A}/appointments/:id`, admin(async (req, res) => {
     const a = IDP.test(req.params.id) ? (await tList('appointments')).find((x) => x.id === req.params.id) : null;

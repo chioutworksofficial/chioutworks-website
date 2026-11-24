@@ -329,3 +329,7 @@ html[data-mode='light'] .adm-pchip { background: color-mix(in srgb, var(--g) 12%
 .adm .adm-areacard .adm-row, .adm .adm-todo-b { border-left-width: 3px; border-left-style: solid; }
 
 .adm :is(button,a,span).adm-pchip:not(#_) { border-radius: 6px !important }
+
+/* Logo = Genel bakışa dön. theme.css'in düğme pill kuralı !important; logo düz metin gibi kalır. */
+.adm button.adm-logo-btn:not(#_) { border: 0; background: transparent; text-align: left; cursor: pointer; border-radius: 6px !important; }
+.adm button.adm-logo-btn:not(#_):focus-visible { outline: 2px solid var(--c-lilac); outline-offset: 4px; }

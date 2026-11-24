@@ -1,0 +1,75 @@
+/* Admin "Voice Agent": durum şeridi, alt sekmeler, kuyruk, kayıtlar, detay paneli. Yalnızca CSS değişkenleri; masaüstü ve telefon ayrı. */
+[data-state='abuse_suspected'] { --c: var(--adm-bad); }
+[data-state='simulated'], [data-state='open'] { --c: var(--adm-src-manual); }
+.vo-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.vo-tile { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--c-hairline); border-radius: var(--r-card); background: var(--c-inkline); min-width: 0; }
+.vo-tile b { font: 500 20px/1.1 var(--font-display); color: var(--c-quartz); }
+.vo-tile b[data-state] { color: color-mix(in srgb, var(--c) 80%, white); }
+html[data-mode='light'] .vo-tile b[data-state] { color: color-mix(in srgb, var(--c) 78%, black); }
+.vo-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--c-hairline); overflow-x: auto; scrollbar-width: none; }
+.vo-tabs::-webkit-scrollbar { display: none; }
+.adm button.vo-tab:not(#_) { flex: none; border-radius: 8px 8px 0 0 !important; padding: 10px 16px; border: 1px solid transparent; border-bottom: 2px solid transparent; background: transparent; color: var(--c-ash); font: 500 14px/1.2 var(--font-body); cursor: pointer; }
+.adm button.vo-tab:not(#_):hover { color: var(--c-quartz); }
+.adm button.vo-tab:not(#_)[aria-selected='true'] { color: var(--c-quartz); border-bottom-color: var(--c-signal); }
+.adm button.vo-tab:not(#_):focus-visible { outline: 2px solid var(--c-lilac); outline-offset: -2px; }
+.vo-tab small { margin-left: 6px; color: var(--c-ash); font-size: 12px; }
+.vo-pick { display: grid; gap: 8px; max-height: 260px; overflow-y: auto; }
+.vo-pick label { display: flex; gap: 10px; align-items: center; font-size: 13px; }
+.vo-q { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.vo-qrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px; border: 1px solid var(--c-hairline); border-radius: var(--r-card); background: var(--c-inkline); }
+.vo-qtop { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.vo-qtop b { font: 500 15px/1.3 var(--font-display); color: var(--c-quartz); }
+.vo-reason { margin: 6px 0; font-size: 14px; line-height: 1.45; color: var(--c-mist); }
+.vo-reason .adm-label { display: block; }
+.vo-qmeta { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.vo-qact { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; max-width: 330px; }
+.vo-confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--c-quartz); }
+.vo-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: end; margin-bottom: 14px; }
+.vo-filters label { display: grid; gap: 4px; }
+.vo-filters .vo-search { grid-column: span 2; }
+.vo-filters .vo-rec { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--c-mist); min-height: 40px; }
+.vo-sum { white-space: normal; min-width: 220px; max-width: 360px; overflow-wrap: anywhere; }
+.vo-cards { display: none; list-style: none; margin: 0; padding: 0; gap: 8px; }
+.vo-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+.vo-drawer { width: min(560px, 100%); }
+.vo-dmeta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.vo-sec { display: grid; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--c-edge); }
+.vo-sec h3 { margin: 0; font: 500 14px/1.2 var(--font-display); color: var(--c-quartz); }
+.vo-sec p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--c-mist); overflow-wrap: anywhere; }
+.vo-sec audio { width: 100%; }
+.vo-links { margin: 0; padding-left: 18px; font-size: 13px; color: var(--c-mist); display: grid; gap: 4px; }
+.vo-chat { display: grid; gap: 8px; max-height: 360px; overflow-y: auto; padding-right: 4px; }
+.vo-chat p { padding: 8px 12px; border-radius: var(--r-input); background: var(--c-inkline); font-size: 13px; }
+.vo-chat p[data-who='ai'] { border-left: 3px solid var(--c-signal); }
+.vo-chat p[data-who='user'] { border-left: 3px solid var(--c-ash); }
+.vo-chat .adm-label { display: block; }
+.vo-settings > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vo-settings > summary::-webkit-details-marker { display: none; }
+.vo-settings > summary h2 { margin: 0; }
+.vo-settings[open] > summary { margin-bottom: 12px; }
+.vo-settings > summary:focus-visible { outline: 2px solid var(--c-lilac); outline-offset: 4px; }
+.vo-stack { display: grid; gap: 16px; }
+@media (max-width: 899px) {
+  .vo-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .vo-tile { padding: 10px 12px; }
+  .vo-tile b { font-size: 17px; }
+  .vo-qrow { grid-template-columns: 1fr; gap: 12px; }
+  .vo-qact { justify-content: flex-start; max-width: none; }
+  .vo-qact .adm-btn { flex: 1 1 calc(50% - 8px); min-height: 40px; }
+  .vo-filters { grid-template-columns: 1fr 1fr; }
+  .vo-filters .vo-search { grid-column: 1 / -1; }
+  .vo-desk { display: none; }
+  .vo-cards { display: grid; }
+  .adm button.vo-card:not(#_) { display: grid; gap: 6px; width: 100%; text-align: left; padding: 12px; border: 1px solid var(--c-hairline); border-radius: 12px !important; background: var(--c-inkline); color: var(--c-mist); cursor: pointer; font: inherit; }
+  .vo-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .vo-card-top b { color: var(--c-quartz); font: 500 15px/1.3 var(--font-display); min-width: 0; overflow-wrap: anywhere; }
+  .vo-card-sum { font-size: 13px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .vo-drawer { padding: 16px; }
+}
+@media (min-width: 900px) { .vo-card { display: none; } }
+@media (prefers-reduced-motion: reduce) { .vo-tab, .vo-card { transition: none; } }
+.adm-table td.vo-sum { white-space: normal; min-width: 220px; max-width: 380px; overflow-wrap: anywhere; }
+.vo-stack > *, .vo-filters > *, .vo-cards li { min-width: 0; }
+.vo-filters .adm-input { min-width: 0; max-width: 100%; }
+.vo-filters input[type='date'] { padding: 10px 8px; }
+@media (max-width: 899px) { .vo-stack { overflow-x: clip; } .vo-pager { flex-wrap: wrap; } }

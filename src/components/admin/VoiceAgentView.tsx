@@ -1,22 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ApiError, fmtDate, type Req } from './api';
-import { Check, SelectHeader, useNote, useSelection } from './bulk';
+import { api, fmtDate, type Req } from './api';
+import { useNote } from './bulk';
 import CallScript from './CallScript';
+import CallsTab from './voice/CallsTab';
+import QueueTab from './voice/QueueTab';
+import StatusStrip from './voice/StatusStrip';
+import { msgOf } from './voice/shared';
+import type { Appt, Cust, Summary } from './voice/types';
+import { fmtSlot } from './voice/types';
+import './voice/voice.css';
 
-type St = 'to_call' | 'calling' | 'booked' | 'no_answer';
-const ST: Record<St, string> = { to_call: 'Aranacak', calling: 'Aranıyor', booked: 'Randevu alındı', no_answer: 'Cevap yok' };
-const PT: Record<string, string> = { morning: 'Sabah', afternoon: 'Öğleden sonra', any: 'Fark etmez' };
 const DAYS = [[1, 'Pzt'], [2, 'Sal'], [3, 'Çar'], [4, 'Per'], [5, 'Cum'], [6, 'Cmt'], [0, 'Paz']] as const;
 interface Sched { days: number[]; start: string; end: string; slotMinutes: number; buffer: number }
 interface Cfg { mode: 'simulation' | 'live'; vapiAssistantId: string; vapiPhoneNumberId: string; n8nWebhookUrl: string; schedule: Sched; vapiKey: { configured: boolean; last4: string }; vapiSecret: { configured: boolean; last4: string }; webhookUrl: string; token: { exists: boolean; createdAt: string | null; revealable: boolean; last4: string }; baseUrl: string; endpoints: string[] }
-interface Cust { id: string; name: string; phone: string; sector: string; preferred_time: string; status: St }
-interface Call { id: string; createdAt: string; customer_name: string; status: string; summary: string; recordingUrl: string; appointmentStart: string; simulated: boolean }
-interface Appt { id: string; name: string; start: string; end: string; notes: string }
-const mask = (p: string) => (p.length > 3 ? `${'•'.repeat(Math.min(p.length - 3, 8))}${p.slice(-3)}` : p);
-const msgOf = (x: unknown, d: string) => (x instanceof ApiError ? x.data?.message ?? (x.status === 401 ? 'Oturum süresi doldu, yeniden giriş yapın.' : d) : d);
-const fmtSlot = (s: string) => `${s.slice(8, 10)}.${s.slice(5, 7)}.${s.slice(0, 4)} ${s.slice(11, 16)}`;
+type Sub = 'queue' | 'inbound' | 'log' | 'appts' | 'script';
+const SUBS: [Sub, string][] = [['queue', 'Aranacaklar'], ['inbound', 'Gelen aramalar'], ['log', 'Arama kayıtları'], ['appts', 'Randevular'], ['script', 'Senaryo']];
 
 export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
+  const [sub, setSub] = useState<Sub>('queue');
+  const [sum, setSum] = useState<Summary | null>(null);
+  const [ver, setVer] = useState(0);
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [form, setForm] = useState({ key: '', secret: '', agent: '', phone: '', n8n: '', mode: 'simulation' as 'simulation' | 'live', sc: { days: [1, 2, 3, 4, 5], start: '09:00', end: '18:00', slotMinutes: 30, buffer: 0 } as Sched });
   const [token, setToken] = useState<string | null>(null);
@@ -25,30 +28,27 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
   const hideT = useRef<number>(0);
   const tNote = useNote();
   const [queue, setQueue] = useState<Cust[]>([]);
-  const [calls, setCalls] = useState<Call[]>([]);
   const [appts, setAppts] = useState<Appt[]>([]);
-  const [picker, setPicker] = useState(false);
-  const [pick, setPick] = useState<Set<string>>(new Set());
-  const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
-  const setNote = useNote(); const qNote = useNote(); const pNote = useNote();
-  const sel = useSelection(queue.map((c) => c.id));
+  const setNote = useNote(); const pNote = useNote();
 
+  const loadSum = useCallback(() => api<Summary>('/api/admin/voice-agent/summary').then(setSum).catch(() => {}), []);
+  const loadAll = useCallback(async () => {
+    const [q, a] = await Promise.all([api<{ customers: Cust[] }>('/api/admin/voice-agent/queue'), api<{ appointments: Appt[] }>('/api/admin/voice-agent/appointments')]);
+    setQueue(q.customers); setAppts(a.appointments);
+  }, []);
+  const reload = useCallback(async () => { await Promise.all([loadAll(), loadSum()]); setVer((v) => v + 1); }, [loadAll, loadSum]);
   const loadCfg = useCallback(async () => {
     const c = await api<Cfg>('/api/admin/voice-agent/settings'); setCfg(c);
     setForm({ key: '', secret: '', agent: c.vapiAssistantId, phone: c.vapiPhoneNumberId, n8n: c.n8nWebhookUrl, mode: c.mode, sc: c.schedule });
   }, []);
-  const loadAll = useCallback(async () => {
-    const [q, c, a] = await Promise.all([api<{ customers: Cust[] }>('/api/admin/voice-agent/queue'), api<{ calls: Call[] }>('/api/admin/voice-agent/calls'), api<{ appointments: Appt[] }>('/api/admin/voice-agent/appointments')]);
-    setQueue(q.customers); setCalls(c.calls); setAppts(a.appointments);
-  }, []);
-  useEffect(() => { loadCfg().catch((x) => setNote.show({ ok: false, text: msgOf(x, 'Ayarlar yüklenemedi.') })); loadAll().catch(() => qNote.show({ ok: false, text: 'Liste yüklenemedi.' })); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => { loadCfg().catch((x) => setNote.show({ ok: false, text: msgOf(x, 'Ayarlar yüklenemedi.') })); loadAll().catch(() => pNote.show({ ok: false, text: 'Liste yüklenemedi.' })); loadSum(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const save = async () => {
     setBusy(true);
     try {
       await api('/api/admin/voice-agent/settings', 'PUT', { vapiApiKey: form.key, vapiServerSecret: form.secret, vapiAssistantId: form.agent, vapiPhoneNumberId: form.phone, n8nWebhookUrl: form.n8n, mode: form.mode, schedule: form.sc });
-      await loadCfg(); setNote.show({ ok: true, text: 'Kaydedildi.' });
+      await loadCfg(); await loadSum(); setNote.show({ ok: true, text: 'Kaydedildi.' });
     } catch (x) { setNote.show({ ok: false, text: msgOf(x, 'Kaydedilemedi, tekrar deneyin.') }); }
     setBusy(false);
   };
@@ -66,21 +66,8 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
   const copyText = async (t: string) => { try { await navigator.clipboard.writeText(t); tNote.show({ ok: true, text: 'Kopyalandı' }); } catch { tNote.show({ ok: false, text: 'Kopyalanamadı, elle seçin.' }); } };
   const copyTok = async () => { try { await copyText(token ?? shown ?? (await fetchTok())); } catch (x) { tNote.show({ ok: false, text: msgOf(x, 'Kopyalanamadı.') }); } };
 
-  const have = new Set(queue.map((c) => (c as unknown as { sourceRequestId?: string }).sourceRequestId));
-  const withPhone = (reqs ?? []).filter((r) => (r.phone ?? '').trim() && !r.archived);
-  const add = async () => {
-    try { const r = await api<{ added: number; skipped: number }>('/api/admin/voice-agent/queue', 'POST', { requestIds: [...pick] }); setPick(new Set()); setPicker(false); await loadAll(); qNote.show({ ok: true, text: `${r.added} kişi eklendi${r.skipped ? `, ${r.skipped} atlandı` : ''}.` }); }
-    catch (x) { qNote.show({ ok: false, text: msgOf(x, 'Eklenemedi.') }); }
-  };
-  const setSt = async (id: string, status: St) => { try { await api(`/api/admin/voice-agent/queue/${id}`, 'PATCH', { status }); await loadAll(); } catch (x) { qNote.show({ ok: false, text: msgOf(x, 'Güncellenemedi.') }); } };
-  const del = async (id: string) => { try { await api(`/api/admin/voice-agent/queue/${id}`, 'DELETE'); await loadAll(); } catch (x) { qNote.show({ ok: false, text: msgOf(x, 'Silinemedi.') }); } };
-  const start = async () => {
-    setConfirm(false); setBusy(true);
-    try { const r = await api<{ message: string; results: { info: string }[] }>('/api/admin/voice-agent/start', 'POST', { customerIds: sel.sel }); sel.clear(); await loadAll(); qNote.show({ ok: true, text: `${r.message} ${[...new Set(r.results.map((x) => x.info))].join('; ')}` }); }
-    catch (x) { qNote.show({ ok: false, text: msgOf(x, 'Başlatılamadı.') }); }
-    setBusy(false);
-  };
   const delAppt = async (id: string) => { try { await api(`/api/admin/voice-agent/appointments/${id}`, 'DELETE'); await loadAll(); } catch (x) { pNote.show({ ok: false, text: msgOf(x, 'Silinemedi.') }); } };
+
   const testConn = async () => {
     try { const r = await api<{ ok: boolean; message: string }>('/api/admin/voice-agent/test-connection', 'POST'); setNote.show({ ok: r.ok, text: r.message }); }
     catch (x) { setNote.show({ ok: false, text: msgOf(x, 'Önce Vapi private API key girip kaydedin.') }); }
@@ -90,15 +77,10 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
   const num = (k: 'slotMinutes' | 'buffer') => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, sc: { ...f.sc, [k]: Number(e.target.value) } }));
   const fld = { display: 'grid', gap: 6, marginBottom: 12 } as const;
 
-  return (
+  const settingsInner = (
     <>
-      <h1 className="adm-h1">Voice Agent</h1>
-      <p className="adm-sub">Telefonda arayan yapay zekâ asistanı: ayarlar, arama kuyruğu, günlükler ve randevular. Simülasyon modunda gerçek arama yapılmaz.</p>
-
-      <div className="lq-card adm-card" style={{ marginBottom: 16 }}>
-        <div className="adm-head"><h2>Ayarlar</h2><span className="adm-chip" data-state={live ? 'bad' : 'paid'}>{live ? 'CANLI' : 'SİMÜLASYON'}</span></div>
-        {setNote.el}
-        {!cfg ? <div className="adm-skel" style={{ height: 200 }} /> : <>
+      {setNote.el}
+      {!cfg ? <div className="adm-skel" style={{ height: 200 }} /> : <>
           <div className="adm-banner" style={{ marginBottom: 12 }}>
             <b>Kurulum adımları (Vapi)</b>
             <ol className="adm-meta" style={{ margin: '6px 0 0', paddingLeft: 18 }}>
@@ -128,56 +110,36 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
             </div><span className="adm-meta">Dolu günler (Takvim) ve alınmış randevular otomatik çıkarılır.</span></div>
           <div className="adm-actions"><button type="button" className="lq-btn-ghost adm-btn adm-pri" onClick={save} disabled={busy}>{busy ? 'Kaydediliyor…' : 'Kaydet'}</button><button type="button" className="lq-btn-ghost adm-btn" onClick={testConn} disabled={busy}>Test bağlantısı</button></div>
 
-        </>}
-      </div>
+      </>}
+    </>
+  );
 
-      <div className="lq-card adm-card" style={{ marginBottom: 16 }}>
-        <div className="adm-head"><h2>Arama Kuyruğu</h2><button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setPicker(!picker)}>{picker ? 'Kapat' : 'Taleplerden ekle'}</button></div>
-        {qNote.el}
-        {picker && <div className="adm-banner">
-          {!withPhone.length ? 'Telefon numarası olan talep yok.' : <div style={{ display: 'grid', gap: 8, maxHeight: 260, overflowY: 'auto' }}>{withPhone.map((r) => (
-            <label key={r.id} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13 }}>
-              <input type="checkbox" className="adm-check" disabled={have.has(r.id)} checked={pick.has(r.id)} onChange={() => setPick((p) => { const n = new Set(p); if (n.has(r.id)) n.delete(r.id); else n.add(r.id); return n; })} />
-              <span>{r.name || 'İsimsiz'} · {mask(r.phone ?? '')}{have.has(r.id) ? ' · kuyrukta' : ''}</span></label>))}</div>}
-          <div className="adm-actions" style={{ marginTop: 10 }}><button type="button" className="lq-btn-ghost adm-btn sm adm-pri" disabled={!pick.size} onClick={add}>Ekle ({pick.size})</button></div>
+  return (
+    <>
+      <h1 className="adm-h1">Voice Agent</h1>
+      <p className="adm-sub">Telefonda arayan yapay zekâ asistanı: kuyruk, gelen aramalar, kayıtlar ve randevular. Simülasyon modunda gerçek arama yapılmaz; otomasyon hazır tutulur, çalıştırılmaz.</p>
+      <StatusStrip s={sum} />
+      <div className="vo-tabs" role="tablist" aria-label="Voice Agent bölümleri">
+        {SUBS.map(([k, l]) => <button key={k} type="button" role="tab" id={`vo-t-${k}`} aria-selected={sub === k} aria-controls="vo-panel" className="vo-tab" onClick={() => setSub(k)}>{l}{k === 'queue' && <small>{queue.filter((c) => !c.doNotCall && c.status !== 'booked').length}</small>}{k === 'inbound' && sum ? <small>{sum.inbound}</small> : null}</button>)}
+      </div>
+      <div id="vo-panel" role="tabpanel" aria-labelledby={`vo-t-${sub}`} className="vo-stack">
+        {sub === 'queue' && <QueueTab queue={queue} reqs={reqs} sum={sum} reload={reload} />}
+        {sub === 'inbound' && <CallsTab inbound version={ver} />}
+        {sub === 'log' && <CallsTab version={ver} />}
+        {sub === 'appts' && <div className="lq-card adm-card">
+          <div className="adm-head"><h2>Randevular</h2></div>
+          <p className="adm-sub">Asistanın araç çağrısıyla (book_appointment) aldığı randevular.</p>
+          {pNote.el}
+          {!appts.length ? <div className="adm-empty">Voice Agent randevusu yok</div> : <div className="adm-table-wrap"><table className="adm-table"><thead><tr><th>Başlangıç</th><th>Bitiş</th><th>Müşteri</th><th>Not</th><th /></tr></thead><tbody>{appts.map((a) => (
+            <tr key={a.id}><td>{fmtSlot(a.start)}</td><td>{a.end.slice(11, 16)}</td><td>{a.name}</td><td style={{ whiteSpace: 'normal' }}>{a.notes || '-'}</td><td><button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => delAppt(a.id)}>Sil</button></td></tr>))}</tbody></table></div>}
         </div>}
-        <SelectHeader s={sel} total={queue.length} />
-        {!queue.length ? <div className="adm-empty">Kuyrukta kimse yok</div> : <div className="adm-table-wrap"><table className="adm-table"><thead><tr><th /><th>Ad</th><th>Telefon</th><th>Sektör</th><th>Tercih</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>{queue.map((c) => (
-          <tr key={c.id}>
-            <td><Check checked={sel.has(c.id)} label={`Seç: ${c.name}`} onToggle={(sh) => sel.toggle(c.id, sh)} /></td>
-            <td>{c.name}</td><td>{mask(c.phone)}</td><td>{c.sector}</td><td>{PT[c.preferred_time] ?? '-'}</td>
-            <td><span className="adm-chip" data-state={c.status}>{ST[c.status]}</span></td>
-            <td><span style={{ display: 'inline-flex', gap: 6 }}>
-              <select className="adm-input" aria-label="Durum değiştir" style={{ width: 'auto', padding: '4px 8px', fontSize: 12 }} value={c.status} onChange={(e) => setSt(c.id, e.target.value as St)}>{(Object.keys(ST) as St[]).map((s) => <option key={s} value={s}>{ST[s]}</option>)}</select>
-              <button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => del(c.id)}>Sil</button></span></td>
-          </tr>))}</tbody></table></div>}
-        <div style={{ marginTop: 12 }}>
-          {confirm ? <div className="adm-banner" role="alert" style={{ marginBottom: 0 }}>
-            {sel.sel.length} kişi için {live ? 'GERÇEK arama başlatılacak' : 'simülasyon başlatılacak (arama yapılmaz)'}. Emin misiniz?
-            <div className="adm-actions" style={{ marginTop: 8 }}><button type="button" className="lq-btn-ghost adm-btn sm adm-pri" onClick={start}>Evet, başlat</button><button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setConfirm(false)}>Vazgeç</button></div></div>
-            : <button type="button" className="lq-btn-ghost adm-btn adm-pri" disabled={!sel.sel.length || busy} onClick={() => setConfirm(true)}>Seçilenleri Aramaya Başlat ({live ? 'Canlı' : 'Simülasyon'})</button>}
-        </div>
-      </div>
+        {sub === 'script' && <CallScript />}
 
-      <CallScript />
-
-      <div className="lq-card adm-card" style={{ marginBottom: 16 }}>
-        <div className="adm-head"><h2>Arama Logları</h2></div>
-        {!calls.length ? <div className="adm-empty">Henüz kayıt yok</div> : <div className="adm-table-wrap"><table className="adm-table"><thead><tr><th>Tarih</th><th>Müşteri</th><th>Durum</th><th>Özet</th><th>Ses kaydı</th><th>Randevu</th></tr></thead><tbody>{calls.map((c) => (
-          <tr key={c.id}><td>{fmtDate(c.createdAt)}</td><td>{c.customer_name}</td><td><span className="adm-chip" data-state={c.status}>{ST[c.status as St] ?? c.status}</span></td>
-            <td style={{ whiteSpace: 'normal', minWidth: 200 }}>{c.summary || '-'}</td>
-            <td>{c.recordingUrl ? <a href={c.recordingUrl} target="_blank" rel="noopener noreferrer">Dinle</a> : '-'}</td>
-            <td>{c.appointmentStart ? fmtSlot(c.appointmentStart) : '-'}</td></tr>))}</tbody></table></div>}
-      </div>
-
-      <div className="lq-card adm-card">
-        <div className="adm-head"><h2>Randevular (Voice Agent)</h2></div>
-        {pNote.el}
-        {!appts.length ? <div className="adm-empty">Voice Agent randevusu yok</div> : <div className="adm-table-wrap"><table className="adm-table"><thead><tr><th>Başlangıç</th><th>Bitiş</th><th>Müşteri</th><th>Not</th><th /></tr></thead><tbody>{appts.map((a) => (
-          <tr key={a.id}><td>{fmtSlot(a.start)}</td><td>{a.end.slice(11, 16)}</td><td>{a.name}</td><td style={{ whiteSpace: 'normal' }}>{a.notes || '-'}</td><td><button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => delAppt(a.id)}>Sil</button></td></tr>))}</tbody></table></div>}
-      </div>
-
-      {cfg && <div className="lq-card adm-card" style={{ marginTop: 16 }}>
+        <details className="lq-card adm-card vo-settings">
+          <summary><h2>Ayarlar ve bağlantı</h2><span className="adm-chip" data-state={live ? 'bad' : 'paid'}>{live ? 'CANLI' : 'SİMÜLASYON'}</span></summary>
+          {settingsInner}
+          {cfg && <div className="vo-stack" style={{ marginTop: 16 }}>
+            <section>
         <div className="adm-head"><h2>Bağlantı bilgileri</h2></div>
         {tNote.el}
         <div style={{ display: 'grid', gap: 6, marginBottom: 12 }}>
@@ -208,7 +170,10 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
         </div>
         <p className="adm-meta" style={{ margin: '10px 0 0' }}>Vapi'de assistant'ın Server URL alanına yukarıdaki webhook adresini yazın; Custom Credential olarak başlık adı <code style={{ fontFamily: 'var(--font-mono)' }}>X-Vapi-Secret</code> (Bearer öneki kapalı) ve yukarıda kaydettiğiniz secret'ı seçin. Assistant araçları (isteğe bağlı): <code style={{ fontFamily: 'var(--font-mono)' }}>check_availability(date)</code>, <code style={{ fontFamily: 'var(--font-mono)' }}>book_appointment(start, notes)</code>, <code style={{ fontFamily: 'var(--font-mono)' }}>mark_do_not_call()</code>.</p>
         <p className="adm-meta" style={{ margin: '10px 0 0' }}>Bearer token'lı REST uçları (n8n için): her istekte <code style={{ fontFamily: 'var(--font-mono)' }}>Authorization: Bearer &lt;token&gt;</code> gönderilir.</p>
-      </div>}
+            </section>
+          </div>}
+        </details>
+      </div>
     </>
   );
 }
