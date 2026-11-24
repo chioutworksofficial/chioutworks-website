@@ -78,7 +78,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const [vLast, setVLast] = useState('');
   const [vSal, setVSal] = useState<Salutation>('none');
   const [offer, setOffer] = useState(false);   // contact card during the call (offered once)
-  const [capEnd, setCapEnd] = useState(false);   // end-screen summary field expanded
+  const closingSaid = useRef(false);   // the form notice (closing sentence) was already said: never ask for it again
   const [captured, setCaptured] = useState<CaptureResult | null>(null);
   const offeredRef = useRef(false);
   const [gate, setGate] = useState(false);   // the in-call card is the mandatory "confirm to continue" gate
@@ -234,7 +234,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       visitorRef.current = NO_VISITOR; setVFirst(''); setVLast(''); setVSal('none'); setNameDone(false); voiceId.current = null; deletedRef.current = false;
       deadlineRef.current = 0; endReasonRef.current = ''; endedAtRef.current = 0; talkStart.current = 0; wrapSent.current = false; goAway.current = false; limitAt.current = 0; endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; softSent.current = false; reconnected.current = false; voiceStarted.current = false; setGraceUi(false);
       liveRole.current = null; liveCut.current = false; outBuf.current = ''; corrections.current = 0; setReconnecting(false); setCard(null); setCardSent(false); setCardErr(''); setCardBusy(false);
-      preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false); offeredRef.current = false; gateForce.current = false; enCorr.current = 0; setOffer(false); setGate(false); setCapEnd(false); setCaptured(null);
+      preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false); offeredRef.current = false; closingSaid.current = false; gateForce.current = false; enCorr.current = 0; setOffer(false); setGate(false); setCaptured(null);
       goPhase('consent'); startedAt.current = Date.now(); setOpen(true);
       if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('voicedemo')) {
         const n = Date.now();
@@ -475,12 +475,13 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     });
   };
 
+  const WRAP_CLOSED = 'WRAP_UP: the call time is over. The form notice was already said, do not repeat it. Say only your short farewell now, then call finish_conversation with reason done as your very last action.';
   const WRAP = 'WRAP_UP: the call time is over. Finish your current sentence, summarise briefly what was confirmed, then say the closing sentence exactly as instructed, completely with the farewell, and only then call finish_conversation with reason done as your very last action.';
   /** Soft limit / goAway: ask the model to wrap up, only while it is quiet (a text message would interrupt its speech). */
   const wrapNow = () => {
     const c = callRef.current;
     if (!c || wrapSent.current || finishPending.current || c.busy()) return;
-    wrapSent.current = true; c.sendText(WRAP);
+    wrapSent.current = true; c.sendText(closingSaid.current ? WRAP_CLOSED : WRAP);
   };
 
   const startTimerOnce = () => {
@@ -494,7 +495,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       if (cardRef.current === 'gate') { deadlineRef.current += 500; return; }   // the call waits for the contact card
       if (left <= 25 && !softSent.current && c && !c.busy()) {
         softSent.current = true;
-        c.sendText('TIME_UP: the call time is almost over. Finish your current sentence, summarise what was confirmed, then say the closing sentence exactly as instructed, completely with the farewell, then call finish_conversation with reason done as your very last action.');
+        c.sendText(closingSaid.current ? WRAP_CLOSED : 'TIME_UP: the call time is almost over. Finish your current sentence, summarise what was confirmed, then say the closing sentence exactly as instructed, completely with the farewell, then call finish_conversation with reason done as your very last action.');
       }
       if (left > 0 && !goAway.current) return;
       if (!c) { endReasonRef.current ||= goAway.current ? 'go_away' : 'time_limit'; endCall(); return; }
@@ -579,7 +580,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       onInterrupted: () => { liveCut.current = turnsRef.current[turnsRef.current.length - 1]?.role === 'assistant'; liveRole.current = null; outBuf.current = ''; },
       onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; const fix = pendingFix.current; pendingFix.current = ''; const fc = callRef.current; if (fix && fc && !finishPending.current && cardRef.current !== 'gate') void fc.whenPlaybackDone().then(() => { if (callRef.current === fc && !finishPending.current && !fc.busy()) fc.sendText(fix); }); liveTail.current = { user: '', assistant: '' }; if (finishPending.current && abuseRef.current) drain(); gateStart(); },
       onFinish: (reason) => {
-        if (reason === 'closing') {   // thanks said, not the end: wait for the visitor; after ~8 s of silence ask for the short farewell
+        if (reason === 'closing') {   closingSaid.current = true; // thanks said, not the end: wait for the visitor; after ~8 s of silence ask for the short farewell
           if (closingTimer.current) clearInterval(closingTimer.current);
           let quiet = 0, asked = false;
           const closingStart = Date.now();
@@ -957,9 +958,6 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
           ) : (
             <RequestWizard lang={lang} channel={captured?.channel} initial={captured ? { ...card, business: captured.business || card.business, email: captured.email || card.email, phone: captured.phone || card.phone } : card} restored={restored} getSession={async () => voiceId.current ?? await saveSession()} onClose={() => { teardown(); setOpen(false); }} />
           )}
-          {card && !captured && (capEnd
-            ? <div style={{ alignSelf: 'center', width: '100%' }}><ContactCapture lang={lang} variant="end" summary={[card.service, [card.business, card.city].filter(Boolean).join(', '), card.notes].filter(Boolean).join(' · ')} getSession={async () => voiceId.current ?? await saveSession()} onDone={onCaptured} onDismiss={() => setCapEnd(false)} /></div>
-            : <button type="button" style={{ ...btn, alignSelf: 'center', border: 0, color: 'var(--lq-silver)', textDecoration: 'underline', fontSize: 14 }} onClick={() => setCapEnd(true)}>{CAPTURE_UI[lang].endTitle}</button>)}
         </div>
       ) : (
         <div style={{ width: '100%', maxWidth: 640, flex: 1, display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 40, minHeight: 0 }}>
