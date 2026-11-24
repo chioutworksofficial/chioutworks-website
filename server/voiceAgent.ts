@@ -1,4 +1,4 @@
-// Chioutworks Voice Agent (Retell AI + n8n). Settings (encrypted key), bearer token for external tools, customer queue,
+// Chioutworks Voice Agent (Vapi + n8n). Settings (encrypted key), bearer token for external tools, customer queue,
 // call logs, availability + appointments. Security: context/GUVENLIK.md §12. No personal data in logs.
 // Storage: Supabase tables va_customers / va_calls / va_appointments (id, created_at, data jsonb) + kv; locally data/va-*.json.
 import type { Express, Request, Response, NextFunction } from 'express';
@@ -12,6 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { dbOn, dbSelect, dbUpsert, dbDelete, kvGet, kvSet } from './db.js';
 import { rlStore } from './rateStore.js';
+import { leadScore, signalLead } from './leadFlow.js';
+import { addCalendarEntry } from './calendar.js';
 import { DEFAULT_SCRIPT, SCRIPT_RULES, AFTER_CALL, type Script, type ScriptLang } from './voiceScript.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,7 +48,7 @@ const kDel = async (k: string) => { if (dbOn()) return dbDelete('kv', `key=eq.${
 
 // ── settings + encryption (AES-256-GCM, key from SETTINGS_ENC_KEY, else derived from ADMIN_TOKEN) ──
 interface Schedule { days: number[]; start: string; end: string; slotMinutes: number; buffer: number }
-interface Settings { retellKeyEnc?: string; retellKeyLast4?: string; retellAgentId: string; retellPhoneNumber: string; n8nWebhookUrl: string; mode: 'simulation' | 'live'; schedule: Schedule }
+interface Settings { vapiKeyEnc?: string; vapiKeyLast4?: string; vapiSecretHash?: string; vapiSecretLast4?: string; vapiAssistantId: string; vapiPhoneNumberId: string; n8nWebhookUrl: string; mode: 'simulation' | 'live'; schedule: Schedule }
 const DEF_SCHEDULE: Schedule = { days: [1, 2, 3, 4, 5], start: '09:00', end: '18:00', slotMinutes: 30, buffer: 0 };
 const encKey = () => {
   const secret = process.env.SETTINGS_ENC_KEY || process.env.ADMIN_TOKEN;
@@ -65,7 +67,8 @@ const decrypt = (blob: string) => {
 };
 const getSettings = async (): Promise<Settings> => {
   const s = (await kGet<Partial<Settings>>('voiceAgent.settings')) ?? {};
-  return { retellAgentId: '', retellPhoneNumber: '', n8nWebhookUrl: '', mode: 'simulation', ...s, schedule: { ...DEF_SCHEDULE, ...(s.schedule ?? {}) } } as Settings;
+  for (const k of Object.keys(s)) if (k.startsWith('retell')) delete (s as Record<string, unknown>)[k];   // provider switched to Vapi: old Retell values are dropped
+  return { vapiAssistantId: '', vapiPhoneNumberId: '', n8nWebhookUrl: '', mode: 'simulation', ...s, schedule: { ...DEF_SCHEDULE, ...(s.schedule ?? {}) } } as Settings;
 };
 
 // ── SSRF guard for the n8n URL ─────────────────────────────────────────────
@@ -146,12 +149,13 @@ const HM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const scheduleS = z.object({ days: z.array(z.number().int().min(0).max(6)).min(1).max(7), start: z.string().regex(HM), end: z.string().regex(HM), slotMinutes: z.number().int().min(5).max(240), buffer: z.number().int().min(0).max(120) })
   .refine((x) => hmMin(x.start) < hmMin(x.end));
 const settingsS = z.object({
-  retellApiKey: z.string().max(300).optional(), retellAgentId: z.string().trim().max(120).optional(),
-  retellPhoneNumber: z.string().trim().regex(/^(\+?[0-9 ()-]{6,24})?$/).optional(), n8nWebhookUrl: z.string().trim().max(500).optional(),
+  vapiApiKey: z.string().max(300).optional(), vapiAssistantId: z.string().trim().regex(/^[A-Za-z0-9_-]{0,80}$/).optional(),
+  vapiPhoneNumberId: z.string().trim().regex(/^[A-Za-z0-9_-]{0,80}$/).optional(), vapiServerSecret: z.string().max(200).optional(), n8nWebhookUrl: z.string().trim().max(500).optional(),
   mode: z.enum(['simulation', 'live']).optional(), schedule: scheduleS.optional(),
 });
 const baseUrl = (req: Request) => (process.env.PUBLIC_ORIGIN ?? '').split(',')[0].trim() || `${req.protocol}://${req.get('host')}`;
-const ENDPOINTS = ['GET /api/customers?status=to_call', 'GET /api/customers/{id}', 'PATCH /api/customers/{id}', 'GET /api/calendar/availability?date=YYYY-MM-DD', 'POST /api/appointments', 'POST /api/voice-agent/call-log'];
+const ENDPOINTS = ['GET /api/customers?status=to_call', 'GET /api/customers/{id}', 'PATCH /api/customers/{id}', 'GET /api/calendar/availability?date=YYYY-MM-DD', 'POST /api/appointments', 'POST /api/voice-agent/call-log', 'GET /api/voice-agent/script'];
+const VAPI_API = 'https://api.vapi.ai';
 let lock: Promise<unknown> = Promise.resolve();   // serialises booking so two calls cannot take the same slot (single instance)
 const exclusive = <T,>(fn: () => Promise<T>) => { const r = lock.then(fn, fn); lock = r.catch(() => {}); return r; };
 
@@ -167,6 +171,93 @@ export async function vaQueueLead(lead: { id: string; name: string; phone: strin
 export function registerVoiceAgent(app: Express, deps: VaDeps) {
   const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response) =>
     fn(req, res).catch((e) => { console.error('[voice-agent] failed', (e as Error)?.message?.slice(0, 120)); if (!res.headersSent) res.status(500).json({ ok: false, error: 'server' }); });
+
+  const bookAppt = (d: { customer_id: string; start: string; notes?: string; name?: string; phone?: string }) => exclusive(async () => {
+    const b = { data: d };
+    const cust = (await tList('customers')).find((x) => x.id === b.data.customer_id);
+    if (!cust) return { code: 404 as const };
+    const t = Date.parse(b.data.start); const { date, time } = berlinParts(t);
+    const slot = (await slotsFor(date, deps)).find((x) => x.s === t);
+    if (!slot) return { code: 409 as const };
+    const name = (b.data.name || cust.name || '').slice(0, 80); const phone = (b.data.phone || cust.phone || '').slice(0, 40);
+    const reqId = crypto.randomUUID();
+    const appt: Row = { id: rid('appt'), createdAt: new Date().toISOString(), customer_id: cust.id, start: slot.start, end: slot.end, notes: b.data.notes ?? '', name, phone, requestId: reqId };
+    await tPut('appointments', appt);
+    await deps.saveRequest({ id: reqId, createdAt: appt.createdAt, kind: 'contact', source: 'voice-agent', name, phone, email: '', business: '', city: '', address: '', message: (b.data.notes ?? '').slice(0, 1000), replyPreference: 'phone', lang: 'de', page: '', preferredStart: date, callTime: time, appointmentId: appt.id });
+    cust.status = 'booked'; await tPut('customers', cust);
+    return { code: 201 as const, appt };
+  });
+
+  // ── Vapi webhook (own secret header, not the Bearer token; registered BEFORE the token guard) ──
+  const vapiLimiter = rateLimit({ store: rlStore('vaVapiHook'), windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
+  const secretOk = async (req: Request) => {
+    const st = await getSettings(); if (!st.vapiSecretHash) return false;
+    const got = req.get('x-vapi-secret') ?? /^Bearer (.+)$/.exec(req.get('authorization') ?? '')?.[1] ?? '';
+    if (!got || got.length > 300) return false;
+    return crypto.timingSafeEqual(crypto.createHash('sha256').update(sha(got)).digest(), crypto.createHash('sha256').update(st.vapiSecretHash).digest());
+  };
+  const NOT_INTERESTED = /kein(e)? interesse|nicht interessiert|not interested|no interest|ilgilenmiyorum|ilgim yok|δεν ενδιαφέρ/i;
+  const CALLBACK = /call (me )?back|callback|rückruf|zurückrufen|später anrufen|geri ara|sonra ara|ξαναπαρ/i;
+  const OUTCOME_NO_ANSWER = /no-answer|busy|voicemail|did-not-answer|customer-did-not|failed|canceled/i;
+  app.post('/api/voice-agent/vapi-webhook', vapiLimiter, wrap(async (req, res) => {
+    if (!(await secretOk(req))) return res.status(401).json({ error: 'unauthorized' });
+    const m = (req.body as { message?: Record<string, any> } | undefined)?.message;
+    if (!m || typeof m !== 'object' || typeof m.type !== 'string') return bad(res, 'geçersiz istek');
+    const callId = String(m.call?.id ?? '').slice(0, 120);
+    const calls = callId ? await tList('calls') : [];
+    const rec = callId ? calls.find((x) => x.callId === callId) : undefined;
+    const custId = String(rec?.customer_id ?? m.call?.assistantOverrides?.metadata?.customer_id ?? m.call?.metadata?.customer_id ?? '');
+    const cust = IDP.test(custId) ? (await tList('customers')).find((x) => x.id === custId) : undefined;
+    if (m.type === 'end-of-call-report') {
+      const secs = Number.isFinite(Date.parse(m.startedAt)) && Number.isFinite(Date.parse(m.endedAt)) ? Math.max(0, Math.round((Date.parse(m.endedAt) - Date.parse(m.startedAt)) / 1000)) : 0;
+      const ended = String(m.endedReason ?? '').slice(0, 80);
+      const summary = String(m.analysis?.summary ?? m.summary ?? '').slice(0, 1500) || String(m.artifact?.transcript ?? '').slice(0, 1500);
+      const rUrl = String(m.artifact?.recordingUrl ?? m.recordingUrl ?? '');
+      const noAns = OUTCOME_NO_ANSWER.test(ended) || secs < 5;
+      const base: Row = rec ?? { id: rid('call'), createdAt: new Date().toISOString(), customer_id: cust?.id ?? '', customer_name: cust?.name ?? '', callId, appointmentStart: '', simulated: false };
+      const booked = cust?.status === 'booked';
+      Object.assign(base, { summary, durationSec: secs, endedReason: ended, recordingUrl: rUrl.startsWith('https://') && rUrl.length <= 500 ? rUrl : '', status: booked ? 'booked' : noAns ? 'no_answer' : (cust?.status === 'calling' ? 'to_call' : base.status ?? 'to_call') });
+      await tPut('calls', base);
+      if (cust && cust.status === 'calling') { cust.status = booked ? 'booked' : noAns ? 'no_answer' : 'to_call'; await tPut('customers', cust); }
+      if (cust && !base.signalled) {   // idempotent per call id: a Vapi retry of the same report does not repeat the calendar/score work
+        base.signalled = true; await tPut('calls', base);
+        const txt = `${summary} ${String(m.artifact?.transcript ?? '').slice(0, 3000)}`;
+        if (NOT_INTERESTED.test(txt) && !booked) { cust.doNotCall = true; await tPut('customers', cust); await dncSet(cust.phone, true); }
+        else if (noAns || CALLBACK.test(txt)) await addCalendarEntry({ kind: 'recall', source: 'voice-agent', phone: cust.phone, refTab: 'voice', refId: cust.id, preferredChannel: 'phone', score: 'kararsız', inDays: 1 });
+        else if (booked || secs >= 30) {
+          const score = booked ? 'sıcak' : leadScore({ hasContact: true, submitted: false, text: summary || txt });
+          await signalLead({ source: 'voice-agent', phone: cust.phone, refTab: 'voice', refId: cust.id, preferredChannel: 'phone', score });
+          await addCalendarEntry({ kind: 'send', source: 'voice-agent', phone: cust.phone, refTab: 'voice', refId: cust.id, preferredChannel: 'phone', score });
+        }
+      }
+      console.log('[voice-agent] vapi end-of-call-report stored');
+      return res.json({ ok: true });
+    }
+    if (m.type === 'status-update') {
+      if (rec && m.status === 'in-progress') { rec.status = 'calling'; await tPut('calls', rec); }
+      return res.json({ ok: true });
+    }
+    if (m.type === 'tool-calls') {
+      const list = Array.isArray(m.toolCallList) ? m.toolCallList.slice(0, 5) : [];
+      const results = [];
+      for (const t of list) {
+        const name = String(t?.function?.name ?? t?.name ?? ''); let a = t?.function?.arguments ?? t?.arguments ?? {}; if (typeof a === 'string') { try { a = JSON.parse(a); } catch { a = {}; } }
+        let result: unknown = { error: 'unknown_tool' };
+        if (name === 'check_availability') {
+          const d = String(a.date ?? ''); result = realDate(d) ? { date: d, slots: (await slotsFor(d, deps)).map(({ start, end }) => ({ start, end })) } : { error: 'invalid_date' };
+        } else if (name === 'book_appointment') {
+          const start = String(a.start ?? '');
+          if (!cust || Number.isNaN(Date.parse(start))) result = { error: 'invalid_request' };
+          else { const o = await bookAppt({ customer_id: cust.id, start, notes: String(a.notes ?? '').slice(0, 1000) }); result = o.code === 201 ? { booked: true, start: o.appt.start, end: o.appt.end } : { booked: false, error: o.code === 409 ? 'slot_taken' : 'not_found' }; }
+        } else if (name === 'mark_do_not_call') {
+          if (cust) { cust.doNotCall = true; await tPut('customers', cust); await dncSet(cust.phone, true); result = { ok: true }; } else result = { error: 'unknown_customer' };
+        }
+        results.push({ name, toolCallId: String(t?.id ?? ''), result: JSON.stringify(result) });
+      }
+      return res.json({ results });
+    }
+    return res.json({ ok: true });   // other event types are informational
+  }));
 
   // ── token-protected API (no cookies; server-to-server) ──
   const limiter = rateLimit({ store: rlStore('vaLimiter'), windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' },
@@ -203,7 +294,7 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
     await tPut('customers', c); return res.json(pub(c));
   }));
 
-  // Call script for n8n / Retell (no secrets): per language steps, style, branches + fixed rules.
+  // Call script for n8n / Vapi (no secrets): per language steps, style, branches + fixed rules.
   app.get('/api/voice-agent/script', wrap(async (_req, res) => res.json({ script: await scriptNow(), rules: SCRIPT_RULES, afterCall: AFTER_CALL })));
 
   app.get('/api/calendar/availability', wrap(async (req, res) => {
@@ -215,21 +306,7 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
   app.post('/api/appointments', wrap(async (req, res) => {
     const b = z.object({ customer_id: z.string().regex(IDP), start: z.string().max(40), end: z.string().max(40).optional(), notes: z.string().max(1000).optional(), name: z.string().max(80).optional(), phone: z.string().max(40).optional() }).safeParse(req.body ?? {});
     if (!b.success || Number.isNaN(Date.parse(b.data.start))) return bad(res, 'geçersiz istek');
-    const out = await exclusive(async () => {
-      const cust = (await tList('customers')).find((x) => x.id === b.data.customer_id);
-      if (!cust) return { code: 404 as const };
-      const t = Date.parse(b.data.start); const { date, time } = berlinParts(t);
-      const slot = (await slotsFor(date, deps)).find((x) => x.s === t);
-      if (!slot) return { code: 409 as const };
-      const name = (b.data.name || cust.name || '').slice(0, 80); const phone = (b.data.phone || cust.phone || '').slice(0, 40);
-      const reqId = crypto.randomUUID();
-      const appt: Row = { id: rid('appt'), createdAt: new Date().toISOString(), customer_id: cust.id, start: slot.start, end: slot.end, notes: b.data.notes ?? '', name, phone, requestId: reqId };
-      await tPut('appointments', appt);
-      // Mirror as a request so it shows under "Talepler" (same record shape the contact form saves)
-      await deps.saveRequest({ id: reqId, createdAt: appt.createdAt, kind: 'contact', source: 'voice-agent', name, phone, email: '', business: '', city: '', address: '', message: (b.data.notes ?? '').slice(0, 1000), replyPreference: 'phone', lang: 'de', page: '', preferredStart: date, callTime: time, appointmentId: appt.id });
-      cust.status = 'booked'; await tPut('customers', cust);
-      return { code: 201 as const, appt };
-    });
+    const out = await bookAppt(b.data);
     if (out.code === 404) return res.status(404).json({ error: 'not_found' });
     if (out.code === 409) return res.status(409).json({ error: 'slot_taken' });
     return res.status(201).json({ id: out.appt.id, start: out.appt.start, end: out.appt.end, customer_id: out.appt.customer_id });
@@ -253,9 +330,9 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
   const admin = (fn: (req: Request, res: Response) => Promise<unknown>) => wrap(async (req, res) => { if (await deps.requireAdmin(req, res)) await fn(req, res); });
   const A = '/api/admin/voice-agent';
   const view = async (req: Request) => {
-    const s = await getSettings(); const t = await kGet<{ createdAt: string }>('voiceAgent.tokenHash');
-    return { mode: s.mode, retellAgentId: s.retellAgentId, retellPhoneNumber: s.retellPhoneNumber, n8nWebhookUrl: s.n8nWebhookUrl, schedule: s.schedule,
-      retellKey: { configured: !!s.retellKeyEnc, last4: s.retellKeyLast4 ?? '' }, token: { exists: !!t, createdAt: t?.createdAt ?? null }, baseUrl: baseUrl(req), endpoints: ENDPOINTS };
+    const s = await getSettings(); const t = await kGet<{ createdAt: string; enc?: string; last4?: string }>('voiceAgent.tokenHash');
+    return { mode: s.mode, vapiAssistantId: s.vapiAssistantId, vapiPhoneNumberId: s.vapiPhoneNumberId, n8nWebhookUrl: s.n8nWebhookUrl, schedule: s.schedule,
+      vapiKey: { configured: !!s.vapiKeyEnc, last4: s.vapiKeyLast4 ?? '' }, vapiSecret: { configured: !!s.vapiSecretHash, last4: s.vapiSecretLast4 ?? '' }, webhookUrl: `${baseUrl(req)}/api/voice-agent/vapi-webhook`, token: { exists: !!t, createdAt: t?.createdAt ?? null, revealable: !!t?.enc, last4: t?.last4 ?? '' }, baseUrl: baseUrl(req), endpoints: ENDPOINTS };
   };
   app.get(`${A}/settings`, admin(async (req, res) => res.json(await view(req))));
   app.put(`${A}/settings`, admin(async (req, res) => {
@@ -263,21 +340,45 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
     if (!b.success) return bad(res, 'Girilen değerler geçersiz (telefon, saat veya aralık).');
     const s = await getSettings(); const d = b.data;
     if (d.n8nWebhookUrl) { const p = urlProblem(d.n8nWebhookUrl); if (p) return bad(res, p); }
-    if (d.retellApiKey) { s.retellKeyEnc = encrypt(d.retellApiKey.trim()); s.retellKeyLast4 = d.retellApiKey.trim().slice(-4); }   // empty = keep
-    if (d.retellAgentId !== undefined) s.retellAgentId = d.retellAgentId;
-    if (d.retellPhoneNumber !== undefined) s.retellPhoneNumber = d.retellPhoneNumber;
+    if (d.vapiApiKey?.trim()) { s.vapiKeyEnc = encrypt(d.vapiApiKey.trim()); s.vapiKeyLast4 = d.vapiApiKey.trim().slice(-4); }   // empty = keep
+    if (d.vapiServerSecret?.trim()) { s.vapiSecretHash = sha(d.vapiServerSecret.trim()); s.vapiSecretLast4 = d.vapiServerSecret.trim().slice(-4); }
+    if (d.vapiAssistantId !== undefined) s.vapiAssistantId = d.vapiAssistantId;
+    if (d.vapiPhoneNumberId !== undefined) s.vapiPhoneNumberId = d.vapiPhoneNumberId;
     if (d.n8nWebhookUrl !== undefined) s.n8nWebhookUrl = d.n8nWebhookUrl;
     if (d.schedule) s.schedule = d.schedule;
     if (d.mode) s.mode = d.mode;
-    if (s.mode === 'live' && !(s.retellKeyEnc && s.retellAgentId && s.retellPhoneNumber)) return bad(res, 'Canlı mod için Retell API anahtarı, Agent ID ve telefon numarası girilmiş olmalı.');
+    if (s.mode === 'live' && !(s.vapiKeyEnc && s.vapiAssistantId && s.vapiPhoneNumberId && s.vapiSecretHash)) return bad(res, 'Canlı mod için Vapi anahtarı, Assistant ID, Phone Number ID ve Server URL secret girilmiş olmalı.');
     await kSet('voiceAgent.settings', s); return res.json(await view(req));
   }));
   app.post(`${A}/token`, admin(async (_req, res) => {
     const token = `cwva_${crypto.randomBytes(32).toString('base64url')}`; const createdAt = new Date().toISOString();
-    await kSet('voiceAgent.tokenHash', { hash: sha(token), createdAt });
-    res.set('Cache-Control', 'no-store'); return res.json({ token, createdAt });   // plaintext shown once, never stored
+    const canReveal = !!process.env.SETTINGS_ENC_KEY;   // reveal-copy only with a dedicated key (not the ADMIN_TOKEN fallback)
+    await kSet('voiceAgent.tokenHash', { hash: sha(token), createdAt, ...(canReveal ? { enc: encrypt(token), last4: token.slice(-4) } : {}) });
+    res.set('Cache-Control', 'no-store');
+    return res.json({ token, createdAt, revealable: canReveal, ...(canReveal ? {} : { message: 'Görüntüleme için SETTINGS_ENC_KEY gerekli' }) });
+  }));
+  const revealLimiter = rateLimit({ store: rlStore('vaReveal'), windowMs: 60_000, max: 10, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
+  app.post(`${A}/token/reveal`, revealLimiter, admin(async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const t = await kGet<{ enc?: string }>('voiceAgent.tokenHash');
+    if (!t?.enc || !process.env.SETTINGS_ENC_KEY) return res.status(404).json({ error: 'not_revealable', message: 'Bu token eski yöntemle oluşturuldu; görmek için yeni token oluştur' });
+    let token: string; try { token = decrypt(t.enc); } catch { return res.status(404).json({ error: 'not_revealable', message: 'Bu token eski yöntemle oluşturuldu; görmek için yeni token oluştur' }); }
+    const log = (await kGet<string[]>('voiceAgent.tokenRevealLog')) ?? []; log.push(new Date().toISOString());
+    await kSet('voiceAgent.tokenRevealLog', log.slice(-100)); console.log('[voice-agent] token revealed');   // time only, no token
+    return res.json({ token });
   }));
   app.delete(`${A}/token`, admin(async (_req, res) => { await kDel('voiceAgent.tokenHash'); return res.json({ ok: true }); }));
+
+  app.post(`${A}/test-connection`, admin(async (_req, res) => {
+    const s = await getSettings();
+    if (!s.vapiKeyEnc) return res.status(400).json({ ok: false, error: 'no_key', message: 'Önce Vapi private API key girip kaydedin.' });
+    let key: string; try { key = decrypt(s.vapiKeyEnc); } catch { return res.status(400).json({ ok: false, error: 'bad_key', message: 'Anahtar çözülemedi, yeniden girin.' }); }
+    try {
+      const r = await fetch(`${VAPI_API}/assistant?limit=1`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(10000), redirect: 'manual' });
+      if (r.status === 401 || r.status === 403) return res.json({ ok: false, message: 'Vapi anahtarı geçersiz (yetkisiz).' });
+      return res.json(r.ok ? { ok: true, message: 'Bağlantı başarılı, anahtar geçerli.' } : { ok: false, message: `Vapi yanıtı: ${r.status}` });
+    } catch { return res.json({ ok: false, message: 'Vapi’ye ulaşılamadı.' }); }
+  }));
 
   app.get(`${A}/script`, admin(async (_req, res) => res.json({ script: await scriptNow(), rules: SCRIPT_RULES, afterCall: AFTER_CALL, defaults: DEFAULT_SCRIPT })));
   const scriptS = z.object(Object.fromEntries(SCRIPT_LANGS.map((l) => [l, z.object({ steps: z.string().max(6000), style: z.string().max(6000), branches: z.string().max(8000) })])) as Record<ScriptLang, z.ZodObject<{ steps: z.ZodString; style: z.ZodString; branches: z.ZodString }>>);
@@ -328,8 +429,8 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
     const live = s.mode === 'live';
     let key = '';
     if (live) {
-      if (!(s.retellKeyEnc && s.retellAgentId && s.retellPhoneNumber)) return bad(res, 'Canlı mod için Retell ayarları eksik.');
-      try { key = decrypt(s.retellKeyEnc); } catch { return bad(res, 'Retell anahtarı çözülemedi, yeniden girin.'); }
+      if (!(s.vapiKeyEnc && s.vapiAssistantId && s.vapiPhoneNumberId && s.vapiSecretHash)) return bad(res, 'Canlı mod için Vapi ayarları eksik.');
+      try { key = decrypt(s.vapiKeyEnc); } catch { return bad(res, 'Vapi anahtarı çözülemedi, yeniden girin.'); }
     }
     const n8nOk = !live && s.n8nWebhookUrl ? await safeFetchUrl(s.n8nWebhookUrl) : false;
     const base = baseUrl(req); const results: { id: string; ok: boolean; info: string }[] = [];
@@ -352,12 +453,14 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
         }
       } else {
         try {
-          const r = await fetch('https://api.retellai.com/v2/create-phone-call', { method: 'POST', signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ from_number: s.retellPhoneNumber, to_number: c.phone, override_agent_id: s.retellAgentId, metadata: { customer_id: c.id } }) });
-          const j = (await r.json().catch(() => ({}))) as { call_id?: string };
-          if (!r.ok) throw new Error('retell');
-          call.callId = String(j.call_id ?? ''); info = 'arama başlatıldı';
-        } catch { c.status = 'to_call'; await tPut('customers', c); call.status = 'to_call'; call.summary = 'Arama başlatılamadı'; info = 'Retell aramayı başlatamadı'; }
+          const lang = (SCRIPT_LANGS as string[]).includes(c.lang) ? (c.lang as ScriptLang) : 'de'; const sc = (await scriptNow())[lang];
+          const r = await fetch(`${VAPI_API}/call`, { method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assistantId: s.vapiAssistantId, phoneNumberId: s.vapiPhoneNumberId, customer: { number: c.phone, name: c.name },
+              assistantOverrides: { metadata: { customer_id: c.id }, variableValues: { lead_summary: String(c.notes ?? '').slice(0, 500), business_name: 'Chioutworks', preferred_language: lang, call_script: `${sc.steps}\n\n${sc.style}\n\n${sc.branches}`.slice(0, 12000) } } }) });
+          const j = (await r.json().catch(() => ({}))) as { id?: string };
+          if (!r.ok) throw new Error('vapi');
+          call.callId = String(j.id ?? ''); info = 'arama başlatıldı';
+        } catch { c.status = 'to_call'; await tPut('customers', c); call.status = 'to_call'; call.summary = 'Arama başlatılamadı'; info = 'Vapi aramayı başlatamadı'; }
       }
       await tPut('calls', call); results.push({ id, ok: !info.includes('başlatamadı'), info });
     }

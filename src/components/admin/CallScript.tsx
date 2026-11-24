@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from './api';
 
 // Arama senaryosu (server/voiceScript.ts): dil başına adımlar, konuşma tarzı ve dallanmalar. Varsayılan metin sunucuda; düzenlenirse kv'de saklanır
-// ve n8n / Retell için GET /api/voice-agent/script ile verilir. Sır ve fiyat içermez.
+// ve n8n / Vapi için GET /api/voice-agent/script ile verilir. Sır ve fiyat içermez.
 type L = 'tr' | 'en' | 'de' | 'el';
 interface Script { steps: string; style: string; branches: string }
 interface Payload { script: Record<L, Script>; rules: Record<L, string[]>; afterCall: Record<L, string>; defaults: Record<L, Script> }
@@ -27,7 +27,7 @@ export default function CallScript() {
       <div className="adm-head"><h2>Arama senaryosu</h2>
         <span className="adm-actions">{!edit ? <button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setEdit(true)} disabled={!p}>Düzenle</button>
           : <><button type="button" className="lq-btn-ghost adm-btn sm adm-pri" onClick={save}>Kaydet</button><button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => { setDraft(p!.script); setEdit(false); }}>Vazgeç</button><button type="button" className="lq-btn-ghost adm-btn sm" onClick={reset}>Varsayılana dön</button></>}</span></div>
-      <p className="adm-sub">Arayan yapay zekâ bu metni kullanır. n8n / Retell bunu <code>GET /api/voice-agent/script</code> ile dil başına alır. Marka okunuşu: Şiut-vörks · Shee-oot works · Schiut-Works · Σιούτ-γουόρκς; yazıda Chioutworks.</p>
+      <p className="adm-sub">Arayan yapay zekâ bu metni kullanır. n8n / Vapi bunu <code>GET /api/voice-agent/script</code> ile dil başına alır. Marka okunuşu: Şiut-vörks · Shee-oot works · Schiut-Works · Σιούτ-γουόρκς; yazıda Chioutworks.</p>
       <div className="adm-chips" role="tablist">{LANGS.map((l) => <button key={l} role="tab" aria-selected={lang === l} className="adm-chip" aria-pressed={lang === l} onClick={() => setLang(l)}>{l.toUpperCase()}</button>)}</div>
       {msg && <div className="adm-banner" role="status">{msg}</div>}
       {cur && PARTS.map(([k, label]) => (

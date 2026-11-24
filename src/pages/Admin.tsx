@@ -15,10 +15,11 @@ import SalesView from '../components/admin/SalesView';
 import MarketingView from '../components/admin/MarketingView';
 import NewsletterView from '../components/admin/NewsletterView';
 import LeadsView from '../components/admin/LeadsView';
+import TrendRadarView from '../components/admin/TrendRadarView';
 import CalendarView, { type CalSection } from '../components/admin/CalendarView';
 
 type Auth = 'checking' | 'out' | 'in' | 'unset';
-export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent' | 'sales' | 'marketing' | 'newsletter' | 'leads';
+export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent' | 'sales' | 'marketing' | 'newsletter' | 'leads' | 'trend';
 export type Group = { label: string; desc: string; tabs: { key: Tab; label: string; desc: string }[] };
 // Navigation map (owner, 2026-11-24). 'appointments' is no longer a tab: it lives inside Takvim (ALIAS keeps old links working).
 export const GROUPS: Group[] = [
@@ -31,7 +32,7 @@ export const GROUPS: Group[] = [
     { key: 'offers', label: 'Teklifler', desc: 'Teklif, onay ve ödeme' }, { key: 'projects', label: 'Projeler', desc: 'Devam eden işler ve mesajlar' },
     { key: 'sales', label: 'Satış ve site kontrolleri', desc: 'Site analizi, potansiyel müşteriler' }, { key: 'voiceAgent', label: 'Voice Agent', desc: 'Telefonla arayan asistan' }] },
   { label: 'Planlama', desc: 'Dolu günler, takip ve randevular', tabs: [{ key: 'calendar', label: 'Takvim', desc: 'Dolu günler, takip girdileri, randevular' }] },
-  { label: 'Pazarlama', desc: 'Yapay zekâ taslakları', tabs: [{ key: 'marketing', label: 'Pazarlama araçları', desc: 'Denetim, metin, SEO, e-posta, sosyal plan' }] },
+  { label: 'Pazarlama', desc: 'Yapay zekâ taslakları', tabs: [{ key: 'marketing', label: 'Pazarlama araçları', desc: 'Denetim, metin, SEO, e-posta, sosyal plan' }, { key: 'trend', label: 'Trend Radar', desc: 'Son 30 gün: içerik fikri, görüşme hazırlığı, rakip' }] },
   { label: 'Site ve sistem', desc: 'Ziyaretler ve hatalar', tabs: [
     { key: 'analytics', label: 'Ziyaret analizi', desc: 'Ziyaretçiler, ülkeler, sayfalar' }, { key: 'errors', label: 'Hatalar ve e-posta', desc: 'Hata kaydı ve bildirim e-postası' }] },
 ];
@@ -222,6 +223,7 @@ export default function Admin() {
         {tab === 'voiceAgent' && <VoiceAgentView reqs={reqs} />}
         {tab === 'sales' && <SalesView />}
         {tab === 'marketing' && <MarketingView />}
+        {tab === 'trend' && <TrendRadarView />}
         {tab === 'leads' && <LeadsView go={go} />}
         {tab === 'newsletter' && <NewsletterView />}
         {tab === 'errors' && <ErrorsView onMailSaved={setNotifyMail} />}

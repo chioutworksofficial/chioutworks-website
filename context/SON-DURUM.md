@@ -1,4 +1,4 @@
-> **KARAR — otonom satış motoru yalnızca altyapı (sahip, 2026-11-24):** n8n + Apify (Google Maps, Website Content Crawler, perplexity-search-scraper) + RetellAI + WhatsApp Business akışı hazır tutulacak ama ÇALIŞTIRILMAYACAK. Öncelik bitmeyen işler; alan adı eklense bile Voice Agent/otomasyon kapalı, sesli asistan normal devam. İlk birkaç müşteri mevcut sistemle bulunacak; canlıya alma kararı sahipte. Ayrıntı: kararlar.md 2026-11-24.
+> **KARAR — otonom satış motoru yalnızca altyapı (sahip, 2026-11-24):** n8n + Apify (Google Maps, Website Content Crawler, perplexity-search-scraper) + Vapi + WhatsApp Business akışı hazır tutulacak ama ÇALIŞTIRILMAYACAK. Öncelik bitmeyen işler; alan adı eklense bile Voice Agent/otomasyon kapalı, sesli asistan normal devam. İlk birkaç müşteri mevcut sistemle bulunacak; canlıya alma kararı sahipte. Ayrıntı: kararlar.md 2026-11-24.
 
 ## 2026-11-24 (akşam) — yayına hazır, "deploy et" bekleniyor
 - Kartlar: her harekette bir kart (12 kart), hızlı kaydırmada atlama yok; telefonda CTA titremesi giderildi.
@@ -14,7 +14,7 @@
 - Sahip canlı test edecek: sesli görüşmede teklif kartı + teşekkür cümlesi, Leads verisi (Supabase'te 0 dönmüştü), aranmasın rozeti yenilemeden sonra.
 - Çelişki (sahibe soruldu): sesli asistan öncesi e-posta/telefon zorunlu mu; yükleme sınırı 5 MB mı 25 MB mı.
 
-> **HATIRLATMA (sahip, 2026-11-24):** Retell AI'da telefon numarası nasıl eklenir — video: https://www.youtube.com/watch?v=uWiBKrHUIOU . Retell hesabı açılıp canlı moda geçilirken sahibe bu linki hatırlat (Admin → İşler → Voice Agent → Retell Phone Number alanı).
+> **NOT (2026-11-24):** Voice Agent sağlayıcısı Retell yerine **Vapi** oldu. Telefon numarası kurulumu admin → Voice Agent → "Kurulum adımları" listesinde; eski Retell numara videosu hatırlatması geçersiz. Canlı mod yalnızca sahip açınca (simülasyon varsayılan).
 
 > **YAPILACAK — Voice Agent canlıya geçmeden önce (2026-11-24):** (1) gizlilik politikasında telefon yapay zekâ sağlayıcısı tür + konum + aktarım güvencesiyle (DPF / AB standart sözleşme maddeleri) anılmalı, 4 dil; (2) arama metni konuşmanın başında yapay zekâ olduğunu söylemeli (AI Act şeffaflık); (3) yalnızca belgelenmiş "makul sebep" olan firmalar aranır (DE UWG §7, TR İYS, GR); (4) avukat kontrolü. Şu an SİMÜLASYON modu: gerçek arama yok. Modül: `server/voiceAgent.ts`, `src/components/admin/VoiceAgentView.tsx` (Admin > İşler > Voice Agent, `/admin/voice-agent`). Randevu saatleri varsayılan Pzt–Cum 09:00–18:00 / 30 dk; sahip onaylayacak.
 

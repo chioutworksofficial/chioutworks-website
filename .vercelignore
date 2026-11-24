@@ -1,0 +1,9 @@
+# Not needed by the build or the API at runtime; keeps Vercel uploads small.
+# Do NOT ignore assistant-knowledge.md / assistant-persona.md: the API reads them at runtime.
+tanitim/
+_yedek/
+graphify-out/
+obsidian/
+context/
+agents/
+.claude/

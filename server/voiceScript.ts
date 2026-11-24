@@ -1,5 +1,5 @@
 // Default call script of the outbound Voice Agent (tr master, translated faithfully). Editable in the admin Voice Agent module,
-// stored in kv "voiceAgent.script", served to n8n / Retell at GET /api/voice-agent/script. No secrets, no prices, no personal data.
+// stored in kv "voiceAgent.script", served to n8n / Vapi at GET /api/voice-agent/script. No secrets, no prices, no personal data.
 // Brand: spoken "Şiut-vörks" / "Shee-oot works" / "Schiut-Works" / "Σιούτ-γουόρκς", written "Chioutworks".
 export type ScriptLang = 'tr' | 'en' | 'de' | 'el';
 export interface Script { steps: string; style: string; branches: string }

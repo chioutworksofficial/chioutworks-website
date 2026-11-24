@@ -34,6 +34,8 @@ import { registerAffiliates } from './affiliates.js';
 import { registerVoiceAgent } from './voiceAgent.js';
 import { registerSales } from './sales.js';
 import { registerMarketing } from './marketing.js';
+import { registerTrendRadar } from './trendRadar.js';
+import { registerActionRoutes } from './actions.js';
 import { registerPreview } from './preview.js';
 import { languageOk, SAFE_FALLBACK } from './languageGuard.js';
 import { ids as abuseIds, recordAbuse, voiceBlocked, chatState, recordStrike, blockedMsg, adminList, adminUnlock, rateOk, globalOk, textMsgAllowed, TEXT_SESSION_MAX, insult, abuseExempt, MSG as ABUSE_MSG } from './abuse.js';
@@ -218,6 +220,7 @@ app.use('/api/admin', async (req, res, next) => {
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '512kb' })); // Stripe signature needs the raw body
 app.use('/api/voice', express.json({ limit: '128kb' }));
 app.use('/api/intake', express.json({ limit: '64kb' })); // client intake autosave
+app.use('/api/voice-agent/vapi-webhook', express.json({ limit: '1mb' })); // Vapi end-of-call reports carry transcripts
 app.use(express.json({ limit: '16kb' }));
 
 // Rate limit: 15 messages per minute per IP
@@ -1869,6 +1872,8 @@ registerAffiliates(app, { requireAdmin });
 registerVoiceAgent(app, { requireAdmin, saveRequest, deleteRequests, listRequests, readBlocked });
 registerSales(app, { requireAdmin });
 registerMarketing(app, { requireAdmin });
+registerTrendRadar(app, { requireAdmin });
+registerActionRoutes(app, { requireAdmin });
 // AI website preview after the intake is submitted (content only, rendered by our template)
 registerPreview(app, { getGroq, rateSkip: demoLimitSkip });
 
