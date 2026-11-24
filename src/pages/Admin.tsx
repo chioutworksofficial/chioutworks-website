@@ -5,9 +5,7 @@ import { api, ApiError, DEMO, type Req, type Usage, type VoiceSession } from '..
 import Overview from '../components/admin/Overview';
 import RequestsView from '../components/admin/RequestsView';
 import VoiceView from '../components/admin/VoiceView';
-import AvailabilityPanel from '../components/admin/AvailabilityPanel';
 import AnalyticsView from '../components/admin/AnalyticsView';
-import AppointmentsView from '../components/admin/AppointmentsView';
 import IntakesView from '../components/admin/IntakesView';
 import OffersView from '../components/admin/OffersView';
 import ProjectsView from '../components/admin/ProjectsView';
@@ -17,15 +15,38 @@ import SalesView from '../components/admin/SalesView';
 import MarketingView from '../components/admin/MarketingView';
 import NewsletterView from '../components/admin/NewsletterView';
 import LeadsView from '../components/admin/LeadsView';
-import CalendarEntries from '../components/admin/CalendarEntries';
+import CalendarView, { type CalSection } from '../components/admin/CalendarView';
 
 type Auth = 'checking' | 'out' | 'in' | 'unset';
 export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent' | 'sales' | 'marketing' | 'newsletter' | 'leads';
-const GROUPS: { label: string; tabs: { key: Tab; label: string }[] }[] = [
-  { label: 'Gelenler', tabs: [{ key: 'leads', label: 'Müşteri adayları' }, { key: 'requests', label: 'Talepler' }, { key: 'intakes', label: 'Analiz formları' }, { key: 'voice', label: 'Sesli görüşmeler' }, { key: 'newsletter', label: 'Bülten' }] },
-  { label: 'İşler', tabs: [{ key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' }, { key: 'calendar', label: 'Takvim' }, { key: 'appointments', label: 'Randevular' }, { key: 'voiceAgent', label: 'Voice Agent' }, { key: 'sales', label: 'Satış' }, { key: 'marketing', label: 'Pazarlama' }] },
-  { label: 'Site', tabs: [{ key: 'overview', label: 'Genel bakış' }, { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'errors', label: 'Hatalar ve e-posta' }] },
+export type Group = { label: string; desc: string; tabs: { key: Tab; label: string; desc: string }[] };
+// Navigation map (owner, 2026-11-24). 'appointments' is no longer a tab: it lives inside Takvim (ALIAS keeps old links working).
+export const GROUPS: Group[] = [
+  { label: 'Genel', desc: '', tabs: [{ key: 'overview', label: 'Genel bakış', desc: 'Özet ve kısayollar' }] },
+  { label: 'Gelenler', desc: 'Size ulaşan kişiler ve formlar', tabs: [
+    { key: 'leads', label: 'Müşteri adayları', desc: 'Tüm kanallardan gelen kişiler' }, { key: 'requests', label: 'Talepler', desc: 'Form, sohbet ve paket talepleri' },
+    { key: 'voice', label: 'Sesli görüşmeler', desc: 'Asistanla yapılan görüşmeler' }, { key: 'intakes', label: 'Analiz formları', desc: 'Müşterinin doldurduğu ayrıntılı form' },
+    { key: 'newsletter', label: 'Bülten', desc: 'Aylık fikir e-postası' }] },
+  { label: 'Satış ve işler', desc: 'Teklif, proje ve aramalar', tabs: [
+    { key: 'offers', label: 'Teklifler', desc: 'Teklif, onay ve ödeme' }, { key: 'projects', label: 'Projeler', desc: 'Devam eden işler ve mesajlar' },
+    { key: 'sales', label: 'Satış ve site kontrolleri', desc: 'Site analizi, potansiyel müşteriler' }, { key: 'voiceAgent', label: 'Voice Agent', desc: 'Telefonla arayan asistan' }] },
+  { label: 'Planlama', desc: 'Dolu günler, takip ve randevular', tabs: [{ key: 'calendar', label: 'Takvim', desc: 'Dolu günler, takip girdileri, randevular' }] },
+  { label: 'Pazarlama', desc: 'Yapay zekâ taslakları', tabs: [{ key: 'marketing', label: 'Pazarlama araçları', desc: 'Denetim, metin, SEO, e-posta, sosyal plan' }] },
+  { label: 'Site ve sistem', desc: 'Ziyaretler ve hatalar', tabs: [
+    { key: 'analytics', label: 'Ziyaret analizi', desc: 'Ziyaretçiler, ülkeler, sayfalar' }, { key: 'errors', label: 'Hatalar ve e-posta', desc: 'Hata kaydı ve bildirim e-postası' }] },
 ];
+/** Old tab ids / deep links -> current place. */
+const ALIAS: Record<string, { tab: Tab; cal?: CalSection }> = {
+  appointments: { tab: 'calendar', cal: 'appointments' }, 'voice-agent': { tab: 'voiceAgent' }, voiceagent: { tab: 'voiceAgent' },
+  followups: { tab: 'calendar', cal: 'followups' }, inbox: { tab: 'leads' }, home: { tab: 'overview' },
+};
+const TAB_KEYS = GROUPS.flatMap((g) => g.tabs.map((t) => t.key));
+function fromUrl(): { tab: Tab; cal: CalSection } {
+  const id = location.pathname.endsWith('/voice-agent') ? 'voice-agent' : (location.hash.replace(/^#\/?/, '') || new URLSearchParams(location.search).get('tab') || '');
+  const al = ALIAS[id];
+  if (al) return { tab: al.tab, cal: al.cal ?? 'blocked' };
+  return { tab: (TAB_KEYS as string[]).includes(id) ? (id as Tab) : 'overview', cal: 'blocked' };
+}
 
 function Login({ unset, onDone }: { unset: boolean; onDone: () => void }) {
   const [pw, setPw] = useState('');
@@ -67,7 +88,10 @@ function Login({ unset, onDone }: { unset: boolean; onDone: () => void }) {
 
 export default function Admin() {
   const [auth, setAuth] = useState<Auth>(DEMO ? 'in' : 'checking');
-  const [tab, setTab] = useState<Tab>(() => (location.pathname.endsWith('/voice-agent') ? 'voiceAgent' : 'overview'));
+  const [tab, setTab] = useState<Tab>(() => fromUrl().tab);
+  const [calSec, setCalSec] = useState<CalSection>(() => fromUrl().cal);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [hideNotify, setHideNotify] = useState(() => { try { return sessionStorage.getItem('cw_adm_hide_notify') === '1'; } catch { return false; } });
   const [reqs, setReqs] = useState<Req[] | null>(null);
   const [sessions, setSessions] = useState<VoiceSession[] | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -118,45 +142,83 @@ export default function Admin() {
     api<{ projects: { unreadOwner: number }[] }>('/api/admin/projects').then((r) => setProjectUnread(r.projects.reduce((s, x) => s + x.unreadOwner, 0))).catch(() => {});
   }, [auth, tab]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    const prev = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', k);
+    return () => { window.removeEventListener('keydown', k); document.body.style.overflow = prev; };
+  }, [menuOpen]);
+  useEffect(() => {
+    const on = () => { const u = fromUrl(); setTab(u.tab); setCalSec(u.cal); };
+    window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on);
+  }, []);
+
   const logout = async () => { try { await api('/api/admin/logout', 'POST'); } catch { /* ignore */ } if (DEMO) return; setReqs(null); setSessions(null); setAuth('out'); };
 
   if (auth === 'checking') return <div data-site-theme="liquid" className="adm-login" />;
   if (auth !== 'in') return <div data-site-theme="liquid"><Login unset={auth === 'unset'} onDone={() => setAuth('in')} /></div>;
 
   const unread = (reqs ?? []).filter((r) => !r.read).length;
-  const go = (t: Tab, id?: string) => { setTab(t); if (t === 'requests') setOpenReq(id ?? null); if (t === 'voice') setOpenVoice(id ?? null); if (t === 'offers') setOpenOffer(id ?? null); window.scrollTo(0, 0); };
-  const nav = (cls?: string) => GROUPS.map((g) => (
-    <div key={g.label} className="adm-group"><span className="adm-grouplabel">{g.label}</span>{g.tabs.map((t) => (
-    <button key={t.key} className="adm-nav" aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key)}>
-      {t.label}{t.key === 'requests' && unread > 0 && <span className={cls ?? 'adm-badge'}>{unread}</span>}{t.key === 'offers' && offerUnread > 0 && <span className={cls ?? 'adm-badge'}>{offerUnread}</span>}{t.key === 'projects' && projectUnread > 0 && <span className={cls ?? 'adm-badge'}>{projectUnread}</span>}
-    </button>))}</div>
-  ));
+  const badges: Partial<Record<Tab, number>> = { requests: unread, offers: offerUnread, projects: projectUnread };
+  const go = (t: Tab, id?: string) => {
+    const al = ALIAS[t]; const target = al ? al.tab : t;
+    if (al?.cal) setCalSec(al.cal);
+    setTab(target); setMenuOpen(false);
+    if (target === 'requests') setOpenReq(id ?? null); if (target === 'voice') setOpenVoice(id ?? null); if (target === 'offers') setOpenOffer(id ?? null);
+    if (!location.pathname.endsWith('/voice-agent')) history.replaceState(null, '', `${location.pathname}${location.search}#${target}`);
+    window.scrollTo(0, 0);
+  };
+  const nav = () => GROUPS.map((g) => {
+    const sum = g.tabs.reduce((n, t) => n + (badges[t.key] ?? 0), 0);
+    return (
+      <div key={g.label} className="adm-group">
+        {g.label !== 'Genel' && <span className="adm-grouplabel">{g.label}{sum > 0 && <span className="adm-grouplabel-n" aria-label={`${sum} yeni`}>{sum}</span>}</span>}
+        {g.tabs.map((t) => (
+          <button key={t.key} className="adm-nav" aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key)}>
+            {t.label}{(badges[t.key] ?? 0) > 0 && <span className="adm-badge">{badges[t.key]}</span>}
+          </button>))}
+      </div>);
+  });
+  const curLabel = GROUPS.flatMap((g) => g.tabs).find((t) => t.key === tab)?.label ?? '';
+  const totalNew = unread + offerUnread + projectUnread;
 
   return (
     <div data-site-theme="liquid" className="adm">
-      <aside className="adm-side">
+      <aside className="adm-side" aria-label="Yönetim menüsü">
         <div className="adm-logo">Chioutworks<small>Yönetim</small></div>
-        {nav()}
-        <div className="adm-spacer" />
-        <div style={{ padding: '0 12px 8px' }}><ModeToggle lang="tr" /></div>
-        <button className="adm-nav" onClick={logout}>Çıkış</button>
+        <nav className="adm-navlist">{nav()}</nav>
+        <div className="adm-sidefoot">
+          <div style={{ padding: '0 12px 8px' }}><ModeToggle lang="tr" /></div>
+          <button className="adm-nav" onClick={logout}>Çıkış</button>
+        </div>
       </aside>
       <header className="adm-topbar">
-        <div className="adm-logo">Chioutworks <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><ModeToggle lang="tr" /><button className="lq-btn-ghost adm-btn sm" onClick={logout}>Çıkış</button></span></div>
-        <div className="adm-tabs">{nav()}</div>
+        <button className="adm-menubtn" aria-expanded={menuOpen} aria-controls="adm-sheet" onClick={() => setMenuOpen(true)}>
+          <span className="adm-burger" aria-hidden="true" />Menü{totalNew > 0 && <span className="adm-badge">{totalNew}</span>}
+        </button>
+        <span className="adm-curtitle">{curLabel}</span>
+        <ModeToggle lang="tr" />
       </header>
+      {menuOpen && <>
+        <div className="adm-sheet-bg" onClick={() => setMenuOpen(false)} />
+        <div id="adm-sheet" className="adm-sheet" role="dialog" aria-modal="true" aria-label="Menü">
+          <div className="adm-sheet-head"><div className="adm-logo" style={{ padding: 0 }}>Chioutworks<small>Yönetim</small></div><button className="lq-btn-ghost adm-btn sm" onClick={() => setMenuOpen(false)}>Kapat</button></div>
+          <nav className="adm-navlist">{nav()}</nav>
+          <button className="adm-nav" onClick={logout}>Çıkış</button>
+        </div>
+      </>}
       <main className="adm-main">
         {err && <div className="adm-banner" role="alert">{err}</div>}
-        {notifyMail === '' && tab !== 'errors' && <div className="adm-banner" role="status" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>Hata bildirim e-postası henüz girilmedi. <button className="lq-btn-ghost adm-btn sm adm-pri" onClick={() => go('errors')}>E-postamı yaz</button></div>}
-        {tab === 'overview' && <Overview reqs={reqs} sessions={sessions} usage={usage} blocked={blocked} go={go} />}
+        {notifyMail === '' && tab !== 'errors' && !hideNotify && <div className="adm-banner adm-banner-slim" role="status"><span>Hata bildirim e-postası henüz girilmedi.</span><button className="lq-btn-ghost adm-btn sm adm-pri" onClick={() => go('errors')}>E-postamı yaz</button><button className="adm-x" aria-label="Bu oturumda gizle" onClick={() => { setHideNotify(true); try { sessionStorage.setItem('cw_adm_hide_notify', '1'); } catch { /* ignore */ } }}>×</button></div>}
+        {tab === 'overview' && <Overview reqs={reqs} sessions={sessions} usage={usage} blocked={blocked} go={go} badges={badges} />}
         {tab === 'requests' && <RequestsView reqs={reqs} setReqs={setReqs} openId={openReq} setOpenId={setOpenReq} go={go} setSessions={setSessions} />}
         {tab === 'intakes' && <IntakesView go={go} />}
         {tab === 'offers' && <OffersView openId={openOffer} setOpenId={setOpenOffer} onUnread={setOfferUnread} />}
         {tab === 'projects' && <ProjectsView onUnread={setProjectUnread} />}
         {tab === 'voice' && <VoiceView sessions={sessions} setSessions={setSessions} openId={openVoice} setOpenId={setOpenVoice} go={go} setReqs={setReqs} />}
-        {tab === 'calendar' && <><AvailabilityPanel onSaved={setBlocked} /><CalendarEntries go={go} /></>}
+        {tab === 'calendar' && <CalendarView section={calSec} onSection={setCalSec} onBlocked={setBlocked} go={go} />}
         {tab === 'analytics' && <AnalyticsView />}
-        {tab === 'appointments' && <AppointmentsView />}
         {tab === 'voiceAgent' && <VoiceAgentView reqs={reqs} />}
         {tab === 'sales' && <SalesView />}
         {tab === 'marketing' && <MarketingView />}

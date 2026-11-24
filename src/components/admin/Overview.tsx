@@ -1,13 +1,13 @@
-import type { Tab } from '../../pages/Admin';
+import { GROUPS, type Tab } from '../../pages/Admin';
 import { fmtDate, fmtDay, tagsOf, type Req, type Usage, type VoiceSession } from './api';
 
 interface Props {
   reqs: Req[] | null; sessions: VoiceSession[] | null; usage: Usage | null; blocked: string[];
-  go: (t: Tab, id?: string) => void;
+  go: (t: Tab, id?: string) => void; badges: Partial<Record<Tab, number>>;
 }
 const nf = (n: number) => n.toLocaleString('tr-TR');
 
-export default function Overview({ reqs, sessions, usage, blocked, go }: Props) {
+export default function Overview({ reqs, sessions, usage, blocked, go, badges }: Props) {
   const loading = reqs === null || sessions === null;
   const week = Date.now() - 7 * 864e5;
   const now = new Date();
@@ -20,7 +20,7 @@ export default function Overview({ reqs, sessions, usage, blocked, go }: Props) 
   return (
     <>
       <h1 className="adm-h1">Genel bakış</h1>
-      <p className="adm-sub">Sitenize gelen taleplerin ve sesli görüşmelerin özeti.</p>
+      <p className="adm-sub">Taleplerin, görüşmelerin ve işlerin özeti; aşağıdan her alana geçebilirsiniz.</p>
       <div className="adm-grid4">
         {stat('Yeni talepler (son 7 gün)', newCount)}
         {stat('Toplam talep', reqs?.length ?? 0)}
@@ -34,6 +34,16 @@ export default function Overview({ reqs, sessions, usage, blocked, go }: Props) 
           </>}
         </div>
       </div>
+      <h2 className="adm-h2">Alanlar</h2>
+      <div className="adm-areas">{GROUPS.filter((g) => g.label !== 'Genel').map((g) => (
+        <section key={g.label} className="lq-card adm-card" aria-label={g.label}>
+          <h3>{g.label}</h3><p className="adm-meta">{g.desc}</p>
+          <div className="adm-list">{g.tabs.map((t) => (
+            <button key={t.key} className="adm-row" onClick={() => go(t.key)}>
+              <span style={{ minWidth: 0, flex: 1 }}><span className="adm-name">{t.label}</span><br /><span className="adm-meta">{t.desc}</span></span>
+              {(badges[t.key] ?? 0) > 0 && <span className="adm-badge">{badges[t.key]}</span>}
+            </button>))}</div>
+        </section>))}</div>
       <div className="adm-grid2">
         <section className="lq-card adm-card">
           <div className="adm-head"><h2>Son talepler</h2><button className="adm-link" onClick={() => go('requests')}>Tümünü gör</button></div>

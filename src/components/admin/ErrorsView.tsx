@@ -26,7 +26,7 @@ export default function ErrorsView({ onMailSaved }: { onMailSaved?: (email: stri
   };
   return (
     <>
-      <h1 className="adm-h1">Hatalar / Errors</h1>
+      <h1 className="adm-h1">Hatalar ve e-posta</h1>
       <p className="adm-sub">Sunucu ve tarayıcı hataları (son 200). E-posta, telefon, IP ve anahtarlar maskelenir; aynı hata bir saat içinde sayaçla birleşir; 30 gün sonra silinir.</p>
       <div id="err-mail-card" className="lq-card adm-card" style={{ marginBottom: 20, border: '1px solid var(--c-lilac)' }}>
         <h2>Hata bildirim e-postası</h2>

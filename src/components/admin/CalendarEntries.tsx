@@ -12,11 +12,9 @@ export default function CalendarEntries({ go }: { go: (t: Tab, id?: string) => v
   useEffect(() => { api<{ entries: Entry[] }>('/api/admin/calendar-entries').then((r) => setItems(r.entries)).catch(() => setErr(true)); }, []);
   const days = [...new Set((items ?? []).map((e) => e.day))].sort().reverse();
   return (
-    <section style={{ marginTop: 28 }} aria-label="Takip girdileri">
-      <h2 className="adm-h1" style={{ fontSize: 20 }}>Takip girdileri</h2>
-      <p className="adm-sub">Kimliği belli adaylar için gün gün takip listesi.</p>
+    <section aria-label="Takip girdileri">
       {err && <div className="adm-banner" role="alert">Girdiler yüklenemedi.</div>}
-      {items && !items.length && <div className="adm-empty">Henüz takip girdisi yok</div>}
+      {items && !items.length && <div className="adm-empty">Henüz takip girdisi yok. Sesli asistan, sohbet veya formdan kimliği belli bir aday geldiğinde burada görünür.</div>}
       {days.map((d) => (
         <div key={d} style={{ marginBottom: 16 }}>
           <div className="adm-meta" style={{ marginBottom: 6 }}>{fmtDay(d)}</div>
