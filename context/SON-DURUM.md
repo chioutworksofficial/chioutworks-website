@@ -1,3 +1,5 @@
+> **KARAR — otonom satış motoru yalnızca altyapı (sahip, 2026-11-24):** n8n + Apify (Google Maps, Website Content Crawler, perplexity-search-scraper) + RetellAI + WhatsApp Business akışı hazır tutulacak ama ÇALIŞTIRILMAYACAK. Öncelik bitmeyen işler; alan adı eklense bile Voice Agent/otomasyon kapalı, sesli asistan normal devam. İlk birkaç müşteri mevcut sistemle bulunacak; canlıya alma kararı sahipte. Ayrıntı: kararlar.md 2026-11-24.
+
 ## 2026-11-24 (akşam) — yayına hazır, "deploy et" bekleniyor
 - Kartlar: her harekette bir kart (12 kart), hızlı kaydırmada atlama yok; telefonda CTA titremesi giderildi.
 - Ücretsiz site kontrolü bandı dönme dolabın arkasına taşındı (tarama animasyonu, gerçek 6 alan, "örnek görünüm"); bülten bandı iki sütun + görünür çip.
