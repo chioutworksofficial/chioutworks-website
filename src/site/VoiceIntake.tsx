@@ -12,7 +12,7 @@ import AssistantConsent from './AssistantConsent';
 import VoiceOrb from './VoiceOrb';
 import { hasConsent, fallbackAllowed, CONSENT_VERSION } from '../lib/assistantConsent';
 import { createAudio, LiveCall, fetchToken, liveDayExceeded, bumpLiveDay, postLiveEnd, SilenceWatch, type LiveHandlers } from '../lib/geminiLive';
-import { wrongScript, namesOwner, usesWe } from '../lib/scriptGuard';
+import { wrongScript, namesOwner, usesWe, SCRIPTED_WE } from '../lib/scriptGuard';
 import { writeVoiceSession, clearVoiceSession, downloadTranscript, printTranscript } from '../lib/voiceSession';
 import RequestWizard, { loadWizardDraft, type WizDraft } from './RequestWizard';
 import { guardFields, prefetchFormToken } from '../lib/formGuard';
@@ -147,6 +147,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const outBuf = useRef('');
   const liveTail = useRef({ user: '', assistant: '' });   // unclosed <...>/{...}/[...] fragment held back between transcript chunks
   const closingTimer = useRef<ReturnType<typeof setInterval> | null>(null);   // 8 s of silence after the thanks -> farewell
+  const pendingFix = useRef('');   // queued model correction, sent after the turn and its audio ended
   const liveCut = useRef(false);   // last assistant bubble was interrupted
   const corrections = useRef(0);
   const nameResolve = useRef<() => void>(() => {});
@@ -522,19 +523,20 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       onOutput: (x) => {
         startTimerOnce(); addLive('assistant', x); watchRef.current?.start();
         outBuf.current += x;
+        // corrections are queued, never sent mid-turn: text sent while the model speaks interrupts it (cut sentence, new one starts)
         if (corrections.current < 2 && wrongScript(outBuf.current, lang)) {
           corrections.current++; outBuf.current = '';
-          ref.c?.sendText(`Answer only in ${LANG_EN[lang]}, using only its alphabet. Repeat your last answer in ${LANG_EN[lang]}.`);
+          pendingFix.current = `Answer only in ${LANG_EN[lang]}, using only its alphabet. Repeat your last answer in ${LANG_EN[lang]}.`;
         } else if (corrections.current < 2 && namesOwner(outBuf.current)) {
           corrections.current++; outBuf.current = '';
-          ref.c?.sendText("Do not mention any personal name of the business owner.");
-        } else if (corrections.current < 2 && usesWe(outBuf.current, lang)) {
+          /* no mid-call nudge: a sent text makes the model speak an extra, unprompted sentence; the prompt rule covers this */
+        } else if (corrections.current < 2 && usesWe(outBuf.current.replace(SCRIPTED_WE, ''), lang)) {
           corrections.current++; outBuf.current = '';
-          ref.c?.sendText("Speak in first person singular as the assistant; never 'we'.");
+          /* no mid-call nudge: a sent text makes the model speak an extra, unprompted sentence; the prompt rule covers this */
         }
       },
       onInterrupted: () => { liveCut.current = turnsRef.current[turnsRef.current.length - 1]?.role === 'assistant'; liveRole.current = null; outBuf.current = ''; },
-      onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; liveTail.current = { user: '', assistant: '' }; if (finishPending.current && abuseRef.current) drain(); },
+      onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; const fix = pendingFix.current; pendingFix.current = ''; const fc = callRef.current; if (fix && fc && !finishPending.current) void fc.whenPlaybackDone().then(() => { if (callRef.current === fc && !finishPending.current && !fc.busy()) fc.sendText(fix); }); liveTail.current = { user: '', assistant: '' }; if (finishPending.current && abuseRef.current) drain(); },
       onFinish: (reason) => {
         if (reason === 'closing') {   // thanks said, not the end: wait for the visitor; after ~8 s of silence ask for the short farewell
           if (closingTimer.current) clearInterval(closingTimer.current);

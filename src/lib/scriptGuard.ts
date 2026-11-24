@@ -20,3 +20,6 @@ const WE: Record<string, RegExp> = {
   en: new RegExp(`${L}(?:we|our|ours|us)${R}`, 'iu'),
 };
 export const usesWe = (text: string, lang: string) => (WE[lang] ?? WE.en).test(text);
+
+/** Scripted prompt sentences that contain "we/our" on purpose (closing "our conversation", language-mismatch "Sollen wir"): not a violation. */
+export const SCRIPTED_WE = /unser\p{L}*\s+Gespräch\p{L}*|our conversation|συζήτησής μας|Sollen wir/giu;

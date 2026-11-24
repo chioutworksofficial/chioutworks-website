@@ -1,4 +1,5 @@
 import { getBid } from './assistantConsent';
+import { isStageTurn } from './voiceMarkup';
 // Browser side of the Gemini Live call: raw WebSocket with a one-use ephemeral token (the config is locked server-side into the token),
 // microphone via AudioWorklet (16 kHz PCM16 up) and gapless 24 kHz PCM16 playback (down) on ONE AudioContext.
 const WS_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=';
@@ -145,7 +146,7 @@ export class LiveCall {
           if (sc.outputTranscription?.text) {
             this.turnText += sc.outputTranscription.text;
             // the model sometimes voices placeholders such as "<no speech>{pause}": silence that turn at once
-            if (!this.muteTurn && /^\s*[<{[]/.test(this.turnText)) { this.muteTurn = true; this.stopPlayback(); dbg('placeholder turn muted'); }
+            if (!this.muteTurn && (/^\s*[<{[]/.test(this.turnText) || isStageTurn(this.turnText))) { this.muteTurn = true; this.stopPlayback(); dbg('placeholder turn muted'); }
             this.h.onOutput(sc.outputTranscription.text);
           }
           if (sc.turnComplete) { this.turnText = ''; this.muteTurn = false; this.generating = false; this.lastTurnAt = performance.now(); if (this.ending || this.grace) this.turnDone = true; if (this.gotAudio && this.greeting) { this.openGuard('first turnComplete'); } this.h.onTurnComplete(); }
