@@ -138,9 +138,9 @@ const PAGES: Record<SitePage, (lang: Lang) => ReactNode> = {
       <StatementReveal lang={lang} />
       <Defer id="popular" minH="80vh"><PopularPackages lang={lang} /></Defer>
       <IndustriesWheel lang={lang} />
+      <div data-sc=""><SiteCheckCta lang={lang} /></div>
       <Defer minH="40vh"><PartnerStrip lang={lang} /></Defer>
       <Defer id="roi" minH="100vh"><RoiCalculator lang={lang} /></Defer>
-      <SiteCheckCta lang={lang} />
     </>
   ),
   services: (lang) => <ServicesPage lang={lang} />,

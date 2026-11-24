@@ -1663,37 +1663,80 @@ html[data-mode='light'] [data-site-theme='liquid'].cw-intake .cw-opt[aria-checke
 
 /* Newsletter band above the footer: wide card, circuit traces with travelling light pulse (CSS only) */
 [data-site-theme='liquid'] .nl-band { padding: 56px 20px 8px; position: relative; z-index: 1; }
-[data-site-theme='liquid'] .nl-card { position: relative; overflow: hidden; max-width: 1100px; margin: 0 auto; border-radius: 28px; border: 1px solid var(--c-hairline); background: linear-gradient(135deg, var(--c-cobalt), var(--c-deep-sea)); }
-[data-site-theme='liquid'] .nl-art { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-[data-site-theme='liquid'] .nl-line { fill: none; stroke: var(--c-signal); stroke-width: 1.5; opacity: .35; }
-[data-site-theme='liquid'] .nl-pulse { fill: none; stroke: var(--c-lilac); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 45 955; stroke-dashoffset: 45; opacity: .9; }
-[data-site-theme='liquid'] .nl-dot { fill: var(--c-lilac); opacity: .7; }
-[data-site-theme='liquid'] .nl-chip { fill: color-mix(in srgb, var(--c-signal) 14%, transparent); stroke: var(--c-signal); stroke-width: 1.5; opacity: .5; transform-box: fill-box; transform-origin: center; }
-[data-site-theme='liquid'] .nl-chip-in { fill: color-mix(in srgb, var(--c-lilac) 30%, transparent); stroke: var(--c-lilac); stroke-width: 1; opacity: .6; }
-[data-site-theme='liquid'] .nl-card::before { content: ''; position: absolute; left: 50%; top: 50%; width: 360px; height: 220px; transform: translate(-50%, -50%); background: radial-gradient(closest-side, color-mix(in srgb, var(--c-signal) 28%, transparent), transparent); pointer-events: none; }
-[data-site-theme='liquid'] .nl-body { position: relative; isolation: isolate; max-width: 560px; margin: 0 auto; padding: 48px 24px; text-align: center; }
-[data-site-theme='liquid'] .nl-body::before { content: ''; position: absolute; inset: 14px 0; z-index: -1; border-radius: 24px; background: color-mix(in srgb, var(--c-deep-sea) 80%, transparent); }
-[data-site-theme='liquid'] .nl-body h2 { margin: 0; font-size: clamp(24px, 3.2vw, 34px); line-height: 1.15; font-weight: 600; letter-spacing: -.015em; color: var(--c-quartz); text-wrap: balance; }
+[data-site-theme='liquid'] .nl-card { position: relative; overflow: hidden; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); align-items: center; border-radius: 28px; border: 1px solid var(--c-hairline); background: linear-gradient(135deg, var(--c-cobalt), var(--c-deep-sea)); }
+[data-site-theme='liquid'] .nl-art { display: block; width: 100%; height: 100%; min-height: 300px; pointer-events: none; }
+[data-site-theme='liquid'] .nl-halo { fill: color-mix(in srgb, var(--c-signal) 22%, transparent); filter: blur(22px); transform-box: fill-box; transform-origin: center; }
+[data-site-theme='liquid'] .nl-line { fill: none; stroke: var(--c-signal); stroke-width: 2; opacity: .6; }
+[data-site-theme='liquid'] .nl-pulse { fill: none; stroke: var(--c-lilac); stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 50 950; stroke-dashoffset: 50; }
+[data-site-theme='liquid'] .nl-dot { fill: var(--c-lilac); }
+[data-site-theme='liquid'] .nl-pin rect { fill: var(--c-signal); opacity: .8; }
+[data-site-theme='liquid'] .nl-chip { fill: var(--c-abyss); stroke: var(--c-signal); stroke-width: 2.5; }
+[data-site-theme='liquid'] .nl-chip-in { fill: color-mix(in srgb, var(--c-signal) 16%, var(--c-abyss)); stroke: var(--c-lilac); stroke-width: 1.5; }
+[data-site-theme='liquid'] .nl-core { fill: var(--c-signal); transform-box: fill-box; transform-origin: center; }
+[data-site-theme='liquid'] .nl-body { position: relative; padding: 48px clamp(24px, 4vw, 48px); text-align: left; }
+[data-site-theme='liquid'] .nl-body h2 { margin: 0; font-size: clamp(24px, 3vw, 34px); line-height: 1.15; font-weight: 600; letter-spacing: -.015em; color: var(--c-quartz); text-wrap: balance; }
 [data-site-theme='liquid'] .nl-sub { margin: 10px 0 22px; font-size: 15px; color: var(--c-mist); }
 [data-site-theme='liquid'] .nl-form { text-align: left; }
 [data-site-theme='liquid'] .nl-form .nl-row > button { padding-inline: 24px; }
-@keyframes nl-run { to { stroke-dashoffset: -955; } }
-@keyframes nl-glow { 0%, 100% { opacity: .45; } 50% { opacity: .85; } }
-.nl-band:not(.nl-on) .nl-pulse, .nl-band:not(.nl-on) .nl-chip { animation-play-state: paused !important; }
+@keyframes nl-run { to { stroke-dashoffset: -950; } }
+@keyframes nl-glow { 0%, 100% { opacity: .55; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.06); } }
+.nl-band:not(.nl-on) :is(.nl-pulse, .nl-halo, .nl-core) { animation-play-state: paused !important; }
 @media (prefers-reduced-motion: no-preference) {
   [data-site-theme='liquid'] .nl-pulse { animation: nl-run 4.5s linear infinite; }
   [data-site-theme='liquid'] .nl-t1 .nl-pulse { animation-delay: -1.1s; }
   [data-site-theme='liquid'] .nl-t2 .nl-pulse { animation-delay: -2.2s; }
   [data-site-theme='liquid'] .nl-t3 .nl-pulse { animation-delay: -3.3s; }
-  [data-site-theme='liquid'] .nl-chip { animation: nl-glow 3.2s ease-in-out infinite; }
+  [data-site-theme='liquid'] .nl-halo, [data-site-theme='liquid'] .nl-core { animation: nl-glow 3.2s ease-in-out infinite; }
 }
 @media (prefers-reduced-motion: reduce) { [data-site-theme='liquid'] .nl-pulse { stroke-dashoffset: -300; } }
 @media (max-width: 767px) {
   [data-site-theme='liquid'] .nl-band { padding: 40px 14px 0; }
-  [data-site-theme='liquid'] .nl-card { border-radius: 22px; }
-  [data-site-theme='liquid'] .nl-t2, [data-site-theme='liquid'] .nl-t3 { display: none; }
-  [data-site-theme='liquid'] .nl-body { padding: 32px 18px; }
-  [data-site-theme='liquid'] .nl-body::before { inset: 8px 0; }
+  [data-site-theme='liquid'] .nl-card { grid-template-columns: 1fr; border-radius: 22px; }
+  [data-site-theme='liquid'] .nl-art { order: -1; min-height: 0; height: 170px; }
+  [data-site-theme='liquid'] .nl-body { padding: 4px 18px 28px; }
   [data-site-theme='liquid'] .nl-form .nl-row { flex-direction: column; }
   [data-site-theme='liquid'] .nl-form .nl-row > * { width: 100%; flex: 0 0 auto !important; }
+}
+
+/* Free site check band (home): hook + button left, animated sample scan right (transform/opacity only, paused off-screen) */
+[data-site-theme='liquid'] .sc-band { padding: clamp(48px, 8vh, 96px) 20px; position: relative; z-index: 1; }
+[data-site-theme='liquid'] .sc-card { position: relative; overflow: hidden; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: clamp(20px, 4vw, 48px); align-items: center; padding: clamp(24px, 4vw, 48px); border-radius: 28px; border: 1px solid var(--c-hairline); background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--c-signal) 20%, transparent), transparent 60%), linear-gradient(135deg, var(--c-deep-sea), var(--c-cobalt)); }
+[data-site-theme='liquid'] .sc-text h2 { margin: 0; font-family: var(--font-display); font-size: clamp(26px, 3.4vw, 40px); line-height: 1.12; font-weight: 600; letter-spacing: -.02em; color: var(--c-quartz); text-wrap: balance; }
+[data-site-theme='liquid'] .sc-text p { margin: 14px 0 26px; font-size: 16px; line-height: 1.55; color: var(--c-mist); max-width: 460px; }
+[data-site-theme='liquid'] .sc-btn { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 48px; padding: 14px 28px; border-radius: 9999px; background: var(--c-signal); color: #fff; font: 600 14px/1.2 var(--font-body); text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 0 8px 24px color-mix(in srgb, var(--c-signal) 35%, transparent); }
+[data-site-theme='liquid'] .sc-btn:hover { transform: translateY(-2px); }
+[data-site-theme='liquid'] .sc-btn:focus-visible { outline: 2px solid var(--c-lilac); outline-offset: 3px; }
+[data-site-theme='liquid'] .sc-vis { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+[data-site-theme='liquid'] .sc-frame { width: 100%; max-width: 460px; border-radius: 14px; border: 1px solid var(--c-hairline); background: var(--c-abyss); box-shadow: 0 20px 50px color-mix(in srgb, var(--c-void) 60%, transparent); overflow: hidden; }
+[data-site-theme='liquid'] .sc-bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--c-hairline); background: var(--c-inkline); }
+[data-site-theme='liquid'] .sc-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--c-slate); opacity: .7; }
+[data-site-theme='liquid'] .sc-url { flex: 1; height: 14px; margin-left: 8px; border-radius: 9999px; background: var(--c-deep-sea); }
+[data-site-theme='liquid'] .sc-page { position: relative; height: 92px; padding: 14px; overflow: hidden; }
+[data-site-theme='liquid'] .sc-sk { display: block; height: 10px; margin-bottom: 9px; border-radius: 5px; background: var(--c-edge); }
+[data-site-theme='liquid'] .sc-sk1 { width: 60%; height: 14px; background: var(--c-hairline); } [data-site-theme='liquid'] .sc-sk2 { width: 90%; } [data-site-theme='liquid'] .sc-sk3 { width: 72%; }
+[data-site-theme='liquid'] .sc-scan { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--c-signal); box-shadow: 0 0 14px 3px color-mix(in srgb, var(--c-signal) 60%, transparent); opacity: 0; transform: translateY(0); }
+[data-site-theme='liquid'] .sc-rows { list-style: none; margin: 0; padding: 4px 14px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+[data-site-theme='liquid'] .sc-rows li { min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+[data-site-theme='liquid'] .sc-lbl { display: block; margin-bottom: 4px; font-size: 11.5px; line-height: 1.2; color: var(--c-mist); }
+[data-site-theme='liquid'] .sc-track { display: block; height: 6px; border-radius: 9999px; background: var(--c-edge); overflow: hidden; }
+[data-site-theme='liquid'] .sc-fill { display: block; height: 100%; width: 100%; border-radius: 9999px; background: linear-gradient(90deg, var(--c-signal), var(--c-lilac)); transform-origin: left; transform: scaleX(var(--w)); }
+[data-site-theme='liquid'] .sc-cap { font-size: 11.5px; color: var(--c-ash); }
+@keyframes sc-sweep { 0% { transform: translateY(0); opacity: 0; } 8% { opacity: 1; } 55% { opacity: 1; } 65%, 100% { transform: translateY(80px); opacity: 0; } }
+@keyframes sc-fillup { 0%, 8% { transform: scaleX(0); } 30%, 88% { transform: scaleX(var(--w)); } 100% { transform: scaleX(0); } }
+.sc-band:not(.sc-on) :is(.sc-scan, .sc-fill) { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: no-preference) {
+  [data-site-theme='liquid'] .sc-scan { animation: sc-sweep 6s ease-in-out infinite; }
+  [data-site-theme='liquid'] .sc-fill { transform: scaleX(0); animation: sc-fillup 6s ease-out infinite; animation-delay: var(--d); }
+}
+@media (max-width: 767px) {
+  [data-site-theme='liquid'] .sc-band { padding: 40px 14px; }
+  [data-site-theme='liquid'] .sc-card { grid-template-columns: 1fr; border-radius: 22px; padding: 22px 18px 26px; gap: 22px; }
+  [data-site-theme='liquid'] .sc-vis { order: -1; }
+  [data-site-theme='liquid'] .sc-frame { max-width: 320px; }
+  [data-site-theme='liquid'] .sc-page { height: 64px; padding: 10px 14px; }
+  [data-site-theme='liquid'] .sc-sk { height: 8px; margin-bottom: 7px; }
+  [data-site-theme='liquid'] .sc-btn { width: 100%; }
+  [data-site-theme='liquid'] .sc-lbl { font-size: 10px; }
+  [data-site-theme='liquid'] .sc-rows { gap: 10px 12px; }
+  [data-site-theme='liquid'] .sc-text p { margin-bottom: 20px; }
 }

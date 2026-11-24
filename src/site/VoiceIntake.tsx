@@ -16,6 +16,8 @@ import { wrongScript, namesOwner, usesWe } from '../lib/scriptGuard';
 import { writeVoiceSession, clearVoiceSession, downloadTranscript, printTranscript } from '../lib/voiceSession';
 import RequestWizard, { loadWizardDraft, type WizDraft } from './RequestWizard';
 import { guardFields, prefetchFormToken } from '../lib/formGuard';
+import ContactCapture, { type CaptureResult } from './ContactCapture';
+import { CAPTURE_UI } from './i18n/capture';
 
 const cleanName = (v: string) => v.replace(/[^\p{L}\s.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 40);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -75,6 +77,10 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const [vFirst, setVFirst] = useState('');
   const [vLast, setVLast] = useState('');
   const [vSal, setVSal] = useState<Salutation>('none');
+  const [offer, setOffer] = useState(false);   // contact card during the call (offered once)
+  const [capEnd, setCapEnd] = useState(false);   // end-screen summary field expanded
+  const [captured, setCaptured] = useState<CaptureResult | null>(null);
+  const offeredRef = useRef(false);
   const [dl, setDl] = useState(false);
   const [dFirst, setDFirst] = useState('');
   const [dLast, setDLast] = useState('');
@@ -220,7 +226,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       visitorRef.current = NO_VISITOR; setVFirst(''); setVLast(''); setVSal('none'); setNameDone(false); voiceId.current = null; deletedRef.current = false;
       deadlineRef.current = 0; endReasonRef.current = ''; endedAtRef.current = 0; talkStart.current = 0; wrapSent.current = false; goAway.current = false; limitAt.current = 0; endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; softSent.current = false; reconnected.current = false; voiceStarted.current = false; setGraceUi(false);
       liveRole.current = null; liveCut.current = false; outBuf.current = ''; corrections.current = 0; setReconnecting(false); setCard(null); setCardSent(false); setCardErr(''); setCardBusy(false);
-      preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false);
+      preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false); offeredRef.current = false; setOffer(false); setCapEnd(false); setCaptured(null);
       goPhase('consent'); startedAt.current = Date.now(); setOpen(true);
       if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('voicedemo')) {
         const n = Date.now();
@@ -551,6 +557,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
         if (reason === 'abuse') { abuseRef.current = true; endReasonRef.current = 'abuse'; } else if (reason === 'language') endReasonRef.current = 'language'; else endReasonRef.current ||= 'finish_tool';
         finishPending.current = true; if (reason === 'abuse') setTimeout(drain, 3000); else drain();
       },
+      onOffer: () => { if (!offeredRef.current && !finishPending.current) { offeredRef.current = true; setOffer(true); } },
       onGoAway: () => { goAway.current = true; wrapNow(); },
       onLevel: (rms) => { const n = performance.now(); if (n - lastLevel.current > 80) { lastLevel.current = n; setLevel(Math.min(1, rms * 8)); } },
       onClosed: (_clean, code) => {
@@ -795,6 +802,18 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     });
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Written offer (typed chat / fallback voice has no tool call): once, after the third visitor message. Live calls use the offer_summary tool instead.
+  useEffect(() => {
+    if (!open || offeredRef.current || phase === 'live' || (phase !== 'idle' && phase !== 'speaking')) return;
+    if (turns.filter((x) => x.role === 'user').length >= 3) { offeredRef.current = true; setOffer(true); }
+  }, [open, phase, turns]);
+  const capDemo = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('capdemo');   // dev only: shows the in-call card without a live call
+  useEffect(() => { if (capDemo) { setOpen(true); goPhase('live'); setOffer(true); } }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  const onCaptured = (r: CaptureResult) => {
+    setCaptured(r);
+    if (phaseRef.current === 'live') callRef.current?.sendText(`CARD_SENT: say exactly this sentence, word for word, nothing else: "${CAPTURE_UI[lang].thanks}"`);
+  };
+
   const onMic = () => {
     if (phase === 'listening') { manualStop.current = true; recRef.current?.stop(); }
     else if (phase === 'idle' || phase === 'speaking') { autoRef.current = true; emptyRuns.current = 0; startListening(); }
@@ -888,8 +907,11 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
           {!card ? (
             <p role="status" aria-live="polite" style={{ textAlign: 'center', color: 'var(--lq-silver)' }}>{t.extracting}</p>
           ) : (
-            <RequestWizard lang={lang} initial={card} restored={restored} getSession={async () => voiceId.current ?? await saveSession()} onClose={() => { teardown(); setOpen(false); }} />
+            <RequestWizard lang={lang} channel={captured?.channel} initial={captured ? { ...card, business: captured.business || card.business, email: captured.email || card.email, phone: captured.phone || card.phone } : card} restored={restored} getSession={async () => voiceId.current ?? await saveSession()} onClose={() => { teardown(); setOpen(false); }} />
           )}
+          {card && !captured && (capEnd
+            ? <div style={{ alignSelf: 'center', width: '100%' }}><ContactCapture lang={lang} variant="end" summary={[card.service, [card.business, card.city].filter(Boolean).join(', '), card.notes].filter(Boolean).join(' · ')} getSession={async () => voiceId.current ?? await saveSession()} onDone={onCaptured} onDismiss={() => setCapEnd(false)} /></div>
+            : <button type="button" style={{ ...btn, alignSelf: 'center', border: 0, color: 'var(--lq-silver)', textDecoration: 'underline', fontSize: 14 }} onClick={() => setCapEnd(true)}>{CAPTURE_UI[lang].endTitle}</button>)}
         </div>
       ) : (
         <div style={{ width: '100%', maxWidth: 640, flex: 1, display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 40, minHeight: 0 }}>
@@ -925,6 +947,8 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
           )}
 
           {notice && <p role="status" style={{ color: 'var(--lq-silver)', fontSize: 13.5, margin: 0, textAlign: 'center' }}>{notice}</p>}
+
+          {offer && <div style={{ alignSelf: 'center', width: '100%', maxWidth: 460, maxHeight: 'min(72vh, 600px)', overflowY: 'auto', flexShrink: 0 }} data-lenis-prevent><ContactCapture lang={lang} variant="card" demo={capDemo} getSession={async () => voiceId.current ?? await saveSession()} onDone={onCaptured} onDismiss={() => setOffer(false)} /></div>}
 
           {phase === 'live' ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>

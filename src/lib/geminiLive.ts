@@ -10,6 +10,7 @@ export interface LiveHandlers {
   onTurnComplete: () => void;
   onFinish: (reason: string) => void;   // the model called finish_conversation (reason: "done" | "abuse")
   onClosed: (clean: boolean, code: number) => void;
+  onOffer?: () => void;   // the model called offer_summary: show the contact card
   onGoAway?: () => void;   // the Live API announced it will close the session soon: wrap up, do not cut
   onLevel: (rms: number) => void;
 }
@@ -153,6 +154,7 @@ export class LiveCall {
         if (m.toolCall?.functionCalls) {
           const calls = m.toolCall.functionCalls as { id: string; name: string; args?: { reason?: unknown } }[];
           ws.send(JSON.stringify({ toolResponse: { functionResponses: calls.map((c) => ({ id: c.id, name: c.name, response: { ok: true } })) } }));
+          if (calls.some((c) => c.name === 'offer_summary')) this.h.onOffer?.();
           const fin = calls.find((c) => c.name === 'finish_conversation');
           if (fin) this.h.onFinish(fin.args?.reason === 'abuse' ? 'abuse' : fin.args?.reason === 'language' ? 'language' : fin.args?.reason === 'closing' ? 'closing' : 'done');
         }

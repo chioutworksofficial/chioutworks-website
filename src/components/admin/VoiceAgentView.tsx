@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, fmtDate, type Req } from './api';
 import { Check, SelectHeader, useNote, useSelection } from './bulk';
+import CallScript from './CallScript';
 
 type St = 'to_call' | 'calling' | 'booked' | 'no_answer';
 const ST: Record<St, string> = { to_call: 'Aranacak', calling: 'Aranıyor', booked: 'Randevu alındı', no_answer: 'Cevap yok' };
@@ -145,6 +146,8 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
             : <button type="button" className="lq-btn-ghost adm-btn adm-pri" disabled={!sel.sel.length || busy} onClick={() => setConfirm(true)}>Seçilenleri Aramaya Başlat ({live ? 'Canlı' : 'Simülasyon'})</button>}
         </div>
       </div>
+
+      <CallScript />
 
       <div className="lq-card adm-card" style={{ marginBottom: 16 }}>
         <div className="adm-head"><h2>Arama Logları</h2></div>

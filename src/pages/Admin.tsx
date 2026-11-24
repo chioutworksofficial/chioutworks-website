@@ -15,11 +15,14 @@ import ErrorsView from '../components/admin/ErrorsView';
 import VoiceAgentView from '../components/admin/VoiceAgentView';
 import SalesView from '../components/admin/SalesView';
 import MarketingView from '../components/admin/MarketingView';
+import NewsletterView from '../components/admin/NewsletterView';
+import LeadsView from '../components/admin/LeadsView';
+import CalendarEntries from '../components/admin/CalendarEntries';
 
 type Auth = 'checking' | 'out' | 'in' | 'unset';
-export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent' | 'sales' | 'marketing';
+export type Tab = 'overview' | 'requests' | 'voice' | 'calendar' | 'analytics' | 'appointments' | 'intakes' | 'offers' | 'projects' | 'errors' | 'voiceAgent' | 'sales' | 'marketing' | 'newsletter' | 'leads';
 const GROUPS: { label: string; tabs: { key: Tab; label: string }[] }[] = [
-  { label: 'Gelenler', tabs: [{ key: 'requests', label: 'Talepler' }, { key: 'intakes', label: 'Analiz formları' }, { key: 'voice', label: 'Sesli görüşmeler' }] },
+  { label: 'Gelenler', tabs: [{ key: 'leads', label: 'Müşteri adayları' }, { key: 'requests', label: 'Talepler' }, { key: 'intakes', label: 'Analiz formları' }, { key: 'voice', label: 'Sesli görüşmeler' }, { key: 'newsletter', label: 'Bülten' }] },
   { label: 'İşler', tabs: [{ key: 'offers', label: 'Teklifler' }, { key: 'projects', label: 'Projeler' }, { key: 'calendar', label: 'Takvim' }, { key: 'appointments', label: 'Randevular' }, { key: 'voiceAgent', label: 'Voice Agent' }, { key: 'sales', label: 'Satış' }, { key: 'marketing', label: 'Pazarlama' }] },
   { label: 'Site', tabs: [{ key: 'overview', label: 'Genel bakış' }, { key: 'analytics', label: 'Ziyaret analizi' }, { key: 'errors', label: 'Hatalar ve e-posta' }] },
 ];
@@ -151,12 +154,14 @@ export default function Admin() {
         {tab === 'offers' && <OffersView openId={openOffer} setOpenId={setOpenOffer} onUnread={setOfferUnread} />}
         {tab === 'projects' && <ProjectsView onUnread={setProjectUnread} />}
         {tab === 'voice' && <VoiceView sessions={sessions} setSessions={setSessions} openId={openVoice} setOpenId={setOpenVoice} go={go} setReqs={setReqs} />}
-        {tab === 'calendar' && <AvailabilityPanel onSaved={setBlocked} />}
+        {tab === 'calendar' && <><AvailabilityPanel onSaved={setBlocked} /><CalendarEntries go={go} /></>}
         {tab === 'analytics' && <AnalyticsView />}
         {tab === 'appointments' && <AppointmentsView />}
         {tab === 'voiceAgent' && <VoiceAgentView reqs={reqs} />}
         {tab === 'sales' && <SalesView />}
         {tab === 'marketing' && <MarketingView />}
+        {tab === 'leads' && <LeadsView go={go} />}
+        {tab === 'newsletter' && <NewsletterView />}
         {tab === 'errors' && <ErrorsView onMailSaved={setNotifyMail} />}
       </main>
     </div>

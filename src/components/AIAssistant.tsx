@@ -17,6 +17,7 @@ import { hasConsent as hasCookieConsent } from '../lib/consent';
 import { hasConsent } from '../lib/assistantConsent';
 import { writeVoiceSession, clearVoiceSession, downloadTranscript } from '../lib/voiceSession';
 import { ChatStyleFlow } from '../site/StyleInline';
+import ContactCapture, { type CaptureResult } from '../site/ContactCapture';
 import { useDialogA11y } from './ui/useDialogA11y';
 
 // ── Chat memory (owner, 2026-11-19): always kept for this tab (sessionStorage = needed for the requested service);
@@ -371,6 +372,9 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [appointmentDone, setAppointmentDone] = useState(false);
   const [card, setCard] = useState(false);   // chat ended with a saved request: show the editable request card
+  const [offer, setOffer] = useState(false);   // inline contact card (offered once per chat)
+  const [capRes, setCapRes] = useState<CaptureResult | null>(null);
+  const offeredRef = useRef(false);
   const [ended, setEnded] = useState(false);   // server ended the chat (goodbye / block): input stays off
   const [, setPause] = useState<{ permanent: boolean; until: number | null } | null>(null);   // server-side pause/close (never persisted)
   const locked = appointmentDone || ended;
@@ -690,9 +694,21 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
     seenRef.current = messages.length;
   }, [messages]);
 
+  // Offer once, after the visitor has had some value: after the third visitor message and the assistant's reply (no model involvement).
+  useEffect(() => {
+    if (!open || !consented || offeredRef.current || loading || card || ended || appointmentDone) return;
+    if (messages.filter((m) => m.role === 'user').length >= 3 && messages[messages.length - 1]?.role === 'assistant') { offeredRef.current = true; setOffer(true); }
+  }, [open, consented, loading, card, ended, appointmentDone, messages]);
+  useEffect(() => { if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('capdemo-chat')) { setConsented(true); setOpen(true); setOffer(true); setMessages([{ role: 'user', content: '…' }, { role: 'assistant', content: '…' }]); } }, []);   // dev only: shows the card without a conversation
+  // Closing after leaving contact details opens the contact form prefilled (contact + need summary); the visitor edits and sends it, or not: contact + summary stay saved.
   const closePanel = () => { void saveSession(); setOpen(false); };
+  const closeWithForm = () => {
+    closePanel();
+    const sess = sessRef.current;
+    if (capRes && sess && !card) navigate(pagePath(lang, 'contact'), { state: { voiceSessionId: sess.id, voiceSecret: sess.secret, prefill: messages.filter((m) => m.role === 'user').map((m) => m.content).join(' ').replace(/\s+/g, ' ').slice(0, 600), email: capRes.email, phone: capRes.phone, business: capRes.business, channel: capRes.channel } });
+  };
   // New chat: keep the stored transcript, start a fresh conversation in the panel
-  const newChat = () => { void saveSession(); sessRef.current = null; forgetChat(); backupRef.current = false; setBackupAsk(null); setMessages([]); setError(null); setEnded(false); setCard(false); setPause(null); setConfirmDel(false); setTab('chat'); startedRef.current = Date.now(); if (!devDemo) void checkStatus(); };
+  const newChat = () => { void saveSession(); sessRef.current = null; offeredRef.current = false; setOffer(false); setCapRes(null); forgetChat(); backupRef.current = false; setBackupAsk(null); setMessages([]); setError(null); setEnded(false); setCard(false); setPause(null); setConfirmDel(false); setTab('chat'); startedRef.current = Date.now(); if (!devDemo) void checkStatus(); };
   const toVoice = () => { void saveSession(); setOpen(false); window.dispatchEvent(new CustomEvent('cw:open-voice')); };
 
   const deleteChat = async () => {
@@ -810,7 +826,7 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
                 style={{ background: 'color-mix(in srgb, var(--c-quartz) 6%, transparent)', border: '1px solid var(--lq-line)', cursor: 'pointer', color: sound ? 'var(--lq-white)' : 'var(--lq-silver)', width: 32, height: 32, borderRadius: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>{sound ? <><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></> : <><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></>}</svg>
               </button>
-              <button onClick={closePanel} aria-label={ui.close}
+              <button onClick={closeWithForm} aria-label={ui.close}
                 style={{ background: 'color-mix(in srgb, var(--c-quartz) 6%, transparent)', border: '1px solid var(--lq-line)', cursor: 'pointer', color: 'var(--lq-silver)', width: 32, height: 32, borderRadius: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -983,6 +999,8 @@ export default function AIAssistant({ lang, hideLauncher = false }: Props) {
                   {error}
                 </div>
               )}
+
+              {offer && !card && <ContactCapture lang={lang} variant="card" demo={!sessRef.current && import.meta.env.DEV} getSession={async () => sessRef.current ?? await saveSession()} onDone={setCapRes} onDismiss={() => setOffer(false)} />}
 
               {card && <RequestCard lang={lang} sess={sessRef.current} ui={ui} />}
 

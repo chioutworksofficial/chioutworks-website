@@ -195,3 +195,19 @@ html[data-mode='light'] .adm-bar i, html[data-mode='light'] .adm-cols i { backgr
 .adm-map path:hover { stroke: var(--c-lilac); stroke-width: 1; }
 .adm-maptip { position: absolute; transform: translate(-50%, calc(-100% - 12px)); pointer-events: none; z-index: 5; white-space: nowrap; padding: 6px 10px; border-radius: var(--r-input, 8px); background: var(--c-abyss); color: var(--c-mist); border: 1px solid var(--c-lilac); font: 500 12px/1.3 var(--font-body); }
 .adm-maptop { margin: 0 0 12px; }
+
+/* leads (LeadsView) */
+.lds-search { width: min(320px, 100%) !important; }
+.lds-soc { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.lds-table .adm-table td { white-space: normal; max-width: 220px; overflow-wrap: anywhere; }
+.lds-table .adm-table tr:hover td { background: var(--c-inkline); }
+.lds-table a, .adm-drawer a { color: var(--c-signal); }
+.lds-cards { display: none; }
+@media (max-width: 767px) {
+  .lds-table { display: none; }
+  .lds-cards { display: flex; }
+  .lds-card { flex-direction: column; align-items: flex-start; gap: 4px; color: var(--c-mist); }
+  .lds-card b { color: var(--c-quartz); font-weight: 500; }
+  .lds-card small { color: var(--c-ash); }
+  .adm-ranges .lds-search { width: 100% !important; }
+}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { CONTACT } from '../data/sections';
 import type { Lang } from '../translations';
@@ -11,6 +11,10 @@ import MonthCalendar from './MonthCalendar';
 import BtnArrow from '../site/BtnArrow';
 import { calcRoi, clearRoi, fmtMoney, fmtNum, readRoi, summaryLine, UNITS } from '../lib/roiModel';
 import { guardFields, prefetchFormToken } from '../lib/formGuard';
+import { CAPTURE_TEXT_VERSION } from '../site/i18n/capture';
+
+const DRAFT_KEY = 'cw.contactDraft.v1';
+type Channel = 'email' | 'phone' | 'whatsapp';
 
 interface Props { lang: Lang; }
 
@@ -30,11 +34,11 @@ const mono: React.CSSProperties = { fontSize: 11, letterSpacing: '0.12em', textT
 const focusOn = (e: React.FocusEvent<HTMLElement>) => { e.currentTarget.style.borderColor = 'var(--lq-g2)'; };
 const focusOff = (e: React.FocusEvent<HTMLElement>) => { e.currentTarget.style.borderColor = 'var(--lq-line)'; };
 
-function Field({ label, type, value, onChange, placeholder }: { label: string; type: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+function Field({ label, type, value, onChange, placeholder, req = true }: { label: string; type: string; value: string; onChange: (v: string) => void; placeholder: string; req?: boolean }) {
   return (
     <label style={labelStyle}>
-      {label} *
-      <input required type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} onFocus={focusOn} onBlur={focusOff} style={inputStyle} />
+      {label}{req ? ' *' : ''}
+      <input required={req} type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} onFocus={focusOn} onBlur={focusOff} style={inputStyle} />
     </label>
   );
 }
@@ -47,13 +51,16 @@ export default function CTASection({ lang }: Props) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [reply, setReply] = useState<'written' | 'phone'>('written');
+  const [channel, setChannel] = useState<Channel>('email');   // preferred contact; phone / whatsapp need a number, only "phone" may be called
+  const reply: 'written' | 'phone' = channel === 'phone' ? 'phone' : 'written';
+  const [capToken, setCapToken] = useState('');
+  const [business, setBusiness] = useState('');
   const loc = useLocation();
   const rawTopic = new URLSearchParams(loc.search).get('topic');
   const initTopic = RESOURCES_TOPICS.find((t) => t === rawTopic) ?? null;
   const [topic, setTopic] = useState<(typeof RESOURCES_TOPICS)[number] | null>(initTopic);
   const tu = RESOURCES_TOPIC_UI[lang];
-  const voiceState = (loc.state ?? null) as { voiceSessionId?: string; voiceSecret?: string; prefill?: string } | null;
+  const voiceState = (loc.state ?? null) as { voiceSessionId?: string; voiceSecret?: string; prefill?: string; email?: string; phone?: string; business?: string; channel?: Channel } | null;
   const [voice, setVoice] = useState(() => (typeof voiceState?.voiceSessionId === 'string' && typeof voiceState.voiceSecret === 'string' ? { id: voiceState.voiceSessionId, secret: voiceState.voiceSecret } : readVoiceSession()));
   const [roi, setRoi] = useState(readRoi);
   const [showRoi, setShowRoi] = useState(false);
@@ -65,6 +72,31 @@ export default function CTASection({ lang }: Props) {
   const [sending, setSending] = useState(false);
   const [website, setWebsite] = useState('');
   useEffect(() => { prefetchFormToken(); }, []);
+  const loaded = useRef(false);
+  // Restore: local draft (this browser only, never sent before submit), then the assistant's prefill (router state or the e-mailed link ?r=)
+  useEffect(() => {
+    let dr: Record<string, unknown> | null = null;
+    try { dr = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null'); } catch { dr = null; }
+    const t = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '');
+    if (dr && typeof dr === 'object') {
+      setName((x) => x || t(dr!.name, 80)); setEmail((x) => x || t(dr!.email, 254)); setPhone((x) => x || t(dr!.phone, 40)); setAddress((x) => x || t(dr!.address, 200)); setBusiness((x) => x || t(dr!.business, 100)); setMessage((x) => x || t(dr!.message, 1000));
+      if (dr.channel === 'phone' || dr.channel === 'whatsapp') setChannel(dr.channel);
+    }
+    if (voiceState) { if (typeof voiceState.email === 'string') setEmail(voiceState.email.slice(0, 254)); if (typeof voiceState.phone === 'string') setPhone(voiceState.phone.slice(0, 40)); if (voiceState.channel) setChannel(voiceState.channel); if (typeof voiceState.business === 'string') setBusiness(voiceState.business.slice(0, 100)); }
+    const r = new URLSearchParams(loc.search).get('r');
+    if (r && /^[\w-]{20,64}$/.test(r)) {
+      fetch(`/api/capture/prefill/${encodeURIComponent(r)}`).then((x) => (x.ok ? x.json() : null)).then((j) => {
+        if (!j) return;
+        setCapToken(r); setEmail(t(j.email, 254)); setPhone(t(j.phone, 40)); setName((x) => x || t(j.name, 80)); setBusiness((x) => x || t(j.business, 100)); setMessage((x) => x || t(j.need, 1000));
+        if (j.preferredChannel === 'phone' || j.preferredChannel === 'whatsapp') setChannel(j.preferredChannel);
+      }).catch(() => {});
+    }
+    loaded.current = true;
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {   // autosave (never removes: the draft is only cleared by a successful submit)
+    if (!loaded.current || submitted || !(name || email || phone || address || message || business)) return;
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ name, email, phone, address, message, business, channel })); } catch { /* storage unavailable */ }
+  }, [name, email, phone, address, message, business, channel, submitted]);
   const [preferredStart, setPreferredStart] = useState<string | null>(null);
   const [callTime, setCallTime] = useState('');
   const [blocked, setBlocked] = useState<Set<string>>(new Set());
@@ -75,10 +107,11 @@ export default function CTASection({ lang }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (sending) return;
-    if (!name.trim() || !email.trim() || !phone.trim() || !address.trim()) {
+    if (!name.trim() || !email.trim() || !address.trim()) {
       setError(d.requiredError);
       return;
     }
+    if ((channel !== 'email' || phone.trim()) && phone.replace(/\D/g, '').length < 7) { setError(u.phoneNeeded); return; }
     if (reply === 'phone' && (!preferredStart || !callTime)) {
       setError(u.callTimeLabel);
       return;
@@ -89,7 +122,7 @@ export default function CTASection({ lang }: Props) {
       const r = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, address, phone, email, message, replyPreference: reply, ...(topic ? { topic } : roi ? { topic: 'roi' } : {}), ...(roi ? { roiCalc: roi } : {}), ...(preferredStart ? { preferredStart } : {}), ...(reply === 'phone' && callTime ? { callTime } : {}), lang, page: window.location.pathname, ...(await guardFields()), ...(voice && attachVoice ? { voiceSessionId: voice.id, voiceSecret: voice.secret } : {}) }),
+        body: JSON.stringify({ name, business, address, phone, email, message, replyPreference: reply, preferredChannel: channel, textVersion: CAPTURE_TEXT_VERSION, ...(capToken ? { capToken } : {}), ...(topic ? { topic } : roi ? { topic: 'roi' } : {}), ...(roi ? { roiCalc: roi } : {}), ...(preferredStart ? { preferredStart } : {}), ...(reply === 'phone' && callTime ? { callTime } : {}), lang, page: window.location.pathname, ...(await guardFields()), ...(voice && attachVoice ? { voiceSessionId: voice.id, voiceSecret: voice.secret } : {}) }),
       });
       if (!r.ok) {
         const j = await r.json().catch(() => null);
@@ -105,7 +138,7 @@ export default function CTASection({ lang }: Props) {
     createAppointment({ name, email, phone, address, date: new Date().toISOString().slice(0, 10), preferredTime: '', message });
     setSubmitted(true);
     if (roi) { clearRoi(); setRoi(null); }
-    setName(''); setEmail(''); setPhone(''); setAddress(''); setReply('written'); setMessage(''); setPreferredStart(null); setCallTime('');
+    setName(''); setEmail(''); setPhone(''); setAddress(''); setChannel('email'); setCapToken(''); setBusiness(''); try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } setMessage(''); setPreferredStart(null); setCallTime('');
   };
 
 
@@ -166,8 +199,9 @@ export default function CTASection({ lang }: Props) {
               <input type="text" name="website" data-hp="1" value={website} onChange={e => setWebsite(e.target.value)} tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: 'absolute', left: -9999, width: 1, height: 1, opacity: 0 }} />
               <div className="grid gap-3.5 sm:grid-cols-2">
                 <Field label={d.nameLabel} type="text" value={name} onChange={setName} placeholder={d.namePlaceholder} />
-                <Field label={d.phoneLabel} type="tel" value={phone} onChange={setPhone} placeholder={d.phonePlaceholder} />
+                <Field label={channel === 'email' ? `${d.phoneLabel} (${u.optional})` : d.phoneLabel} req={channel !== 'email'} type="tel" value={phone} onChange={setPhone} placeholder={d.phonePlaceholder} />
                 <Field label={d.emailLabel} type="email" value={email} onChange={setEmail} placeholder={d.emailPlaceholder} />
+                <Field label={`${u.business} (${u.optional})`} req={false} type="text" value={business} onChange={setBusiness} placeholder="" />
                 <Field label={d.addressLabel} type="text" value={address} onChange={setAddress} placeholder={d.addressPlaceholder} />
               </div>
               <label style={labelStyle}>
@@ -176,14 +210,14 @@ export default function CTASection({ lang }: Props) {
               </label>
 
               <div>
-                <p style={{ ...mono, margin: '0 0 8px' }}>{u.reply}</p>
-                <div role="radiogroup" aria-label={u.reply} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {([['written', u.replyWritten], ['phone', u.replyPhone]] as const).map(([k, l]) => (
-                    <button key={k} type="button" role="radio" aria-checked={reply === k} onClick={() => setReply(k)}
+                <p style={{ ...mono, margin: '0 0 8px' }}>{u.channel}</p>
+                <div role="radiogroup" aria-label={u.channel} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {([['email', u.chEmail], ['phone', u.chPhone], ['whatsapp', u.chWhatsapp]] as const).map(([k, l]) => (
+                    <button key={k} type="button" role="radio" aria-checked={channel === k} onClick={() => setChannel(k)}
                       style={{ padding: '8px 14px', borderRadius: 9999, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--lq-font)',
-                        border: reply === k ? '1px solid var(--c-lilac)' : '1px solid var(--c-hairline)',
-                        background: reply === k ? 'color-mix(in srgb, var(--c-lilac) 18%, transparent)' : 'var(--c-deep-sea)',
-                        color: reply === k ? 'var(--c-quartz)' : 'var(--c-mist)' }}>{l}</button>
+                        border: channel === k ? '1px solid var(--c-lilac)' : '1px solid var(--c-hairline)',
+                        background: channel === k ? 'color-mix(in srgb, var(--c-lilac) 18%, transparent)' : 'var(--c-deep-sea)',
+                        color: channel === k ? 'var(--c-quartz)' : 'var(--c-mist)' }}>{l}</button>
                   ))}
                 </div>
               </div>

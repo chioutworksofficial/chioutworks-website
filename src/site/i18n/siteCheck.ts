@@ -28,6 +28,7 @@ export const SITE_CHECK_UI = {
     nlTitle: 'One short digital tip per month', nlEmail: 'E-mail address', nlConsent: 'I would like to receive one short tip by e-mail about once a month. I can unsubscribe with one click at any time.', nlBtn: 'Subscribe', nlDone: 'Check your inbox to confirm your subscription.', nlErr: 'Could not subscribe. Please check the e-mail address and the consent box.',
     roiConsent: 'I agree that my e-mail address is stored and that I receive a confirmation e-mail, so that you can reply to this calculation in writing.', roiPending: 'Check your inbox and confirm the e-mail. Nothing is stored before that.',
     ctaTitle: 'Free website check', ctaText: 'Curious how your site performs? Get scores in 6 areas and the 5 most important fixes by e-mail.', ctaBtn: 'Check my website',
+    scHook: 'Is your website losing you customers? Find out in 60 seconds.', scSub: 'Scores in 6 areas and the 5 most important fixes, by e-mail. Free.', scSample: 'Sample view',
   },
   de: {
     word: 'Kostenloser Website-Check',
@@ -46,6 +47,7 @@ export const SITE_CHECK_UI = {
     nlTitle: 'Ein kurzer Digitalisierungs-Tipp pro Monat', nlEmail: 'E-Mail-Adresse', nlConsent: 'Ich möchte etwa einmal im Monat einen kurzen Tipp per E-Mail erhalten. Ich kann mich jederzeit mit einem Klick abmelden.', nlBtn: 'Anmelden', nlDone: 'Bitte bestätigen Sie die Anmeldung in Ihrem Postfach.', nlErr: 'Anmeldung nicht möglich. Bitte prüfen Sie E-Mail-Adresse und Einwilligung.',
     roiConsent: 'Ich bin einverstanden, dass meine E-Mail-Adresse gespeichert wird und ich eine Bestätigungs-E-Mail erhalte, damit Sie mir zu dieser Berechnung schriftlich antworten können.', roiPending: 'Bitte bestätigen Sie die E-Mail in Ihrem Postfach. Vorher wird nichts gespeichert.',
     ctaTitle: 'Kostenloser Website-Check', ctaText: 'Wie gut ist Ihre Website? Erhalten Sie Bewertungen in 6 Bereichen und die 5 wichtigsten Verbesserungen per E-Mail.', ctaBtn: 'Meine Website prüfen',
+    scHook: 'Kostet Ihre Website Sie Kunden? Finden Sie es in 60 Sekunden heraus.', scSub: 'Bewertungen in 6 Bereichen und die 5 wichtigsten Verbesserungen per E-Mail. Kostenlos.', scSample: 'Beispielansicht',
   },
   tr: {
     word: 'Ücretsiz web sitesi kontrolü',
@@ -64,6 +66,7 @@ export const SITE_CHECK_UI = {
     nlTitle: 'Ayda bir kısa dijitalleşme ipucu', nlEmail: 'E-posta adresi', nlConsent: 'Ayda yaklaşık bir kez kısa bir ipucu e-postası almak istiyorum. İstediğim zaman tek tıkla çıkabilirim.', nlBtn: 'Abone ol', nlDone: 'Aboneliği onaylamak için gelen kutunuza bakın.', nlErr: 'Abone olunamadı. Lütfen e-posta adresini ve onay kutusunu kontrol edin.',
     roiConsent: 'E-posta adresimin saklanmasını ve bu hesaplamaya yazılı yanıt verilebilmesi için bana bir onay e-postası gönderilmesini kabul ediyorum.', roiPending: 'Gelen kutunuza bakıp e-postayı onaylayın. Ondan önce hiçbir şey saklanmaz.',
     ctaTitle: 'Ücretsiz web sitesi kontrolü', ctaText: 'Siteniz nasıl performans gösteriyor? 6 alanda puanları ve en önemli 5 düzeltmeyi e-postayla alın.', ctaBtn: 'Sitemi kontrol et',
+    scHook: 'Siteniz müşteri kaybettiriyor mu? 60 saniyede öğrenin.', scSub: '6 alanda puanlar ve en önemli 5 düzeltme e-postayla. Ücretsiz.', scSample: 'Örnek görünüm',
   },
   el: {
     word: 'Δωρεάν έλεγχος ιστοσελίδας',
@@ -82,5 +85,6 @@ export const SITE_CHECK_UI = {
     nlTitle: 'Μία σύντομη συμβουλή ψηφιοποίησης τον μήνα', nlEmail: 'Διεύθυνση e-mail', nlConsent: 'Θέλω να λαμβάνω περίπου μία φορά τον μήνα μια σύντομη συμβουλή με e-mail. Μπορώ να διαγραφώ οποιαδήποτε στιγμή με ένα κλικ.', nlBtn: 'Εγγραφή', nlDone: 'Ελέγξτε τα εισερχόμενά σας για να επιβεβαιώσετε την εγγραφή.', nlErr: 'Η εγγραφή δεν ήταν δυνατή. Ελέγξτε το e-mail και το πλαίσιο συγκατάθεσης.',
     roiConsent: 'Συμφωνώ να αποθηκευτεί το e-mail μου και να λάβω e-mail επιβεβαίωσης, ώστε να μου απαντήσετε γραπτώς σε αυτόν τον υπολογισμό.', roiPending: 'Ελέγξτε τα εισερχόμενά σας και επιβεβαιώστε το e-mail. Πριν από αυτό δεν αποθηκεύεται τίποτα.',
     ctaTitle: 'Δωρεάν έλεγχος ιστοσελίδας', ctaText: 'Πώς τα πάει η ιστοσελίδα σας; Λάβετε βαθμολογίες σε 6 τομείς και τις 5 σημαντικότερες βελτιώσεις με e-mail.', ctaBtn: 'Ελέγξτε την ιστοσελίδα μου',
+    scHook: 'Η ιστοσελίδα σας σάς κοστίζει πελάτες; Μάθετε σε 60 δευτερόλεπτα.', scSub: 'Βαθμολογίες σε 6 τομείς και οι 5 σημαντικότερες βελτιώσεις με e-mail. Δωρεάν.', scSample: 'Δείγμα προβολής',
   },
 } as const satisfies Record<Lang, Record<string, string | readonly string[]>>;

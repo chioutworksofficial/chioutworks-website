@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { dbOn, dbSelect, dbUpsert, dbDelete, kvGet, kvSet } from './db.js';
 import { rlStore } from './rateStore.js';
+import { DEFAULT_SCRIPT, SCRIPT_RULES, AFTER_CALL, type Script, type ScriptLang } from './voiceScript.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(__dirname, '../data');
@@ -126,7 +127,20 @@ const STATUS = ['to_call', 'calling', 'booked', 'no_answer'] as const;
 const IDP = /^[A-Za-z0-9_-]{1,64}$/;
 const sha = (v: string) => crypto.createHash('sha256').update(v).digest('hex');
 const rid = (p: string) => `${p}_${crypto.randomBytes(8).toString('hex')}`;
-const pub = (c: Row) => ({ id: c.id, name: c.name, phone: c.phone, notes: c.notes ?? '', sector: c.sector ?? 'Genel', status: c.status, preferred_time: c.preferred_time ?? 'any' });
+// "Do not call" list (phone keys, last 9 digits): set from the admin Leads drawer or by the agent (PATCH doNotCall). The queue and the API never return these numbers.
+const phoneKey = (p: unknown) => String(p ?? '').replace(/\D/g, '').replace(/^0+/, '').slice(-9);
+export const dncList = async () => new Set((await kGet<string[]>('voiceAgent.dnc')) ?? []);
+export async function dncSet(phone: unknown, on: boolean) {
+  const k = phoneKey(phone); if (k.length < 7) return;
+  const s = await dncList(); if (on) s.add(k); else s.delete(k);
+  await kSet('voiceAgent.dnc', [...s].slice(-5000));
+}
+const SCRIPT_LANGS: ScriptLang[] = ['tr', 'en', 'de', 'el'];
+const scriptNow = async (): Promise<Record<ScriptLang, Script>> => {
+  const st = (await kGet<Partial<Record<ScriptLang, Partial<Script>>>>('voiceAgent.script')) ?? {};
+  return Object.fromEntries(SCRIPT_LANGS.map((l) => [l, { ...DEFAULT_SCRIPT[l], ...(st[l] ?? {}) }])) as Record<ScriptLang, Script>;
+};
+const pub = (c: Row) => ({ id: c.id, name: c.name, phone: c.phone, notes: c.notes ?? '', sector: c.sector ?? 'Genel', status: c.status, preferred_time: c.preferred_time ?? 'any', doNotCall: c.doNotCall === true });
 const bad = (res: Response, message: string, code = 400) => res.status(code).json({ ok: false, error: 'invalid', message });
 const HM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const scheduleS = z.object({ days: z.array(z.number().int().min(0).max(6)).min(1).max(7), start: z.string().regex(HM), end: z.string().regex(HM), slotMinutes: z.number().int().min(5).max(240), buffer: z.number().int().min(0).max(120) })
@@ -143,6 +157,7 @@ const exclusive = <T,>(fn: () => Promise<T>) => { const r = lock.then(fn, fn); l
 
 /** Sales module: create/update a queue customer for a lead (idempotent by sourceLeadId). */
 export async function vaQueueLead(lead: { id: string; name: string; phone: string; notes: string; sector: string }) {
+  if ((await dncList()).has(phoneKey(lead.phone))) return '';
   const ex = (await tList('customers')).find((c) => c.sourceLeadId === lead.id);
   const rec: Row = { ...(ex ?? { id: rid('cust'), createdAt: new Date().toISOString(), notesHistory: [], preferred_time: 'any' }), sourceLeadId: lead.id, source: 'sales',
     name: lead.name.slice(0, 80) || 'İsimsiz', phone: lead.phone.slice(0, 40), notes: lead.notes.slice(0, 500), sector: lead.sector.slice(0, 60) || 'Genel', status: 'to_call' };
@@ -170,21 +185,26 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
   app.get('/api/customers', wrap(async (req, res) => {
     const st = req.query.status;
     if (st !== undefined && !(STATUS as readonly string[]).includes(String(st))) return bad(res, 'status geçersiz');
-    return res.json((await tList('customers')).filter((c) => !st || c.status === st).map(pub));
+    const dnc = await dncList();
+    return res.json((await tList('customers')).filter((c) => (!st || c.status === st) && !dnc.has(phoneKey(c.phone)) && c.doNotCall !== true).map(pub));
   }));
   app.get('/api/customers/:id', wrap(async (req, res) => {
     const c = IDP.test(req.params.id) ? (await tList('customers')).find((x) => x.id === req.params.id) : null;
     return c ? res.json(pub(c)) : res.status(404).json({ error: 'not_found' });
   }));
   app.patch('/api/customers/:id', wrap(async (req, res) => {
-    const b = z.object({ status: z.enum(STATUS).optional(), note: z.string().trim().min(1).max(1000).optional() }).safeParse(req.body ?? {});
+    const b = z.object({ status: z.enum(STATUS).optional(), note: z.string().trim().min(1).max(1000).optional(), doNotCall: z.boolean().optional() }).safeParse(req.body ?? {});
     if (!b.success) return bad(res, 'geçersiz istek');
     const c = IDP.test(req.params.id) ? (await tList('customers')).find((x) => x.id === req.params.id) : null;
     if (!c) return res.status(404).json({ error: 'not_found' });
     if (b.data.status) c.status = b.data.status;
+    if (b.data.doNotCall !== undefined) { c.doNotCall = b.data.doNotCall; await dncSet(c.phone, b.data.doNotCall); }
     if (b.data.note) c.notesHistory = [...(c.notesHistory ?? []), { at: new Date().toISOString(), text: b.data.note }].slice(-200);
     await tPut('customers', c); return res.json(pub(c));
   }));
+
+  // Call script for n8n / Retell (no secrets): per language steps, style, branches + fixed rules.
+  app.get('/api/voice-agent/script', wrap(async (_req, res) => res.json({ script: await scriptNow(), rules: SCRIPT_RULES, afterCall: AFTER_CALL })));
 
   app.get('/api/calendar/availability', wrap(async (req, res) => {
     const date = String(req.query.date ?? '');
@@ -259,6 +279,14 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
   }));
   app.delete(`${A}/token`, admin(async (_req, res) => { await kDel('voiceAgent.tokenHash'); return res.json({ ok: true }); }));
 
+  app.get(`${A}/script`, admin(async (_req, res) => res.json({ script: await scriptNow(), rules: SCRIPT_RULES, afterCall: AFTER_CALL, defaults: DEFAULT_SCRIPT })));
+  const scriptS = z.object(Object.fromEntries(SCRIPT_LANGS.map((l) => [l, z.object({ steps: z.string().max(6000), style: z.string().max(6000), branches: z.string().max(8000) })])) as Record<ScriptLang, z.ZodObject<{ steps: z.ZodString; style: z.ZodString; branches: z.ZodString }>>);
+  app.put(`${A}/script`, admin(async (req, res) => {
+    const b = scriptS.safeParse(req.body ?? {}); if (!b.success) return bad(res, 'geçersiz senaryo');
+    await kSet('voiceAgent.script', b.data); return res.json({ ok: true });
+  }));
+  app.delete(`${A}/script`, admin(async (_req, res) => { await kDel('voiceAgent.script'); return res.json({ ok: true }); }));
+
   app.get(`${A}/queue`, admin(async (_req, res) => res.json({ customers: (await tList('customers')).reverse() })));
   app.post(`${A}/queue`, admin(async (req, res) => {
     const b = z.object({ requestIds: z.array(z.string().max(80)).min(1).max(100) }).safeParse(req.body ?? {});
@@ -267,7 +295,7 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
     let added = 0, skipped = 0;
     for (const r of (await deps.listRequests()).filter((x) => ids.has(x.id))) {
       const phone = String(r.phone ?? '').trim();
-      if (!phone || have.has(r.id)) { skipped++; continue; }
+      if (!phone || have.has(r.id) || (await dncList()).has(phoneKey(phone)) || (r.preferredChannel && r.preferredChannel !== 'phone')) { skipped++; continue; }   // owner rule: only people who chose "phone" are called
       const hr = /^(\d{2}):/.exec(String(r.callTime ?? ''))?.[1];
       await tPut('customers', { id: rid('cust'), createdAt: new Date().toISOString(), sourceRequestId: r.id, name: String(r.name ?? '').slice(0, 80) || 'İsimsiz', phone: phone.slice(0, 40),
         notes: String(r.message || r.topic || r.business || '').slice(0, 500), sector: String(r.roiCalc?.sectorLabel || 'Genel').slice(0, 60), status: 'to_call',

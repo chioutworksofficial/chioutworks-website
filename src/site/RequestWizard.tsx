@@ -27,8 +27,8 @@ export async function loadWizardDraft(): Promise<{ id: string; secret: string; l
   } catch { return null; }
 }
 
-export default function RequestWizard({ lang, initial, restored, getSession, onClose }: {
-  lang: Lang; initial: WizCard; restored?: WizDraft | null; getSession: () => Promise<{ id: string; secret: string } | null>; onClose: () => void;
+export default function RequestWizard({ lang, initial, restored, getSession, onClose, channel }: {
+  lang: Lang; initial: WizCard; restored?: WizDraft | null; channel?: 'email' | 'phone' | 'whatsapp'; getSession: () => Promise<{ id: string; secret: string } | null>; onClose: () => void;
 }) {
   const w = WIZ_UI[lang];
   const [c, setC] = useState<Record<string, string>>(() => restored?.card ?? { ...initial, site: '', contactWhen: '', startWhen: '', budget: '' });
@@ -41,7 +41,7 @@ export default function RequestWizard({ lang, initial, restored, getSession, onC
   const top = useRef<HTMLDivElement>(null);
   const set = (k: string, v: string) => setC((o) => ({ ...o, [k]: v }));
 
-  const mailOk = EMAIL_RE.test(c.email.trim()), phoneOk = c.phone.replace(/\D/g, '').length >= 7;
+  const mailOk = EMAIL_RE.test(c.email.trim()), phoneDigits = c.phone.replace(/\D/g, '').length >= 7, phoneOptional = channel === 'email', phoneOk = phoneDigits || (phoneOptional && !c.phone.trim());   // phone only required when Phone / WhatsApp was chosen
   const missing = ['firstName', 'lastName', 'business', 'city', 'service'].filter((k) => !c[k].trim());
   const valid = missing.length === 0 && mailOk && phoneOk;
   const visual = VISUAL_RE.test(`${c.service} ${c.notes}`);
@@ -71,7 +71,7 @@ export default function RequestWizard({ lang, initial, restored, getSession, onC
       const name = [cleanName(c.firstName), cleanName(c.lastName)].filter(Boolean).join(' ');
       const r = await fetch('/api/contact', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...(await guardFields()), name, email: c.email.trim(), phone: c.phone.trim(), business: c.business.trim(), city: c.city.trim(), message: c.service.trim().slice(0, 1000), replyPreference: 'written', via: 'assistant', lang, page: window.location.pathname, voiceSessionId: s.id, voiceSecret: s.secret,
+        body: JSON.stringify({ ...(await guardFields()), name, email: c.email.trim(), phone: c.phone.trim(), business: c.business.trim(), city: c.city.trim(), message: c.service.trim().slice(0, 1000), replyPreference: 'written', ...(channel ? { preferredChannel: channel } : {}), via: 'assistant', lang, page: window.location.pathname, voiceSessionId: s.id, voiceSecret: s.secret,
           wiz: { site: c.site.trim() ? normUrl(c.site) : '', contactWhen: c.contactWhen, startWhen: c.startWhen, budget: c.budget, notes: c.notes.trim(), exUrls: urls, exNote: ex.none ? '' : ex.note.trim(), exNone: ex.none,
             style: visual && !skipStyle && sv.likes.length ? styleBody(sv) : null } }),
       });
@@ -115,7 +115,7 @@ export default function RequestWizard({ lang, initial, restored, getSession, onC
           <h3 style={{ margin: 0, textAlign: 'center', fontFamily: 'var(--font-display)', fontWeight: 600 }}>{w.title1}</h3>
           <p style={{ margin: 0, color: 'var(--lq-silver)', fontSize: 13.5, textAlign: 'center' }}>{w.hint}</p>
           {field('firstName', w.first, true, 'text', 40)}{field('lastName', w.last, true, 'text', 40)}{field('business', w.business, true)}{field('city', w.city, true, 'text', 80)}
-          {field('email', w.email, true, 'email', 254)}{field('phone', w.phone, true, 'tel', 40)}
+          {field('email', w.email, true, 'email', 254)}{field('phone', w.phone, !phoneOptional, 'tel', 40)}
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: 'var(--lq-silver)' }}>{w.need} *
             <textarea value={c.service} maxLength={600} rows={3} aria-required onChange={(e) => set('service', e.target.value)} style={{ ...inp, resize: 'vertical', ...(touched && !c.service.trim() ? { borderColor: 'var(--lq-white)' } : {}) }} />
           </label>

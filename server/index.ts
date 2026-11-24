@@ -15,14 +15,19 @@ import fs from 'fs';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { registerIntake, submittedIntake, intakeById } from './intake.js';
+import { registerIntake, submittedIntake, intakeById, listIntakes } from './intake.js';
 import { registerAnalyze } from './analyze.js';
 import { registerOffers } from './offers.js';
 import { registerBilling } from './billing.js';
 import { registerProjects } from './projects.js';
 import { registerStyles, saveChoice } from './styles.js';
 import { registerNewsletter, registerNewsletterAdmin } from './newsletter.js';
+import { registerNewsletterIssues } from './newsletterIssues.js';
 import { registerSiteCheck, stripMarketingTag } from './siteCheck.js';
+import { registerLeads } from './leads.js';
+import { registerCalendar } from './calendar.js';
+import { leadScore, signalLead } from './leadFlow.js';
+import { recordContactConsent, sendSummaryMail, sendDueReminders, needOf, CAPTURE_TEXT_VERSION, CHANNELS } from './capture.js';
 import { confirmMail } from './mail.js';
 import { registerAnalytics } from './analytics.js';
 import { registerAffiliates } from './affiliates.js';
@@ -354,7 +359,7 @@ const wizS = z.object({ site: s(200), contactWhen: z.enum(['', 'morning', 'after
   budget: z.enum(['', 'b1', 'b2', 'b3', 'b4', 'unsure']).nullish(), notes: s(600), exUrls: z.array(z.string().max(300)).max(3).nullish(), exNote: s(300), exNone: bool,
   style: z.object({ likes: z.array(z.string().max(20)).max(8).nullish(), palette: z.any().optional(), font: s(40) }).nullish() }).nullish();
 const contactS = z.object({ wiz: wizS, ...WS, email: emailOpt, phone: s(40), name: s(80), message: s(1000), preferredStart: s(10), callTime: s(5), voiceSessionId: s(64), voiceSecret: s(200),
-  roiCalc: z.any().optional(), topic: s(20), via: s(20), business: s(100), city: s(80), address: s(200), replyPreference: s(10), lang: LANG.nullish(), page: s(200) });
+  roiCalc: z.any().optional(), topic: s(20), via: s(20), business: s(100), city: s(80), address: s(200), replyPreference: s(10), lang: LANG.nullish(), page: s(200), preferredChannel: z.enum(CHANNELS).nullish(), capToken: s(80), textVersion: s(40) });
 const manualS = z.object({ name: s(80), email: emailOpt, phone: s(40), business: s(100), address: s(200), message: s(2000), lang: LANG.nullish() });
 const readS = z.object({ read: bool });
 const statusS = z.object({ lang: LANG.nullish(), bid: s(200) });
@@ -365,6 +370,7 @@ const sessionS = z.object({ lang: LANG, turns: z.array(turnS).min(1).max(30), id
   durationSec: z.number().min(0).max(7200).nullish(), endReason: s(40), timings: z.object({ lastAudioChunkAt: z.number().nullish(), lastTurnCompleteAt: z.number().nullish(), playbackDoneAt: z.number().nullish() }).nullish() }).passthrough();
 const cardS = z.object({ secret: s(200), name: s(80), email: emailOpt, phone: s(40), business: s(100), city: s(80), message: s(2000) }).passthrough();
 const vcontactS = z.object({ ...WS, email, name: s(80), phone: s(60), message: s(1000), secret: s(200) });
+const captureS = z.object({ ...WS, sessionId: idp, secret: s(200), email, phone: s(40), business: s(100), preferredChannel: z.enum(CHANNELS).nullish(), lang: LANG.nullish(), textVersion: s(40) });
 const vreqS = z.object({ ...WS, email, firstName: s(40), lastName: s(40), secret: s(200), page: s(200) });
 const bulkS = z.object({ ids: z.array(z.string().max(100)).min(1).max(500), action: z.enum(['read', 'unread', 'delete', 'archive', 'unarchive']) });
 const liveTokS = z.object({ consent: bool, consentVersion: s(40), lang: LANG.nullish(), bid: s(200), prevSessionId: s(64), ticket: s(64), visitor: anyObj, transcript: z.array(z.any()).max(200).nullish() }).passthrough();
@@ -760,6 +766,8 @@ app.post('/api/contact', quoteLimiter, botGate, v(contactS), async (req, res) =>
   const message = str(req.body?.message, 1000);
   if (!name || (!email && !phone)) return res.status(400).json({ ok: false, error: 'invalid' });
   if (email && !EMAIL_RE.test(email)) return res.status(400).json({ ok: false, error: 'invalid_email' });
+  const channel: (typeof CHANNELS)[number] = req.body?.preferredChannel ?? 'email';
+  if (channel !== 'email' && phone.replace(/\D/g, '').length < 7) return res.status(400).json({ ok: false, error: 'phone_required' });
   if ((await readBlocked()).includes(str(req.body?.preferredStart, 10))) return res.status(400).json({ ok: false, error: 'date_blocked' });
   let voiceLink: VoiceSession | null = null;
   const vid = str(req.body?.voiceSessionId, 64);
@@ -767,7 +775,7 @@ app.post('/api/contact', quoteLimiter, botGate, v(contactS), async (req, res) =>
     const vs = await getVoice(vid) as VoiceSession | null;
     if (vs && safeEq(vs.secret, req.body?.voiceSecret)) voiceLink = vs;
   }
-  if (req.body?.via === 'assistant' && voiceLink && voiceLink.kind !== 'text' && (!email || !/@.+\./.test(email) || /\s/.test(email) || phone.replace(/\D/g, '').length < 7)) return res.status(400).json({ ok: false, error: 'voice_contact_required' });
+  if (req.body?.via === 'assistant' && voiceLink && voiceLink.kind !== 'text' && (!email || !/@.+\./.test(email) || /\s/.test(email) || (phone.replace(/\D/g, '').length < 7 && voiceLink.capture?.preferredChannel !== 'email'))) return res.status(400).json({ ok: false, error: 'voice_contact_required' });
   const w = voiceLink && req.body?.via === 'assistant' ? req.body?.wiz : null;
   const urlOk = (u: string) => /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(u);
   const exUrls = ((w?.exUrls ?? []) as string[]).map((u) => str(u, 200)).filter(urlOk);
@@ -792,6 +800,8 @@ app.post('/api/contact', quoteLimiter, botGate, v(contactS), async (req, res) =>
     email,
     message,
     replyPreference: req.body?.replyPreference === 'phone' ? 'phone' : 'written',
+    preferredChannel: channel,   // email (default) | phone | whatsapp; the Voice Agent may call ONLY those who chose phone
+    callConsent: channel === 'phone',
     lang: DEMO_LANGS.has(req.body?.lang) ? String(req.body.lang) : 'en',
     page: str(req.body?.page, 200),
     ...(voiceLink ? { voiceSessionId: voiceLink.id } : {}),
@@ -809,6 +819,11 @@ app.post('/api/contact', quoteLimiter, botGate, v(contactS), async (req, res) =>
       if (vs) { vs.contactSubmitted = true; vs.contactId = rec.id; delete vs.draft; vs.contact = { name: rec.name, email: rec.email, phone: rec.phone, message: rec.message }; await saveVoice(vs); }
     }
     notifyOwnerOfRequest(rec, 'Contact');
+    if (channel !== 'email') void recordContactConsent({ source, lang: rec.lang, preferredChannel: channel, ref: rec.id, textVersion: str(req.body?.textVersion, 40) });
+    const capSess = voiceLink ?? await sessionByToken(str(req.body?.capToken, 80));
+    if (capSess) { if (capSess.capture) capSess.capture.formSubmittedAt = rec.createdAt; if (!capSess.contactId) { capSess.contactId = rec.id; capSess.contactSubmitted = true; } await saveVoice(capSess); }
+    if (source === 'form' || source === 'voice' || source === 'chat') void signalLead({ source, email: rec.email, phone: rec.phone, refTab: 'requests', refId: rec.id, preferredChannel: channel,
+      score: leadScore({ hasContact: true, submitted: true, text: `${message}\n${capSess ? sessText(capSess) : ''}`, timeline: Boolean((rec as any).startWhen || (rec as any).budget) }) });
     return res.json({ ok: true });
   } catch (err) {
     void recordError('contact/failed', err); console.error('[contact] failed', err);
@@ -995,6 +1010,7 @@ interface VoiceSession {
   closeAsked?: boolean;   // text chat: request saved and the closing question was asked
   deleted?: boolean;
   contact?: { name: string; email: string; phone: string; message: string };
+  capture?: { at: string; textVersion: string; source: string; lang: string; preferredChannel: string; callConsent: boolean; business?: string; formToken: string; summary?: string; mailedAt?: string; reminderSentAt?: string; formSubmittedAt?: string };   // consent-based contact capture (POST /api/capture)
   firstName?: string;
   lastName?: string;
   salutation?: 'm' | 'f';
@@ -1202,6 +1218,7 @@ app.get('/api/cron/daily', async (req, res) => {
   if (!crypto.timingSafeEqual(given, crypto.createHash('sha256').update(`Bearer ${secret}`).digest())) return res.status(401).json({ error: 'unauthorized' });
   if (dbOn()) await kvSet('keepalive', { at: new Date().toISOString() });
   await pruneVoice();
+  await sendDueReminders(await listVoice(), (x) => saveVoice(x as VoiceSession)).then((n) => n && console.log(`[cron] reminders sent=${n}`)).catch((e) => { void recordError('cron/reminders-failed', e); console.error('[cron] reminders failed'); });
   if (dbOn()) await runNightlySnapshot().then((b) => console.log(`[cron] backup ${b.file} tables=${b.tables} rows=${b.rows} failed=${b.failed.length} pruned=${b.pruned}`)).catch((e) => { void recordError('cron/backup-failed', e); console.error('[cron] backup failed', (e as Error).message); });
   if (dbOn()) await dbDelete('app_errors', `t=lt.${new Date(Date.now() - 30 * 86400e3).toISOString()}`).catch((e) => console.error('[cron] errors prune failed', (e as Error).message));   // 30-day retention
   return res.json({ ok: true });
@@ -1223,10 +1240,62 @@ app.post('/api/voice/session/:id/contact', voiceLimiter, botGate, v(vcontactS, i
     s.contact = contact;
     s.contactSubmitted = true;
     await saveVoice(s);
+    void signalSession(s, contact.email, contact.phone, false, 'voice', s.id);
     return res.json({ ok: true });
   } catch (err) {
     void recordError('voice/contact-failed', err); console.error('[voice] contact failed', err);
     return res.status(500).json({ error: 'server' });
+  }
+});
+
+const sessText = (s: VoiceSession) => s.turns.filter((t) => t.role === 'user').map((t) => t.text).join('\n');
+function signalSession(s: VoiceSession, email: string, phone: string, submitted: boolean, refTab: 'requests' | 'voice', refId: string) {
+  return signalLead({ source: s.kind === 'text' ? 'chat' : 'voice', email, phone, refTab, refId, preferredChannel: s.capture?.preferredChannel,
+    score: leadScore({ hasContact: Boolean(email || phone), submitted, text: sessText(s) }) });
+}
+/** Session of a prefilled-form link (capability token from the summary mail); 30 days. */
+async function sessionByToken(tok: string): Promise<VoiceSession | null> {
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(tok)) return null;
+  const s = (await listVoice()).find((x) => !x.deleted && x.capture?.formToken && safeEq(x.capture.formToken, tok));
+  return s && Date.now() - Date.parse(s.capture!.at) < 30 * 86400e3 ? s : null;
+}
+const prefillLimiter = rateLimit({ store: rlStore('prefillLimiter'), windowMs: 60 * 60 * 1000, max: 30, skip: demoLimitSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
+app.get('/api/capture/prefill/:token', prefillLimiter, async (req, res) => {
+  res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex' });
+  const s = await sessionByToken(String(req.params.token)).catch(() => null);
+  if (!s?.contact) return res.status(404).json({ error: 'not_found' });
+  return res.json({ lang: s.lang, email: s.contact.email, phone: s.contact.phone, name: s.contact.name, preferredChannel: s.capture!.preferredChannel, business: s.capture!.business ?? '', need: needOf(s.turns) });
+});
+// Consent-based contact capture from the assistant (voice call card, chat card, end screen). Capability = session id + secret.
+// E-mail is required, phone optional; "you may call me" is a separate flag that only counts with a valid phone number.
+const captureLimiter = rateLimit({ store: rlStore('captureLimiter'), windowMs: 60 * 60 * 1000, max: 12, skip: demoLimitSkip, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
+app.post('/api/capture', captureLimiter, botGate, v(captureS), async (req, res) => {
+  const email = String(req.body.email ?? '').trim().toLowerCase();
+  const phone = String(req.body.phone ?? '').replace(/[^\d+\s()-]/g, '').trim().slice(0, 30);
+  const phoneOk = phone.replace(/\D/g, '').length >= 7;
+  if (!EMAIL_RE.test(email) || (phone && !phoneOk)) return res.status(400).json({ ok: false, error: 'invalid' });
+  try {
+    const s = await getVoice(String(req.body.sessionId));
+    if (!s || s.deleted || !safeEq(s.secret, req.body.secret)) return res.status(404).json({ error: 'not_found' });   // same answer as a missing session (no enumeration)
+    const source = s.kind === 'text' ? 'chat' : 'voice';
+    const channel: (typeof CHANNELS)[number] = req.body.preferredChannel ?? 'email';
+    if (channel !== 'email' && !phoneOk) return res.status(400).json({ ok: false, error: 'phone_required' });
+    const lang = DEMO_LANGS.has(req.body.lang) ? String(req.body.lang) : s.lang;
+    const proof = await recordContactConsent({ source, lang, preferredChannel: channel, ref: s.id, textVersion: String(req.body.textVersion ?? '').slice(0, 40) || CAPTURE_TEXT_VERSION });
+    const first = !s.capture?.mailedAt;
+    s.capture = { ...s.capture, at: s.capture?.at ?? proof.at, textVersion: proof.textVersion, source, lang, preferredChannel: channel, callConsent: channel === 'phone', business: String(req.body.business ?? '').replace(/[<>\u0000-\u001f]/g, ' ').trim().slice(0, 100) || s.capture?.business, formToken: s.capture?.formToken ?? crypto.randomBytes(24).toString('base64url') };
+    s.contact = { name: s.contact?.name || [s.firstName, s.lastName].filter(Boolean).join(' '), email, phone, message: s.contact?.message ?? '' };
+    s.contactSubmitted = true;
+    await saveVoice(s);
+    void signalSession(s, email, phone, Boolean(s.contactId), s.contactId ? 'requests' : 'voice', s.contactId ?? s.id);
+    // one summary mail per session, only when mail is configured; nothing is sent (and nothing logged) otherwise
+    const mailed = first ? await sendSummaryMail(email, lang, s.turns, s.capture.formToken).catch(() => false) : false;
+    if (mailed) { const t = await getVoice(s.id) as VoiceSession | null; if (t?.capture) { t.capture.mailedAt = new Date().toISOString(); await saveVoice(t); } }
+    console.log('[capture] contact received');
+    return res.json({ ok: true, mailed, formToken: s.capture.formToken });
+  } catch (err) {
+    void recordError('capture/failed', err); console.error('[capture] failed');
+    return res.status(500).json({ ok: false, error: 'server' });
   }
 });
 
@@ -1263,6 +1332,7 @@ app.post('/api/voice/session/:id/request', voiceLimiter, botGate, v(vreqS, idP),
     await saveRequest(rec);
     s.contactSubmitted = true; s.contactId = rec.id; s.contact = { name, email, phone: '', message: '' };
     await saveVoice(s);
+    void signalSession(s, email, '', true, 'requests', rec.id);
     console.log('[voice] written-evaluation request received');
     return res.json({ ok: true });
   } catch (err) {
@@ -1787,8 +1857,12 @@ registerStyles(app, {
 // Newsletter (double opt-in + one-click unsubscribe), shown in the footer; confirmation mails need a verified sending domain, otherwise the address stays pending
 registerNewsletter(app, { rateSkip: demoLimitSkip, onUnsubscribe: stripMarketingTag, sendConfirm: (to, lang, confirmUrl, unsubUrl) => confirmMail('nl', to, lang, confirmUrl, unsubUrl) });
 registerNewsletterAdmin(app, { requireAdmin, onUnsubscribe: stripMarketingTag });
+// Monthly idea (daily cron, idempotent: generates in the first 7 days of a month, then continues sending within the Resend daily cap)
+registerNewsletterIssues(app, { requireAdmin });
 // Free website check + calculator e-mail double opt-in (nothing is analysed or mailed before the confirm click)
 const siteCheck = registerSiteCheck(app, { requireAdmin, rateSkip: demoLimitSkip, saveRequest });
+registerLeads(app, { requireAdmin, listRequests, listVoice, listIntakes });
+registerCalendar(app, { requireAdmin });
 // Cookieless visitor statistics with bot filtering (no IP stored)
 registerAnalytics(app, { requireAdmin, rateSkip: demoLimitSkip });
 registerAffiliates(app, { requireAdmin });
