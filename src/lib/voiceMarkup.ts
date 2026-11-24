@@ -30,13 +30,16 @@ export const STYLE_PARAMS: Record<Style, { ls: number; nw?: number } | null> = {
 // Live-call transcripts: drop control tokens the model may emit (<no speech>, {pause}, [x]); an unclosed opener at the end of a chunk
 // is held back in `tail` until the next chunk completes it. Spoken brand spellings are shown as the written brand.
 const LIVE_TOKEN = /<[^<>]{0,40}>|\{[^{}]{0,40}\}|\[[^[\]]{0,40}\]|\([^()]{0,40}\)|\*[^*]{0,40}\*/g;
-const LIVE_OPENER = /[<{[(*][^<>{}[\]()*]{0,40}$/;
+// Meta notes about the visitor or the silence, e.g. "(The visitor stated silent)", "[no response]", "(waiting)": never shown, never played (any length up to 100).
+const META = /visitor|user|caller|silen|pause|waiting|no response|no reply|no speech|no audio|stille|schweig|keine antwort|sessiz|yanıt yok|σιωπ|παύση|παυση|καμία απάντηση/i;
+const LIVE_META = /\([^()]{0,100}\)|\[[^[\]]{0,100}\]|\*[^*]{0,100}\*/g;
+const LIVE_OPENER = /[<{[(*][^<>{}[\]()*]{0,100}$/;
 export function cleanLive(tail: string, x: string): { text: string; tail: string } {
-  const s = (tail + x).replace(LIVE_TOKEN, ''), m = LIVE_OPENER.exec(s);
+  const s = (tail + x).replace(LIVE_TOKEN, '').replace(LIVE_META, (g) => (META.test(g) ? '' : g)), m = LIVE_OPENER.exec(s);
   return { text: (m ? s.slice(0, m.index) : s).replace(/ {2,}/g, ' '), tail: m ? m[0] : '' };
 }
 // A turn that is only a stage direction such as "(Silence)", "*Stille*", "(σιωπή)": never played, never shown.
 const STAGE_WORD = 'silence|silent|stille|schweigen|still|sessizlik|sessiz|σιωπή|σιωπη|παύση|παυση|pause|pausa|no speech|no audio|keine sprache|\\.{3}|…';
 const STAGE_TURN = new RegExp(`^\\s*[(*]\\s*(?:${STAGE_WORD})\\s*[.!]?\\s*[)*]\\s*$`, 'iu');
-export const isStageTurn = (text: string) => STAGE_TURN.test(text);
+export const isStageTurn = (text: string) => STAGE_TURN.test(text) || (/^\s*[(*[]/.test(text) && META.test(text));
 export const writtenBrand = (s: string) => s.replace(/Shee-oot works|Schiut-Works|Şiut-vörks|Σιούτ-γουόρκς/gi, 'Chioutworks');

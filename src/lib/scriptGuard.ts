@@ -23,3 +23,16 @@ export const usesWe = (text: string, lang: string) => (WE[lang] ?? WE.en).test(t
 
 /** Scripted prompt sentences that contain "we/our" on purpose (closing "our conversation", language-mismatch "Sollen wir"): not a violation. */
 export const SCRIPTED_WE = /unser\p{L}*\s+Gespräch\p{L}*|our conversation|συζήτησής μας|Sollen wir/giu;
+
+/** true = an assistant turn in a tr/de call is English: >= 3 English function words and clearly more than the target-language markers. (el: wrongScript covers it.) */
+const EN_W = new Set('the and you your is are that this with please let know anything else glad understand can would like thank thanks of for it what have if there assist enjoyed session help'.split(' '));
+const TG_W: Record<string, Set<string>> = {
+  tr: new Set('ve bir bu için ile ben siz size mi mı mu mü da de çok daha evet hayır var yok ne nasıl lütfen teşekkürler'.split(' ')),
+  de: new Set('ich und der die das ist nicht sie ein eine mit für zu wir ihre ihnen gerne bitte noch auch wie was dass'.split(' ')),
+};
+export function looksEnglish(text: string, lang: string): boolean {
+  if (lang === 'en' || lang === 'el') return false;
+  const w = (text.toLowerCase().match(/[\p{L}']+/gu) ?? []).map((x) => x.replace(/'.*$/, ''));
+  const en = w.filter((x) => EN_W.has(x)).length, tg = w.filter((x) => TG_W[lang]?.has(x)).length;
+  return en >= 3 && en >= 2 * tg;
+}

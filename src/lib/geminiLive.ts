@@ -46,6 +46,10 @@ const PASS_HOLD = 0.6;         // seconds all frames pass after a loud frame (wh
 // assistant's own voice from laptop speakers was taken as an interruption and it restarted its sentence mid-way).
 const BARGE_STRONG = 0.1, BARGE_FRAMES = 3;
 const TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+// Phones/touch/narrow screens: half-duplex. The speaker is next to the mic, so mic frames are silenced while the assistant plays and for HD_TAIL s after
+// (2026-11-24: echo was transcribed as the visitor and the model answered itself). Desktop keeps the echo gate with barge-in.
+const HD_TAIL = 0.4;
+const halfDuplex = () => typeof matchMedia === 'function' && (matchMedia('(pointer: coarse)').matches || matchMedia('(max-width: 820px)').matches);
 const LEAD = TOUCH ? 0.28 : 0.12;   // jitter-buffer lead after silence
 
 export const END_QUIET_MS = 1500, END_SAFETY_MS = 45000, END_SAFETY_SILENT_MS = 5000, END_STALL_MS = 10000;
@@ -101,6 +105,7 @@ export class LiveCall {
   private greetHeard = false;   // greeting audio has played at least once (never reset by an 'interrupted' event)
   private held: { pcm: Uint8Array; rms: number }[] = [];   // mic frames captured after the greeting audio ended, before the guard opened
   private kickoffs = 0;
+  private micPaused = false;   // contact card open: only silence frames go up
   private grace = false;
   private graceStart = 0;
   private graceHeardAt = 0;
@@ -146,8 +151,8 @@ export class LiveCall {
           if (sc.outputTranscription?.text) {
             this.turnText += sc.outputTranscription.text;
             // the model sometimes voices placeholders such as "<no speech>{pause}": silence that turn at once
-            if (!this.muteTurn && (/^\s*[<{[]/.test(this.turnText) || isStageTurn(this.turnText))) { this.muteTurn = true; this.stopPlayback(); dbg('placeholder turn muted'); }
-            this.h.onOutput(sc.outputTranscription.text);
+            if (!this.muteTurn && (/^\s*[<{[(*]/.test(this.turnText) || isStageTurn(this.turnText))) { this.muteTurn = true; this.stopPlayback(); dbg('placeholder turn muted'); }
+            if (!this.muteTurn) this.h.onOutput(sc.outputTranscription.text);   // a muted turn never gets a bubble
           }
           if (sc.turnComplete) { this.turnText = ''; this.muteTurn = false; this.generating = false; this.lastTurnAt = performance.now(); if (this.ending || this.grace) this.turnDone = true; if (this.gotAudio && this.greeting) { this.openGuard('first turnComplete'); } this.h.onTurnComplete(); }
         }
@@ -215,7 +220,8 @@ export class LiveCall {
         return;
       }
       if (this.grace && e.data.rms > BARGE_RMS) this.heardInGrace();
-      if (this.ending) pcm = new Uint8Array(pcm.length);
+      if (this.ending || this.micPaused) pcm = new Uint8Array(pcm.length);
+      else if (halfDuplex()) { if (this.next + HD_TAIL > now) pcm = new Uint8Array(pcm.length); }
       else if (this.next + GATE_TAIL > now) {   // assistant audible (or just ended): echo gate
         this.loudRun = e.data.rms > BARGE_STRONG ? this.loudRun + 1 : 0;
         if (this.loudRun >= BARGE_FRAMES) this.passUntil = now + PASS_HOLD;
@@ -238,6 +244,9 @@ export class LiveCall {
     this.sendText(text);
     return true;
   }
+
+  /** Contact card open: the mic sends silence only (no model turns are triggered by the room). */
+  pauseMic(on: boolean) { this.micPaused = on; }
 
   sendText(text: string) { if (this.ready && this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ realtimeInput: { text } })); }
 

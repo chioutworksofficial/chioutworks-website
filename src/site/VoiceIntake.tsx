@@ -12,7 +12,7 @@ import AssistantConsent from './AssistantConsent';
 import VoiceOrb from './VoiceOrb';
 import { hasConsent, fallbackAllowed, CONSENT_VERSION } from '../lib/assistantConsent';
 import { createAudio, LiveCall, fetchToken, liveDayExceeded, bumpLiveDay, postLiveEnd, SilenceWatch, type LiveHandlers } from '../lib/geminiLive';
-import { wrongScript, namesOwner, usesWe, SCRIPTED_WE } from '../lib/scriptGuard';
+import { wrongScript, namesOwner, usesWe, looksEnglish, SCRIPTED_WE } from '../lib/scriptGuard';
 import { writeVoiceSession, clearVoiceSession, downloadTranscript, printTranscript } from '../lib/voiceSession';
 import RequestWizard, { loadWizardDraft, type WizDraft } from './RequestWizard';
 import { guardFields, prefetchFormToken } from '../lib/formGuard';
@@ -81,6 +81,12 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const [capEnd, setCapEnd] = useState(false);   // end-screen summary field expanded
   const [captured, setCaptured] = useState<CaptureResult | null>(null);
   const offeredRef = useRef(false);
+  const [gate, setGate] = useState(false);   // the in-call card is the mandatory "confirm to continue" gate
+  const cardRef = useRef<'none' | 'gate' | 'done'>('none');   // 'gate': call waits (mic muted, no model turns, timers paused)
+  const gateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gateWait = useRef(false);
+  const gateForce = useRef(false);   // the model called offer_summary
+  const enCorr = useRef(0);
   const [dl, setDl] = useState(false);
   const [dFirst, setDFirst] = useState('');
   const [dLast, setDLast] = useState('');
@@ -175,6 +181,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     if (hbRef.current) { clearInterval(hbRef.current); hbRef.current = null; }
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     watchRef.current?.stop(); watchRef.current = null;
+    if (gateTimer.current) { clearTimeout(gateTimer.current); gateTimer.current = null; } cardRef.current = 'none'; gateWait.current = false;
     devOff.current?.(); devOff.current = null;
     if (closingTimer.current) { clearInterval(closingTimer.current); closingTimer.current = null; }
     if (callRef.current && !endedAtRef.current) { endedAtRef.current = Date.now(); timingRef.current = callRef.current.timing(); if (!endReasonRef.current) endReasonRef.current = 'user_hangup'; }
@@ -227,7 +234,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       visitorRef.current = NO_VISITOR; setVFirst(''); setVLast(''); setVSal('none'); setNameDone(false); voiceId.current = null; deletedRef.current = false;
       deadlineRef.current = 0; endReasonRef.current = ''; endedAtRef.current = 0; talkStart.current = 0; wrapSent.current = false; goAway.current = false; limitAt.current = 0; endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; softSent.current = false; reconnected.current = false; voiceStarted.current = false; setGraceUi(false);
       liveRole.current = null; liveCut.current = false; outBuf.current = ''; corrections.current = 0; setReconnecting(false); setCard(null); setCardSent(false); setCardErr(''); setCardBusy(false);
-      preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false); offeredRef.current = false; setOffer(false); setCapEnd(false); setCaptured(null);
+      preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false); offeredRef.current = false; gateForce.current = false; enCorr.current = 0; setOffer(false); setGate(false); setCapEnd(false); setCaptured(null);
       goPhase('consent'); startedAt.current = Date.now(); setOpen(true);
       if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('voicedemo')) {
         const n = Date.now();
@@ -413,6 +420,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     const c = cleanLive(liveTail.current[role], raw); liveTail.current[role] = c.tail;
     const text = c.text;
     if (!text.trim()) return;   // a chunk that was only a control token shows nothing
+    if (liveRole.current !== role && !/[\p{L}\p{N}]/u.test(text)) return;   // never open an empty / punctuation-only bubble
     if (role === 'user') liveCut.current = false;
     const r = addLiveChunk(turnsRef.current, role, text, liveRole.current === role, liveCut.current);
     turnsRef.current = r.turns; liveRole.current = role;
@@ -483,6 +491,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       const left = Math.ceil((deadlineRef.current - Date.now()) / 1000);
       const c = callRef.current;
       if (finishPending.current) return;
+      if (cardRef.current === 'gate') { deadlineRef.current += 500; return; }   // the call waits for the contact card
       if (left <= 25 && !softSent.current && c && !c.busy()) {
         softSent.current = true;
         c.sendText('TIME_UP: the call time is almost over. Finish your current sentence, summarise what was confirmed, then say the closing sentence exactly as instructed, completely with the farewell, then call finish_conversation with reason done as your very last action.');
@@ -504,12 +513,41 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   };
   silenceEndRef.current = silenceEnd;
 
+  /** Contact-card gate (owner 2026-11-24): after the visitor's 3rd substantive turn (or offer_summary), once the assistant's turn and audio ended:
+   *  mute the mic, show the card and have the assistant say the scripted sentence. Deterministic on the client, not up to the model. */
+  const gateStart = () => {
+    const c = callRef.current;
+    if (!c || phaseRef.current !== 'live' || offeredRef.current || gateWait.current || finishPending.current || endingRef.current || closingTimer.current || softSent.current || wrapSent.current) return;
+    const n = turnsRef.current.filter((x) => x.role === 'user' && (x.text.match(/\p{L}+/gu) ?? []).length >= 2).length;
+    if (!gateForce.current && n < 3) return;
+    gateWait.current = true;
+    void c.whenPlaybackDone(15000).then(() => {
+      gateWait.current = false;
+      if (callRef.current !== c || offeredRef.current || finishPending.current || endingRef.current || c.busy()) return;   // busy: the next turnComplete retries
+      offeredRef.current = true; cardRef.current = 'gate'; c.pauseMic(true); watchRef.current?.heard();
+      setGate(true); setOffer(true);
+      c.sendText(`CARD_SCRIPT: say exactly this sentence, word for word, nothing else: "${CAPTURE_UI[lang].gate}"`);
+      gateTimer.current = setTimeout(() => declineGate(), 60000);
+    });
+  };
+  /** "Not now" or 60 s without action: short goodbye, end the call, open the request form prefilled with everything gathered. */
+  const declineGate = () => {
+    if (cardRef.current !== 'gate') return;
+    cardRef.current = 'none'; if (gateTimer.current) { clearTimeout(gateTimer.current); gateTimer.current = null; }
+    setOffer(false); setGate(false);
+    const c = callRef.current;
+    if (!c || endingRef.current) return;
+    endReasonRef.current ||= 'card_declined'; finishPending.current = true;
+    c.sendText(`CARD_DECLINED: say exactly this sentence, word for word, nothing else: "${CAPTURE_UI[lang].bye}"`);
+    drain();
+  };
+
   /** Opens the socket with a token and wires the handlers. `call` is compared in onClosed so stale sockets are ignored. */
   const openCall = async (token: string) => {
     const sid = sessionRef.current;
     const ref: { c: LiveCall | null } = { c: null };
     if (!watchRef.current) watchRef.current = new SilenceWatch(
-      () => finishPending.current || !callRef.current || callRef.current.speaking(),   // paused while the assistant talks, on reconnect and while closing
+      () => finishPending.current || cardRef.current === 'gate' || !callRef.current || callRef.current.speaking(),   // paused while the assistant talks, on reconnect and while closing
       () => callRef.current?.sendText(`The visitor has been silent for a while. Gently check in ${LANG_EN[lang]}, in one short sentence, whether they are still there.`),
       () => silenceEndRef.current(),
     );
@@ -527,6 +565,9 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
         if (corrections.current < 2 && wrongScript(outBuf.current, lang)) {
           corrections.current++; outBuf.current = '';
           pendingFix.current = `Answer only in ${LANG_EN[lang]}, using only its alphabet. Repeat your last answer in ${LANG_EN[lang]}.`;
+        } else if (enCorr.current < 2 && looksEnglish(outBuf.current, lang)) {
+          enCorr.current++; outBuf.current = '';
+          pendingFix.current = `Answer only in ${LANG_EN[lang]} from now on. Say your last answer again in ${LANG_EN[lang]}, in one short sentence, and never use English.`;
         } else if (corrections.current < 2 && namesOwner(outBuf.current)) {
           corrections.current++; outBuf.current = '';
           /* no mid-call nudge: a sent text makes the model speak an extra, unprompted sentence; the prompt rule covers this */
@@ -536,7 +577,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
         }
       },
       onInterrupted: () => { liveCut.current = turnsRef.current[turnsRef.current.length - 1]?.role === 'assistant'; liveRole.current = null; outBuf.current = ''; },
-      onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; const fix = pendingFix.current; pendingFix.current = ''; const fc = callRef.current; if (fix && fc && !finishPending.current) void fc.whenPlaybackDone().then(() => { if (callRef.current === fc && !finishPending.current && !fc.busy()) fc.sendText(fix); }); liveTail.current = { user: '', assistant: '' }; if (finishPending.current && abuseRef.current) drain(); },
+      onTurnComplete: () => { liveRole.current = null; outBuf.current = ''; const fix = pendingFix.current; pendingFix.current = ''; const fc = callRef.current; if (fix && fc && !finishPending.current && cardRef.current !== 'gate') void fc.whenPlaybackDone().then(() => { if (callRef.current === fc && !finishPending.current && !fc.busy()) fc.sendText(fix); }); liveTail.current = { user: '', assistant: '' }; if (finishPending.current && abuseRef.current) drain(); gateStart(); },
       onFinish: (reason) => {
         if (reason === 'closing') {   // thanks said, not the end: wait for the visitor; after ~8 s of silence ask for the short farewell
           if (closingTimer.current) clearInterval(closingTimer.current);
@@ -559,7 +600,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
         if (reason === 'abuse') { abuseRef.current = true; endReasonRef.current = 'abuse'; } else if (reason === 'language') endReasonRef.current = 'language'; else endReasonRef.current ||= 'finish_tool';
         finishPending.current = true; if (reason === 'abuse') setTimeout(drain, 3000); else drain();
       },
-      onOffer: () => { if (!offeredRef.current && !finishPending.current) { offeredRef.current = true; setOffer(true); } },
+      onOffer: () => { gateForce.current = true; gateStart(); },
       onGoAway: () => { goAway.current = true; wrapNow(); },
       onLevel: (rms) => { const n = performance.now(); if (n - lastLevel.current > 80) { lastLevel.current = n; setLevel(Math.min(1, rms * 8)); } },
       onClosed: (_clean, code) => {
@@ -810,9 +851,14 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
     if (turns.filter((x) => x.role === 'user').length >= 3) { offeredRef.current = true; setOffer(true); }
   }, [open, phase, turns]);
   const capDemo = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('capdemo');   // dev only: shows the in-call card without a live call
-  useEffect(() => { if (capDemo) { setOpen(true); goPhase('live'); setOffer(true); } }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (capDemo) { setOpen(true); goPhase('live'); setOffer(true); setGate(true); } }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const onCaptured = (r: CaptureResult) => {
     setCaptured(r);
+    if (cardRef.current === 'gate') {
+      cardRef.current = 'done'; if (gateTimer.current) { clearTimeout(gateTimer.current); gateTimer.current = null; }
+      callRef.current?.pauseMic(false); watchRef.current?.heard();
+      setTimeout(() => { setOffer(false); setGate(false); }, 4000);
+    }
     if (phaseRef.current === 'live') callRef.current?.sendText(`CARD_SENT: say exactly this sentence, word for word, nothing else: "${CAPTURE_UI[lang].thanks}"`);
   };
 
@@ -950,10 +996,11 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
 
           {notice && <p role="status" style={{ color: 'var(--lq-silver)', fontSize: 13.5, margin: 0, textAlign: 'center' }}>{notice}</p>}
 
-          {offer && <div style={{ alignSelf: 'center', width: '100%', maxWidth: 460, maxHeight: 'min(72vh, 600px)', overflowY: 'auto', flexShrink: 0 }} data-lenis-prevent><ContactCapture lang={lang} variant="card" demo={capDemo} getSession={async () => voiceId.current ?? await saveSession()} onDone={onCaptured} onDismiss={() => setOffer(false)} /></div>}
+          {offer && <div className={gate ? 'cw-gate' : undefined} style={{ alignSelf: 'center', width: '100%', maxWidth: 460, maxHeight: 'min(72vh, 600px)', overflowY: 'auto', flexShrink: 0 }} data-lenis-prevent><ContactCapture lang={lang} variant={gate ? 'gate' : 'card'} demo={capDemo} getSession={async () => voiceId.current ?? await saveSession()} onDone={onCaptured} onDismiss={() => (cardRef.current === 'gate' ? declineGate() : setOffer(false))} /></div>}
+          {gate && <style>{`@media (max-width:820px){.cw-gate{max-height:calc(100dvh - 190px)!important}.cw-live-ui,[role=log]{display:none!important}}`}</style>}
 
           {phase === 'live' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <div className="cw-live-ui" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               <div style={{ position: 'relative', width: 150, height: 150, borderRadius: '50%', overflow: 'hidden', ['--orb' as string]: '150px' }}><VoiceOrb bare label="" onTalk={() => {}} /></div>
               <div aria-hidden style={{ width: 120, height: 4, borderRadius: 2, background: 'var(--lq-line)', overflow: 'hidden' }}>
                 <div style={{ width: `${liveSpeak ? 0 : Math.round(level * 100)}%`, height: '100%', background: 'var(--lq-gradient)', transition: 'width 120ms linear' }} />
