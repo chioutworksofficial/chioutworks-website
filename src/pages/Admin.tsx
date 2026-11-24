@@ -16,6 +16,8 @@ import MarketingView from '../components/admin/MarketingView';
 import NewsletterView from '../components/admin/NewsletterView';
 import LeadsView from '../components/admin/LeadsView';
 import TrendRadarView from '../components/admin/TrendRadarView';
+import TabHint from '../components/admin/TabHint';
+import { GROUP_ICON, GROUP_ID, HINTS, TAB_ICON } from '../components/admin/hints';
 import CalendarView, { type CalSection } from '../components/admin/CalendarView';
 
 type Auth = 'checking' | 'out' | 'in' | 'unset';
@@ -170,17 +172,23 @@ export default function Admin() {
     if (!location.pathname.endsWith('/voice-agent')) history.replaceState(null, '', `${location.pathname}${location.search}#${target}`);
     window.scrollTo(0, 0);
   };
-  const nav = () => GROUPS.map((g) => {
+  const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
+  const showTip = (e: React.SyntheticEvent<HTMLElement>, text: string) => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text, top: r.top + r.height / 2, left: r.right + 10 }); };
+  const nav = (sheet: boolean) => GROUPS.map((g) => {
     const sum = g.tabs.reduce((n, t) => n + (badges[t.key] ?? 0), 0);
+    const gid = GROUP_ID[g.label]; const GI = GROUP_ICON[gid];
     return (
-      <div key={g.label} className="adm-group">
-        {g.label !== 'Genel' && <span className="adm-grouplabel">{g.label}{sum > 0 && <span className="adm-grouplabel-n" aria-label={`${sum} yeni`}>{sum}</span>}</span>}
-        {g.tabs.map((t) => (
-          <button key={t.key} className="adm-nav" aria-current={tab === t.key ? 'page' : undefined} onClick={() => go(t.key)}>
-            {t.label}{(badges[t.key] ?? 0) > 0 && <span className="adm-badge">{badges[t.key]}</span>}
-          </button>))}
+      <div key={g.label} className="adm-group" data-g={gid}>
+        {g.label !== 'Genel' && <span className="adm-grouplabel" lang="tr"><GI size={16} aria-hidden="true" />{g.label}{sum > 0 && <span className="adm-grouplabel-n" aria-label={`${sum} yeni`}>{sum}</span>}</span>}
+        {g.tabs.map((t) => { const TI = TAB_ICON[t.key]; const one = HINTS[t.key].what.split(/(?<=\.)\s/)[0]; return (
+          <button key={t.key} className="adm-nav" data-g={gid} aria-current={tab === t.key ? 'page' : undefined} onClick={() => { setTip(null); go(t.key); }}
+            {...(sheet ? {} : { onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showTip(e, one), onFocus: (e: React.FocusEvent<HTMLElement>) => showTip(e, one), onMouseLeave: () => setTip(null), onBlur: () => setTip(null), 'aria-describedby': 'adm-tip' })}>
+            <TI size={16} className="adm-nav-ic" aria-hidden="true" />
+            <span className="adm-nav-tx">{t.label}{sheet && <small>{one}</small>}</span>{(badges[t.key] ?? 0) > 0 && <span className="adm-badge">{badges[t.key]}</span>}
+          </button>); })}
       </div>);
   });
+  const curGroup = GROUPS.find((g) => g.tabs.some((t) => t.key === tab));
   const curLabel = GROUPS.flatMap((g) => g.tabs).find((t) => t.key === tab)?.label ?? '';
   const totalNew = unread + offerUnread + projectUnread;
 
@@ -188,7 +196,8 @@ export default function Admin() {
     <div data-site-theme="liquid" className="adm">
       <aside className="adm-side" aria-label="Yönetim menüsü">
         <div className="adm-logo">Chioutworks<small>Yönetim</small></div>
-        <nav className="adm-navlist">{nav()}</nav>
+        <nav className="adm-navlist">{nav(false)}</nav>
+        {tip && <div id="adm-tip" role="tooltip" className="adm-tip" style={{ top: tip.top, left: tip.left }}>{tip.text}</div>}
         <div className="adm-sidefoot">
           <div style={{ padding: '0 12px 8px' }}><ModeToggle lang="tr" /></div>
           <button className="adm-nav" onClick={logout}>Çıkış</button>
@@ -198,21 +207,22 @@ export default function Admin() {
         <button className="adm-menubtn" aria-expanded={menuOpen} aria-controls="adm-sheet" onClick={() => setMenuOpen(true)}>
           <span className="adm-burger" aria-hidden="true" />Menü{totalNew > 0 && <span className="adm-badge">{totalNew}</span>}
         </button>
-        <span className="adm-curtitle">{curLabel}</span>
+        <span className="adm-curtitle" data-g={GROUP_ID[curGroup?.label ?? 'Genel']}>{curLabel}</span>
         <ModeToggle lang="tr" />
       </header>
       {menuOpen && <>
         <div className="adm-sheet-bg" onClick={() => setMenuOpen(false)} />
         <div id="adm-sheet" className="adm-sheet" role="dialog" aria-modal="true" aria-label="Menü">
           <div className="adm-sheet-head"><div className="adm-logo" style={{ padding: 0 }}>Chioutworks<small>Yönetim</small></div><button className="lq-btn-ghost adm-btn sm" onClick={() => setMenuOpen(false)}>Kapat</button></div>
-          <nav className="adm-navlist">{nav()}</nav>
+          <nav className="adm-navlist">{nav(true)}</nav>
           <button className="adm-nav" onClick={logout}>Çıkış</button>
         </div>
       </>}
       <main className="adm-main">
         {err && <div className="adm-banner" role="alert">{err}</div>}
         {notifyMail === '' && tab !== 'errors' && !hideNotify && <div className="adm-banner adm-banner-slim" role="status"><span>Hata bildirim e-postası henüz girilmedi.</span><button className="lq-btn-ghost adm-btn sm adm-pri" onClick={() => go('errors')}>E-postamı yaz</button><button className="adm-x" aria-label="Bu oturumda gizle" onClick={() => { setHideNotify(true); try { sessionStorage.setItem('cw_adm_hide_notify', '1'); } catch { /* ignore */ } }}>×</button></div>}
-        {tab === 'overview' && <Overview reqs={reqs} sessions={sessions} usage={usage} blocked={blocked} go={go} badges={badges} />}
+        <TabHint key={tab} tab={tab} group={curGroup?.label ?? 'Genel'} label={curLabel} hideCard={tab === 'overview'} />
+        {tab === 'overview' && <Overview reqs={reqs} sessions={sessions} usage={usage} blocked={blocked} go={go} badges={badges} notifyMail={notifyMail} />}
         {tab === 'requests' && <RequestsView reqs={reqs} setReqs={setReqs} openId={openReq} setOpenId={setOpenReq} go={go} setSessions={setSessions} />}
         {tab === 'intakes' && <IntakesView go={go} />}
         {tab === 'offers' && <OffersView openId={openOffer} setOpenId={setOpenOffer} onUnread={setOfferUnread} />}
