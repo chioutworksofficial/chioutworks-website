@@ -36,28 +36,44 @@ const trace = (pts: number[][], r = 14) => pts.map(([x, y], i) => {
   return `L${x + ((px - x) / l1) * k} ${y + ((py - y) / l1) * k}Q${x} ${y} ${x + ((nx - x) / l2) * k} ${y + ((ny - y) / l2) * k}`;
 }).join('');
 const TR: number[][][] = [
+  // 0..4: animated pulses (desktop all five, phone the first three); the rest are static traces
+  [[60, 112], [320, 112], [320, 76], [560, 76], [560, 98], [640, 98]],
+  [[1380, 112], [1120, 112], [1120, 76], [880, 76], [880, 98], [800, 98]],
+  [[200, 210], [420, 210], [420, 138], [590, 138], [590, 122], [640, 122]],
+  [[1240, 210], [1020, 210], [1020, 138], [850, 138], [850, 122], [800, 122]],
+  [[720, 160], [720, 230], [920, 230], [920, 320]],
   [[40, 120], [300, 120], [300, 210], [560, 210], [560, 300], [640, 300]],
   [[1400, 90], [1120, 90], [1120, 190], [900, 190], [900, 290], [820, 290]],
   [[60, 600], [260, 600], [260, 500], [520, 500], [520, 420], [620, 420]],
   [[1380, 610], [1180, 610], [1180, 500], [940, 500], [940, 410], [830, 410]],
-  [[420, 20], [420, 110], [610, 110], [610, 250], [690, 250]],
-  [[1020, 20], [1020, 130], [830, 130], [830, 250], [760, 250]],
+  [[420, 20], [420, 60], [500, 60], [500, 150]],
+  [[1020, 20], [1020, 60], [940, 60], [940, 150]],
   [[160, 330], [380, 330], [380, 390], [600, 390], [600, 340]],
   [[1290, 340], [1070, 340], [1070, 400], [860, 400], [860, 350]],
 ];
-const NODES: number[][] = [[300, 210], [560, 300], [1120, 190], [900, 290], [260, 500], [940, 410], [610, 110], [830, 130], [380, 390], [1070, 400]];
+const PULSES = 5;
+const NODES: number[][] = [[320, 76], [1120, 112], [420, 138], [1020, 138], [560, 98], [880, 98], [720, 230], [300, 210], [920, 230], [940, 410]];
 const STARS: number[][] = [[90, 60], [210, 250], [480, 60], [700, 40], [980, 70], [1240, 200], [1350, 420], [1300, 560], [800, 640], [520, 640], [120, 440], [660, 560], [1150, 640], [330, 640]];
 function Circuit() {
   return (
     <svg aria-hidden="true" className="cf-circ" viewBox="0 0 1440 700" preserveAspectRatio="xMidYMid slice">
-      <g className="cf-cstars">{STARS.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={i % 3 ? 1.2 : 1.8} style={{ animationDelay: `${-i * 1.7}s` }} />)}</g>
-      <rect className="cf-chip" x="640" y="240" width="160" height="150" rx="14" fill="none" strokeWidth="1.4" />
-      <rect className="cf-chip" x="664" y="264" width="112" height="102" rx="8" fill="none" strokeWidth="1" />
-      {[0, 1, 2, 3, 4, 5].map((i) => <path key={i} className="cf-ct" d={`M${640 - 22} ${268 + i * 20}h22M${800} ${268 + i * 20}h22`} fill="none" />)}
+      <g className="cf-cstars">{STARS.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={i % 3 ? 1.2 : 1.8} style={i % 3 ? { animation: 'none' } : { animationDelay: `${-i * 1.7}s` }} />)}</g>
+      <rect className="cf-chip" x="640" y="40" width="160" height="120" rx="14" fill="none" strokeWidth="1.6" />
+      <rect className="cf-chip" x="664" y="62" width="112" height="76" rx="8" fill="none" strokeWidth="1.2" />
+      {[0, 1, 2, 3, 4].map((i) => <path key={i} className="cf-ct" d={`M${640 - 22} ${70 + i * 18}h22M800 ${70 + i * 18}h22`} fill="none" />)}
       {TR.map((p, i) => <path key={`b${i}`} className="cf-ct" d={trace(p)} fill="none" strokeWidth="1.2" />)}
       {NODES.map(([x, y], i) => <circle key={`n${i}`} className="cf-cn" cx={x} cy={y} r="3.2" style={i % 3 === 0 ? { animationDelay: `${-i * 1.3}s` } : { animation: 'none' }} />)}
-      {TR.map((p, i) => <path key={`p${i}`} className={`cf-cp${i > 3 ? ' cf-cx' : ''}`} d={trace(p)} pathLength={100} fill="none" strokeWidth="2.2" strokeLinecap="round" style={{ animationDuration: `${5 + (i % 4) * 1.3}s`, animationDelay: `${-i * 1.9}s` }} />)}
-      <rect className="cf-cglow" x="640" y="240" width="160" height="150" rx="14" />
+      {TR.slice(0, PULSES).map((p, i) => {
+        const st = { animationDuration: `${5 + (i % 4) * 1.3}s`, animationDelay: `${-i * 1.9}s` };
+        const d = trace(p);
+        return (
+          <g key={`p${i}`} className={i > 2 ? 'cf-cx' : undefined}>
+            <path className="cf-cp cf-ch" d={d} pathLength={100} fill="none" strokeWidth="7" strokeLinecap="round" style={st} />
+            <path className="cf-cp" d={d} pathLength={100} fill="none" strokeWidth="2.4" strokeLinecap="round" style={st} />
+          </g>
+        );
+      })}
+      <rect className="cf-cglow" x="640" y="40" width="160" height="120" rx="14" />
     </svg>
   );
 }
@@ -134,7 +150,7 @@ function FitBox({ children }: { children: ReactNode }) {
 function Float({ z = 2, className = '', children }: { z?: 1 | 2; className?: string; children: ReactNode }) {
   return (
     <div className={`relative ${className}`} style={{ transformStyle: 'preserve-3d' }}>
-      <span aria-hidden="true" className="absolute pointer-events-none" style={{ left: '8%', right: '8%', bottom: -10, height: 14, filter: 'blur(8px)', background: 'radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, var(--c-void, #0b0c0e) 85%, transparent), transparent)' }} />
+      <span aria-hidden="true" className="absolute pointer-events-none" style={{ left: '8%', right: '8%', bottom: -10, height: 18, background: 'radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, var(--c-void, #0b0c0e) 85%, transparent), transparent)' }} />
       <div className={`h-full ${z === 2 ? 'fx-z2' : 'fx-z1'}`}>{children}</div>
     </div>
   );
@@ -707,40 +723,47 @@ const MOCK_BY: ((p: P) => ReactNode)[] = [VoiceMock, CalMock, CrmMock, QueueMock
 // angle every frame; hovering a card pops it to the front with a glow while the rest dim and a starry blue backdrop fades in.
 // Phone / no-hover devices: no hover, the centre card is permanently "lit" (lighter glow). 12 cards share a 6-slot look (|d|>3 fades out).
 const CF_CSS = `
-.cf-circ{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.75;-webkit-mask-image:radial-gradient(ellipse 85% 80% at 50% 50%,#000 40%,transparent 100%);mask-image:radial-gradient(ellipse 85% 80% at 50% 50%,#000 40%,transparent 100%)}
-.cf-ct{stroke:color-mix(in srgb,var(--c-lilac,#85a6e9) 16%,transparent);stroke-width:1.2}
-.cf-chip{stroke:color-mix(in srgb,var(--c-lilac,#85a6e9) 22%,transparent)}
+.cf-circ{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.95;transform:translateZ(0);contain:strict;-webkit-mask-image:radial-gradient(ellipse 95% 100% at 50% 40%,#000 55%,transparent 100%);mask-image:radial-gradient(ellipse 95% 100% at 50% 40%,#000 55%,transparent 100%)}
+.cf-ct{stroke:color-mix(in srgb,var(--c-lilac,#85a6e9) 30%,transparent);stroke-width:1.2}
+.cf-chip{stroke:color-mix(in srgb,var(--c-lilac,#85a6e9) 55%,transparent)}
 .cf-cn{fill:color-mix(in srgb,var(--c-lilac,#85a6e9) 40%,transparent);animation:cf-node 7s ease-in-out infinite}
-.cf-cp{stroke:var(--c-signal,#2862d7);stroke-dasharray:7 93;stroke-dashoffset:0;opacity:0;animation:cf-pulse 6s linear infinite;filter:drop-shadow(0 0 3px var(--c-lilac,#85a6e9))}
+.cf-cp{stroke:var(--c-signal,#2862d7);stroke-dasharray:7 93;stroke-dashoffset:0;opacity:0;animation:cf-pulse 6s linear infinite}
+.cf-ch{stroke:var(--c-lilac,#85a6e9);stroke-width:7;opacity:0}
 .cf-cglow{fill:var(--c-signal,#2862d7);opacity:0;animation:cf-glow 9s ease-in-out infinite}
 .cf-cstars circle{fill:var(--c-quartz,#fff);opacity:.22;animation:cf-drift 24s ease-in-out infinite alternate}
-@keyframes cf-pulse{0%{stroke-dashoffset:7;opacity:0}8%{opacity:.85}60%{opacity:.85}85%{stroke-dashoffset:-93;opacity:0}100%{stroke-dashoffset:-93;opacity:0}}
+@keyframes cf-pulse{0%{stroke-dashoffset:7;opacity:0}8%{opacity:.95}60%{opacity:.95}85%{stroke-dashoffset:-93;opacity:0}100%{stroke-dashoffset:-93;opacity:0}}
+.cf-ch{animation-name:cf-pulse-h}
+@keyframes cf-pulse-h{0%{stroke-dashoffset:7;opacity:0}8%{opacity:.16}60%{opacity:.16}85%{stroke-dashoffset:-93;opacity:0}100%{stroke-dashoffset:-93;opacity:0}}
 @keyframes cf-node{0%,70%,100%{opacity:.5}80%{opacity:1;transform:scale(1)}}
-@keyframes cf-glow{0%,55%,100%{opacity:0}75%{opacity:.09}}
+@keyframes cf-glow{0%,55%,100%{opacity:0}75%{opacity:.14}}
 @keyframes cf-drift{from{transform:translate(0,0);opacity:.1}to{transform:translate(12px,8px);opacity:.3}}
-html[data-mode='light'] .cf-circ{opacity:.6}
-html[data-mode='light'] .cf-ct{stroke:color-mix(in srgb,var(--c-signal,#2459c8) 16%,transparent)}
-html[data-mode='light'] .cf-chip{stroke:color-mix(in srgb,var(--c-signal,#2459c8) 22%,transparent)}
+html[data-mode='light'] .cf-circ{opacity:.85}
+html[data-mode='light'] .cf-ct{stroke:color-mix(in srgb,var(--c-signal,#2459c8) 28%,transparent)}
+html[data-mode='light'] .cf-chip{stroke:color-mix(in srgb,var(--c-signal,#2459c8) 50%,transparent)}
 html[data-mode='light'] .cf-cn{fill:color-mix(in srgb,var(--c-signal,#2459c8) 35%,transparent)}
-html[data-mode='light'] .cf-cp{filter:none;stroke:color-mix(in srgb,var(--c-signal,#2459c8) 70%,transparent)}
+html[data-mode='light'] .cf-ch{stroke:var(--c-signal,#2459c8)}
+html[data-mode='light'] .cf-cp{stroke:color-mix(in srgb,var(--c-signal,#2459c8) 70%,transparent)}
 html[data-mode='light'] .cf-cstars circle{fill:var(--c-signal,#2459c8);opacity:.14}
-#features[data-vis="0"] .cf-cp,#features[data-vis="0"] .cf-cn,#features[data-vis="0"] .cf-cglow,#features[data-vis="0"] .cf-cstars circle{animation-play-state:paused}
+#features[data-vis="0"] .cf-cp,#features[data-vis="0"] .cf-ch,#features[data-vis="0"] .cf-cn,#features[data-vis="0"] .cf-cglow,#features[data-vis="0"] .cf-cstars circle{animation-play-state:paused}
 @keyframes cf-star{to{background-position:320px 220px}}
 .cf-stage{overscroll-behavior-x:contain;touch-action:pan-y}
-.cf-stage{--w:min(620px,41vw,calc((100svh - 300px)*1.6));--h:calc(var(--w)/1.6);--rx:1.08;--rz:.91;--ty:.17;--top:calc(var(--h)*.62);position:relative;height:calc(var(--h)*1.5);perspective:1800px;perspective-origin:50% 30%;z-index:1;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;outline:none}
+.cf-stage{margin-top:44px;--w:min(620px,41vw,calc((100svh - 300px)*1.6));--h:calc(var(--w)/1.6);--rx:1.08;--rz:.91;--ty:.17;--top:calc(var(--h)*.62);position:relative;height:calc(var(--h)*1.5);perspective:1800px;perspective-origin:50% 30%;z-index:1;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;outline:none}
 .cf-stage[data-drag="1"],.cf-stage[data-drag="1"] *{cursor:grabbing!important}
-.cf-space{position:absolute;inset:0;z-index:0;opacity:0;transition:opacity .7s ease;pointer-events:none;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);background:radial-gradient(ellipse 60% 70% at 50% 55%,color-mix(in srgb,var(--c-signal,#2862d7) 45%,var(--c-deep-sea,#0d172b)) 0%,var(--c-deep-sea,#0d172b) 45%,var(--c-void,#0b0c0e) 80%)}
+.cf-space{position:absolute;inset:0;z-index:0;opacity:0;visibility:hidden;transition:opacity .7s ease,visibility 0s .7s;pointer-events:none;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 18%,#000 86%,transparent 100%);background:radial-gradient(ellipse 60% 70% at 50% 55%,color-mix(in srgb,var(--c-signal,#2862d7) 45%,var(--c-deep-sea,#0d172b)) 0%,var(--c-deep-sea,#0d172b) 45%,var(--c-void,#0b0c0e) 80%)}
 .cf-space::before,.cf-space::after{content:"";position:absolute;inset:0;background-repeat:repeat}
 .cf-space::before{background-image:radial-gradient(1.2px 1.2px at 20px 30px,var(--c-quartz,#fff),transparent),radial-gradient(1px 1px at 90px 140px,var(--c-mist,#c7c9d1),transparent),radial-gradient(1.4px 1.4px at 160px 60px,var(--c-quartz,#fff),transparent),radial-gradient(1px 1px at 230px 190px,var(--c-lilac,#85a6e9),transparent),radial-gradient(1.1px 1.1px at 300px 100px,var(--c-quartz,#fff),transparent);background-size:320px 220px;opacity:.75;animation:cf-star 60s linear infinite}
 .cf-space::after{background-image:radial-gradient(.9px .9px at 50px 80px,var(--c-quartz,#fff),transparent),radial-gradient(1.3px 1.3px at 180px 20px,var(--c-mist,#c7c9d1),transparent),radial-gradient(.8px .8px at 260px 150px,var(--c-quartz,#fff),transparent);background-size:280px 200px;opacity:.5;animation:cf-star 110s linear infinite reverse}
 #features[data-vis="0"] .cf-space::before,#features[data-vis="0"] .cf-space::after{animation-play-state:paused}
-.cf-stage[data-hov="1"] .cf-space{opacity:1}
+.cf-stage:not([data-hov="1"]) .cf-space::before,.cf-stage:not([data-hov="1"]) .cf-space::after{animation-play-state:paused}
+.cf-stage[data-hov="1"] .cf-space{opacity:1;visibility:visible;transition-delay:0s}
 .cf-ring{position:absolute;left:50%;top:var(--top);width:0;height:0;transform-style:preserve-3d}
-.cf-card{position:absolute;left:calc(var(--w)/-2);top:calc(var(--h)/-2);width:var(--w);height:var(--h);container-type:inline-size;border-radius:18px;transition:filter .45s,box-shadow .45s;will-change:transform}
-.cf-frame{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:linear-gradient(160deg,var(--c-cobalt,#12244f) 0%,var(--c-deep-sea,#0d172b) 55%,var(--c-abyss,#0e111b) 100%);border:1px solid color-mix(in srgb,var(--c-signal,#2862d7) 32%,var(--c-hairline,#24375a));box-shadow:0 20px 44px color-mix(in srgb,var(--c-void,#0b0c0e) 55%,transparent);transition:box-shadow .45s}
-.cf-stage[data-hov="1"] .cf-card{filter:brightness(.45) saturate(.6)}
-.cf-stage[data-hov="1"] .cf-card.lit{filter:none}
-.cf-stage[data-hov="1"] .cf-card.lit .cf-frame{box-shadow:0 0 0 1px color-mix(in srgb,var(--c-lilac,#85a6e9) 55%,transparent),0 30px 90px color-mix(in srgb,var(--c-signal,#2862d7) 55%,transparent)}
+.cf-card{position:absolute;left:calc(var(--w)/-2);top:calc(var(--h)/-2);width:var(--w);height:var(--h);container-type:inline-size;border-radius:18px;contain:layout style}
+.cf-card::before,.cf-card::after{content:"";position:absolute;inset:0;border-radius:18px;pointer-events:none;opacity:0;transition:opacity .45s}
+.cf-card::before{z-index:-1;visibility:hidden;transition:opacity .45s,visibility 0s .45s;box-shadow:0 0 0 1px color-mix(in srgb,var(--c-lilac,#85a6e9) 55%,transparent),0 30px 90px color-mix(in srgb,var(--c-signal,#2862d7) 55%,transparent)}
+.cf-card::after{z-index:6;background:var(--c-void,#0b0c0e)}
+.cf-stage[data-hov="1"] .cf-card.lit::before{opacity:1;visibility:visible;transition-delay:0s}
+.cf-stage[data-hov="1"] .cf-card:not(.lit)::after{opacity:.55}
+.cf-frame{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:linear-gradient(160deg,var(--c-cobalt,#12244f) 0%,var(--c-deep-sea,#0d172b) 55%,var(--c-abyss,#0e111b) 100%);border:1px solid color-mix(in srgb,var(--c-signal,#2862d7) 32%,var(--c-hairline,#24375a));box-shadow:0 20px 44px color-mix(in srgb,var(--c-void,#0b0c0e) 55%,transparent)}
 .cf-hit{position:absolute;inset:0;z-index:5;border-radius:18px;outline-offset:4px}
 .cf-over{position:absolute;left:0;right:0;bottom:0;height:56%;z-index:3;pointer-events:none;background:linear-gradient(to bottom,transparent,color-mix(in srgb,var(--c-void,#0b0c0e) 82%,transparent) 50%,color-mix(in srgb,var(--c-void,#0b0c0e) 94%,transparent))}
 .cf-cap{position:absolute;left:0;right:0;bottom:0;z-index:4;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:0 5cqw 4.2cqw;pointer-events:none}
@@ -750,11 +773,11 @@ html[data-mode='light'] .cf-cstars circle{fill:var(--c-signal,#2459c8);opacity:.
 .cf-card.lit .cf-cta{opacity:1;transform:none}
 html[data-mode='light'] .cf-space{background:radial-gradient(ellipse 60% 70% at 50% 55%,color-mix(in srgb,var(--c-signal,#2459c8) 22%,var(--c-deep-sea,#ecf1fa)) 0%,var(--c-deep-sea,#ecf1fa) 50%,var(--c-void,#f4f7fc) 85%)}
 html[data-mode='light'] .cf-space::before,html[data-mode='light'] .cf-space::after{opacity:.18}
-html[data-mode='light'] .cf-stage[data-hov="1"] .cf-card{filter:saturate(.6) opacity(.8)}
-html[data-mode='light'] .cf-stage[data-hov="1"] .cf-card.lit{filter:none}
-html[data-mode='light'] .cf-stage[data-hov="1"] .cf-card.lit .cf-frame{box-shadow:0 0 0 1px color-mix(in srgb,var(--c-signal,#2459c8) 35%,transparent),0 26px 70px color-mix(in srgb,var(--c-signal,#2459c8) 28%,transparent)}
+html[data-mode='light'] .cf-card::before{box-shadow:0 0 0 1px color-mix(in srgb,var(--c-signal,#2459c8) 35%,transparent),0 26px 70px color-mix(in srgb,var(--c-signal,#2459c8) 28%,transparent)}
+html[data-mode='light'] .cf-card::after{background:var(--c-void,#f4f7fc)}
+html[data-mode='light'] .cf-stage[data-hov="1"] .cf-card:not(.lit)::after{opacity:.4}
 html[data-mode='light'] .cf-frame{box-shadow:0 16px 36px -14px color-mix(in srgb,var(--c-signal,#2459c8) 30%,transparent)}
-html[data-mode='light'] .cf-tag{background:color-mix(in srgb,var(--c-abyss,#fff) 72%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-color:var(--c-hairline,#bccbe3)}
+html[data-mode='light'] .cf-tag{background:color-mix(in srgb,var(--c-abyss,#fff) 90%,transparent);border-color:var(--c-hairline,#bccbe3)}
 .cf-tag{position:absolute;top:3cqw;left:50%;transform:translateX(-50%);z-index:4;border-radius:9999px;padding:.5em 1.35em;font-size:clamp(12.5px,2.4cqw,18px);font-weight:700;letter-spacing:.02em;color:var(--c-quartz,#fff);background:color-mix(in srgb,var(--c-void,#0b0c0e) 78%,transparent);border:1px solid color-mix(in srgb,var(--c-quartz,#fff) 14%,transparent);max-width:84%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
 .cf-dot:focus-visible,.cf-hit:focus-visible{outline:2px solid var(--c-lilac,#85a6e9);outline-offset:3px}
 .cf-dot{height:8px;width:8px;border-radius:9999px;border:0;padding:0;cursor:pointer;background:var(--c-hairline,#24375a);transition:width .3s,background .3s}
@@ -762,23 +785,25 @@ html[data-mode='light'] .cf-tag{background:color-mix(in srgb,var(--c-abyss,#fff)
 .cf-dotw{display:flex;align-items:center;justify-content:center;min-width:14px;height:32px}
 .cf-card[data-act="0"] .fx,.cf-card[data-act="0"] .fx-dots i{animation-play-state:paused}
 @media (max-width:767px),(pointer:coarse){
-  .cf-stage{--w:min(88vw,340px);--h:calc(var(--w)*1.2);--rx:.56;--rz:.89;--ty:.16;--top:calc(var(--h)/2 + 36px);perspective:1000px;height:calc(var(--h) + 80px)}
+  .cf-stage{margin-top:4px;--w:min(88vw,340px);--h:calc(var(--w)*1.2);--rx:.56;--rz:.89;--ty:.16;--top:calc(var(--h)/2 + 36px);perspective:1000px;height:calc(var(--h) + 80px)}
   .cf-card,.cf-frame,.cf-hit{border-radius:16px}
   .cf-space{display:none}
-  .cf-circ{opacity:.45}.cf-cx{display:none}
-  .cf-card.lit .cf-frame{box-shadow:0 0 0 1px color-mix(in srgb,var(--c-lilac,#85a6e9) 30%,transparent),0 14px 34px -8px color-mix(in srgb,var(--c-signal,#2862d7) 45%,transparent)}
+  .cf-circ{opacity:.7}.cf-cx{display:none}
+  .cf-card::before{box-shadow:0 0 0 1px color-mix(in srgb,var(--c-lilac,#85a6e9) 30%,transparent),0 14px 34px -8px color-mix(in srgb,var(--c-signal,#2862d7) 45%,transparent)}
+  .cf-card.lit::before{opacity:1;visibility:visible;transition-delay:0s}
+  .cf-ch{display:none}
   .cf-cap{flex-direction:column;align-items:flex-start;gap:10px;padding:0 5.5cqw 5.5cqw}
   .cf-t{font-size:clamp(17px,6.2cqw,24px)}
   .cf-s{font-size:clamp(12px,3.9cqw,14px)}
   .cf-cta{font-size:13px;padding:.55em 1em}
   .cf-tag{top:12px;font-size:12.5px;max-width:86%}
 }
-@media (prefers-reduced-motion: reduce){.cf-space{transition:none}.cf-space::before,.cf-space::after,.cf-cp,.cf-cn,.cf-cglow,.cf-cstars circle{animation:none}.cf-dot{transition:none}}
+@media (prefers-reduced-motion: reduce){.cf-space{transition:none}.cf-space::before,.cf-space::after,.cf-cp,.cf-ch,.cf-cn,.cf-cglow,.cf-cstars circle{animation:none}.cf-dot{transition:none}}
 `;
 
 
 const N = ORDER.length;
-const DRAG_K = 0.22 / 60; // ring slots per dragged pixel (reference: 0.22 deg per px on a 60 deg slot)
+const CULL = 2.5; // cards further than this many slots from the front are hidden and render no mock
 
 export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const ui = FEATURES_UI[lang];
@@ -792,17 +817,19 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
   const touch = useRef(false);
   const suppress = useRef(false);
   const wheelT = useRef(0);
+  const scrollT = useRef(-1e9);
+  const kick = useRef<() => void>(() => {});
   const smp = useRef<number[][]>([]);
   // pos: current ring position in card slots; target: where it eases to; pop: per-card hover pop 0..1
-  const S = useRef({ pos: 0, target: 0, hov: -1, pop: new Array<number>(N).fill(0), dx: null as number | null, start: 0, moved: false, cur: 0, k: DRAG_K, v: 0, fast: false });
+  const S = useRef({ pos: 0, target: 0, hov: -1, pop: new Array<number>(N).fill(0), dx: null as number | null, dy: 0, start: 0, moved: false, cur: 0, k: 0.004, v: 0, fast: false });
 
   const go = useCallback((i: number) => {
     const s = S.current; let t = i;
     while (t - s.pos > N / 2) t -= N;
     while (s.pos - t > N / 2) t += N;
-    s.target = t;
+    s.target = t; kick.current();
   }, []);
-  const step = useCallback((d: number) => { S.current.fast = false; S.current.target = Math.round(S.current.target) + d; }, []);
+  const step = useCallback((d: number) => { S.current.fast = false; S.current.target = Math.round(S.current.target) + d; kick.current(); }, []);
 
   useLayoutEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -820,98 +847,110 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     const io = new IntersectionObserver(([e]) => setVis(e.isIntersecting), { rootMargin: '80px' });
     io.observe(el);
     const t = window.setTimeout(() => ScrollTrigger.refresh(), 400);
-    return () => { io.disconnect(); window.clearTimeout(t); };
+    const onScroll = () => { scrollT.current = performance.now(); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { io.disconnect(); window.clearTimeout(t); window.removeEventListener('scroll', onScroll); };
   }, []);
 
   useEffect(() => {
     if (!vis) return;
-    const id = window.setInterval(() => { if (!paused.current && S.current.hov < 0 && S.current.dx === null && !reduce.current && !document.hidden) step(1); }, 6000);
+    const id = window.setInterval(() => { if (!paused.current && S.current.hov < 0 && S.current.dx === null && !reduce.current && !document.hidden && performance.now() - scrollT.current > 800) step(1); }, 6000);
     return () => window.clearInterval(id);
   }, [vis, step]);
 
-  // Frame loop: ease the ring, place every card on the orbit (same maths as the reference), toggle the lit state.
+  // Frame loop: runs ONLY while something moves (ring easing, dragging, hover pop); stops when settled, off-screen or tab hidden.
+  // Transforms go straight to element.style, no React state per frame (idx changes only when the front card changes).
   useEffect(() => {
     if (!vis) return;
-    let raf = 0, last = 0;
-    const tick = (ts: number) => {
-      raf = requestAnimationFrame(tick);
-      const st = stage.current, s = S.current;
-      if (!st) return;
-      const dt = Math.min(64, ts - (last || ts)); last = ts;
-      if (s.dx === null) {
-        const diff = s.target - s.pos;
-        s.pos += reduce.current || Math.abs(diff) < 0.001 ? diff : diff * Math.min(1, dt / (s.fast ? 85 : 200));
-      }
+    let raf = 0, last = 0, RX = 0, RZ = 0, TY = 0;
+    const measure = () => {
+      const st = stage.current; if (!st) return;
       const cs = getComputedStyle(st);
       const w = cardEl.current[0]?.offsetWidth || 400;
-      const RX = (parseFloat(cs.getPropertyValue('--rx')) || 1) * w, RZ = (parseFloat(cs.getPropertyValue('--rz')) || 0.9) * w, TY = (parseFloat(cs.getPropertyValue('--ty')) || 0.17) * w;
+      RX = (parseFloat(cs.getPropertyValue('--rx')) || 1) * w; RZ = (parseFloat(cs.getPropertyValue('--rz')) || 0.9) * w; TY = (parseFloat(cs.getPropertyValue('--ty')) || 0.17) * w;
+      S.current.k = 1 / ((parseFloat(cs.getPropertyValue('--rx')) || 1) * w * 0.866); // 1:1 drag: one slot = distance between neighbouring cards
+    };
+    const tick = (ts: number) => {
+      raf = 0;
+      const s = S.current;
+      if (!stage.current || document.hidden) { last = 0; return; }
+      const dt = Math.min(64, ts - (last || ts)); last = ts;
+      let moving = s.dx !== null;
+      if (s.dx === null) {
+        const diff = s.target - s.pos;
+        if (reduce.current || Math.abs(diff) < 0.001) s.pos = s.target; else { s.pos += diff * Math.min(1, dt / (s.fast ? 80 : 200)); moving = true; }
+      }
       const cur = ((Math.round(s.pos) % N) + N) % N;
-      const settled = Math.abs(s.target - s.pos) < 0.01;
+      const settled = !moving;
       for (let i = 0; i < N; i++) {
         const c = cardEl.current[i]; if (!c) continue;
         let d = i - s.pos; d -= Math.round(d / N) * N;
         const ad = Math.abs(d), dd = Math.max(-3, Math.min(3, d));
         const th = (dd * 60 * Math.PI) / 180, sn = Math.sin(th), co = Math.cos(th);
-        const want = i === s.hov ? 1 : 0; s.pop[i] += (want - s.pop[i]) * Math.min(1, dt / 120);
+        const want = i === s.hov ? 1 : 0; const dp = want - s.pop[i];
+        if (Math.abs(dp) < 0.004) s.pop[i] = want; else { s.pop[i] += dp * Math.min(1, dt / 120); moving = true; }
         const p = s.pop[i];
+        const fade = ad > CULL - 0.5 ? Math.max(0, 1 - (ad - (CULL - 0.5)) * 2) : 1;
+        if (fade === 0) { if (c.style.visibility !== 'hidden') { c.style.visibility = 'hidden'; c.style.willChange = ''; c.style.pointerEvents = 'none'; } continue; }
         const x = RX * sn * (1 - p * 0.25), z = RZ * co - RZ + p * 260, y = -TY * (1 - co) * (1 - p) + p * 10;
         const sc = (0.6 + 0.4 * (1 + co) / 2) * (1 - p) + 1.16 * p;
-        const fade = ad > 3 ? Math.max(0, 1 - (ad - 3)) : 1;
         c.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,${z.toFixed(1)}px) rotateY(${(-sn * 22 * (1 - p)).toFixed(2)}deg) scale(${sc.toFixed(3)})`;
         c.style.zIndex = String(Math.round(1000 + z));
         c.style.opacity = String(Math.min(1, Math.max(0.35, 0.55 + 0.45 * co + p)) * fade);
-        c.style.visibility = fade === 0 ? 'hidden' : 'visible';
+        if (c.style.visibility !== 'visible') c.style.visibility = 'visible';
         c.style.pointerEvents = fade < 0.5 ? 'none' : '';
+        c.style.willChange = moving ? 'transform, opacity' : '';
         const lit = s.hov >= 0 ? i === s.hov : i === cur && settled;
         if (c.classList.contains('lit') !== lit) c.classList.toggle('lit', lit);
         const act = i === cur || i === s.hov ? '1' : '0';
         if (c.dataset.act !== act) c.dataset.act = act;
       }
       if (cur !== s.cur) { s.cur = cur; setIdx(cur); }
+      if (moving) raf = requestAnimationFrame(tick);
+      else { last = 0; for (const c of cardEl.current) if (c) c.style.willChange = ''; }
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    const start = () => { if (!raf && !document.hidden) raf = requestAnimationFrame(tick); };
+    kick.current = start;
+    measure(); start();
+    const onResize = () => { measure(); start(); };
+    window.addEventListener('resize', onResize);
+    document.addEventListener('visibilitychange', start);
+    return () => { cancelAnimationFrame(raf); raf = 0; kick.current = () => {}; window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', start); };
   }, [vis]);
 
-  const setHov = (i: number) => { S.current.hov = i; if (i >= 0) stage.current?.setAttribute('data-hov', '1'); else stage.current?.removeAttribute('data-hov'); };
+  const setHov = (i: number) => { S.current.hov = i; if (i >= 0) stage.current?.setAttribute('data-hov', '1'); else stage.current?.removeAttribute('data-hov'); kick.current(); };
   const onDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && (e.button !== 0)) return;
-    const s = S.current; s.dx = e.clientX; s.start = s.pos; s.moved = false; s.v = 0; s.fast = false; smp.current = [[e.clientX, e.timeStamp]];
-    if (e.pointerType === 'touch') {
-      paused.current = true;
-      // finger 1:1: one slot of the ring = horizontal distance between neighbouring cards
-      const st = stage.current, w = cardEl.current[0]?.offsetWidth || 300;
-      const rx = (st ? parseFloat(getComputedStyle(st).getPropertyValue('--rx')) : 0) || 0.56;
-      s.k = 1 / (rx * w * 0.866);
-    } else s.k = DRAG_K;
+    const s = S.current; s.dx = e.clientX; s.dy = e.clientY; s.start = s.pos; s.moved = false; s.v = 0; s.fast = false; smp.current = [[e.clientX, e.timeStamp]];
+    if (e.pointerType === 'touch') paused.current = true;
   };
   const onMoveP = (e: React.PointerEvent) => {
     const s = S.current; if (s.dx === null) return;
     const dx = e.clientX - s.dx;
-    if (!s.moved && Math.abs(dx) > 6) { s.moved = true; stage.current?.setPointerCapture(e.pointerId); stage.current?.setAttribute('data-drag', '1'); setHov(-1); }
+    // direction is decided after ~8 px: a clearly vertical gesture is left to the page (the browser then cancels the pointer)
+    if (!s.moved && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(e.clientY - s.dy)) { s.moved = true; stage.current?.setPointerCapture(e.pointerId); stage.current?.setAttribute('data-drag', '1'); setHov(-1); }
     if (s.moved) {
       s.pos = s.start - dx * s.k; s.target = s.pos;
       smp.current.push([e.clientX, e.timeStamp]);
       while (smp.current.length > 2 && e.timeStamp - smp.current[0][1] > 120) smp.current.shift();
+      kick.current();
     }
   };
   const onUp = (e: React.PointerEvent) => {
     const s = S.current; if (s.dx === null) return;
     s.dx = null; stage.current?.removeAttribute('data-drag');
     if (s.moved) {
-      if (e.pointerType === 'touch') {
-        smp.current.push([e.clientX, e.timeStamp]);
-        const a = smp.current[0], z = smp.current[smp.current.length - 1];
-        s.v = z[1] > a[1] ? (z[0] - a[0]) / (z[1] - a[1]) : 0;
-        const base = Math.round(s.start);
-        let t = Math.round(s.pos - s.v * s.k * 160);
-        if (t === base && (Math.abs(s.pos - s.start) / s.k > 40 || Math.abs(s.v) > 0.3)) t = base + (s.pos > s.start ? 1 : -1);
-        s.target = Math.max(base - 3, Math.min(base + 3, t)); s.fast = true;
-      } else s.target = Math.round(s.pos);
+      smp.current.push([e.clientX, e.timeStamp]);
+      const a = smp.current[0], z = smp.current[smp.current.length - 1];
+      s.v = z[1] > a[1] ? (z[0] - a[0]) / (z[1] - a[1]) : 0;
+      const base = Math.round(s.start);
+      let t = Math.round(s.pos - s.v * s.k * 160);
+      if (t === base && (Math.abs(s.pos - s.start) / s.k > 40 || Math.abs(s.v) > 0.3)) t = base + (s.pos > s.start ? 1 : -1);
+      s.target = Math.max(base - 3, Math.min(base + 3, t)); s.fast = true; kick.current();
       suppress.current = true; window.setTimeout(() => { suppress.current = false; }, 60); }
     if (e.pointerType === 'touch') window.setTimeout(() => { paused.current = false; }, 4000);
   };
-  const onCancel = () => { const s = S.current; if (s.dx === null) return; s.dx = null; stage.current?.removeAttribute('data-drag'); s.target = Math.round(s.pos); };
+  const onCancel = () => { const s = S.current; if (s.dx === null) return; s.dx = null; stage.current?.removeAttribute('data-drag'); s.target = Math.round(s.pos); s.fast = true; kick.current(); };
   const onWheel = (e: React.WheelEvent) => {
     const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0);
     if (Math.abs(dx) < 4 || (!e.shiftKey && Math.abs(e.deltaX) <= Math.abs(e.deltaY))) return;
@@ -941,6 +980,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
             const M = MOCK_BY[o];
             const tag = it.title.split(/\s+[&·]\s+|,\s*/)[0];
             const cur = i === idx;
+            const near = Math.min((i - idx + N) % N, (idx - i + N) % N) <= 2;
             return (
               <div key={i} ref={(el) => { cardEl.current[i] = el; }} className="cf-card" data-act={cur ? '1' : '0'} aria-hidden={cur ? undefined : true}
                 onMouseEnter={() => { if (!touch.current && S.current.dx === null) setHov(i); }} onMouseLeave={() => { if (S.current.hov === i) setHov(-1); }}>
@@ -948,7 +988,7 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
                   <span className="cf-tag">{tag}</span>
                   <FitBox>
                     <div className="absolute inset-0 pt-2 px-5 pb-5 flex">
-                      <M m={ui.mock} s={ui.sim} x={ui.x} lang={lang} />
+                      {near ? <M m={ui.mock} s={ui.sim} x={ui.x} lang={lang} /> : null}
                     </div>
                   </FitBox>
                   <div aria-hidden="true" className="cf-over" />
