@@ -2,12 +2,14 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { Link } from 'react-router-dom';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Observer } from 'gsap/Observer';
 import type { Lang } from '../translations';
 import { demoPath, pagePath } from '../lib/routes';
 import { FEATURES_UI } from './i18n/features';
+import { getLenis } from '../lib/smoothScroll';
 import { ageText, makeFmt, makeRng, RATE, useSim } from './featureSim';
 
-gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger, Observer);
 // Phones (owner, 2026-11-23: card run felt stuck while scrolling): don't recompute every pin when the address bar hides/shows,
 // and follow the finger closely instead of trailing behind native touch scrolling.
 ScrollTrigger.config({ ignoreMobileResize: true });
@@ -914,17 +916,54 @@ export default function FeaturesScroll({ lang }: { lang: Lang }) {
     const el = root.current; if (!el) return;
     const s = S.current;
     const per = phone ? 0.45 : 0.6;
+    let onT = (_a: boolean) => {}, onE = (_y: number) => {};
     const tw = gsap.fromTo(s, { target: 0 }, {
       target: N - 1, ease: 'none', onUpdate: () => kick.current(),
       scrollTrigger: {
         trigger: el, start: 'top top', end: () => `+=${Math.round(window.innerHeight * per * (N - 1))}`, pin: true, anticipatePin: 1, invalidateOnRefresh: true,
         scrub: phone ? true : 0.6,
-        snap: { snapTo: 1 / (N - 1), inertia: false, duration: { min: 0.2, max: 0.45 }, delay: 0.1, ease: 'power2.out' },
+        onToggle: (self) => onT(self.isActive),
+        onEnter: (self) => onE(self.start + 1),
+        onEnterBack: (self) => onE(self.end - 1),
       },
     });
-    trig.current = tw.scrollTrigger ?? null;
+    const st = tw.scrollTrigger!;
+    trig.current = st;
+    // One card per gesture: wheel/touch/keys step exactly one card; inertia is swallowed; ends release the page.
+    let until = 0, tween: gsap.core.Tween | null = null;
+    const pos = (i: number) => (i <= 0 ? st.start + 1 : i >= N - 1 ? st.end - 1 : st.start + ((st.end - st.start) * i) / (N - 1));
+    const jump = (y: number) => { tween?.kill(); tween = null; window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior }); until = performance.now() + 350; };
+    const step = (dir: 1 | -1) => {
+      const now = performance.now();
+      if (now < until) { until = Math.max(until, now + 250); return; }
+      const i = Math.round(((window.scrollY - st.start) / (st.end - st.start)) * (N - 1));
+      const n = i + dir;
+      if (n < 0 || n > N - 1) { act(false); window.scrollTo({ top: dir > 0 ? st.end + 2 : st.start - 2, behavior: 'instant' as ScrollBehavior }); return; }
+      const d = reduce.current ? 0 : phone ? 0.45 : 0.55;
+      const pr = { y: window.scrollY };
+      until = now + d * 1000 + 350;
+      tween?.kill();
+      tween = gsap.to(pr, { y: pos(n), duration: d, ease: 'power2.out', onUpdate: () => { window.scrollTo({ top: pr.y, behavior: 'instant' as ScrollBehavior }); }, onComplete: () => {  until = performance.now() + 350; } });
+    };
+    const obs = Observer.create({
+      target: window, type: 'wheel,touch', preventDefault: true, allowClicks: true, tolerance: 10, dragMinimum: 8, wheelSpeed: -1, onDown: () => step(-1), onUp: () => step(1),
+    });
+    // Lenis (desktop smooth wheel) would fight the stepping: pause it while the carousel owns the wheel.
+    const act = (a: boolean) => { if (a) { obs.enable(); getLenis()?.stop(); } else { obs.disable(); getLenis()?.start(); } };
+    onT = act; onE = jump;
+    onT(st.isActive);
+    const onKey = (e: KeyboardEvent) => {
+      if (!st.isActive || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+      const tg = e.target as HTMLElement | null;
+      if (tg && (/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName) || tg.isContentEditable)) return;
+      const k = e.key;
+      const dir = k === 'ArrowDown' || k === 'PageDown' || (k === ' ' && !e.shiftKey) ? 1 : k === 'ArrowUp' || k === 'PageUp' || (k === ' ' && e.shiftKey) ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault(); step(dir);
+    };
+    window.addEventListener('keydown', onKey);
     const t = window.setTimeout(() => ScrollTrigger.refresh(), 400);
-    return () => { window.clearTimeout(t); trig.current = null; tw.scrollTrigger?.kill(); tw.kill(); s.target = 0; };
+    return () => { window.clearTimeout(t); window.removeEventListener('keydown', onKey); tween?.kill(); obs.kill(); getLenis()?.start(); trig.current = null; tw.scrollTrigger?.kill(); tw.kill(); s.target = 0; };
   }, [phone]);
 
   // Off-screen: pause animations and the frame loop.
