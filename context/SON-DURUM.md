@@ -1,3 +1,15 @@
+## ▶ RESUME P — 2026-11-25 gece (buradan devam)
+**Devam eden iş (yarım kaldıysa yeniden başlat):** Voice Agent canlı denetim + düzeltme.
+1. Canlı admin'de (#voiceAgent) her sekmeyi dene, hata veren /api isteklerini listele, hepsini düzelt.
+2. Aranmasın: sayaç eski DNC anahtar listesinden sayıyor, sekme yalnızca yeni kayıtları gösteriyor → eski kayıtları da maskeli + eşleşen kişiyle listele, "Geri al" (not zorunlu, loglu), sayaç = liste.
+3. Analiz formu/talep → "Aranacaklar" (Telefon seçenler, tekilleştir, kaynak rozeti).
+4. Voice Agent üstüne "Hazırlık" paneli (Vapi anahtar/asistan/numara/webhook secret, Server URL, {{system_prompt}}, PUBLIC_ORIGIN, mail, CRON_SECRET, SETTINGS_ENC_KEY, Supabase, mod, planlama, gizlilik) + "Uçtan uca deneme (simülasyon)" düğmesi.
+5. Anahtarlar/alan adı bağlanınca kod değişmeden canlı çalışsın.
+Kontrol: `node scripts/voice-guard.mjs` (sitedeki sesli asistana dokunma), iki tsc, temiz worktree tsc, sonra push.
+
+**Sahipten beklenenler:** APIFY_TOKEN, YOUTUBE_API_KEY (.env'e; Vercel'e ben eklerim) · Vapi kurulunca asistan talimatına `{{system_prompt}}` · telefonda sesli asistan denemesi (de/en isimli selamlama, kararsız kişide kart) · kararlar: Trend Radar'da fal.ai A seçeneği mi; rapor e-postası "arayayım/arayalım"; "teklif linki gelecek" sözü; form/asistan kişilerine rapor; gizlilik ekleri.
+**Kurallar:** çalışanı elleme (memory: feedback_chioutworks_dont_touch_working); deploy yalnızca sahip isteyince/onaylayınca; Admin.tsx'te erken return'den sonra hook yok; admin buton köşesi için `.adm button.x:not(#_)`.
+
 ## 2026-11-25 — yayında
 - Voice Agent (Vapi): sekmeler Aranacaklar / Gelen aramalar / Arama kayıtları (transkript, kayıt varsa dinle-indir, CSV) / Randevular / Senaryo; Ayarlar en altta. 4 dilde sistem talimatı (context/vapi-asistan-talimati.md). Vapi asistanının talimat alanına `{{system_prompt}}` yazılmalı.
 - Satış: Apollo→LeadMash URL üretici; derin analiz + PDF; izinli kişilere rapor e-postası; Apify website-content-crawler ile "Tam tara" ve "Derin araştırma" (aylık 1,50 $ tavan). APIFY_TOKEN bekleniyor.
