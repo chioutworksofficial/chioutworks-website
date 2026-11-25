@@ -16,6 +16,9 @@ import { leadScore, signalLead } from './leadFlow.js';
 import { addCalendarEntry } from './calendar.js';
 import { VAPI_SYSTEM_PROMPT } from './voiceSystemPrompt.js';
 import { DEFAULT_SCRIPT, SCRIPT_RULES, AFTER_CALL, type Script, type ScriptLang } from './voiceScript.js';
+import { DEF_PLANNING, HOLIDAYS, TZS, COUNTRY_TR, countryOf, hoursProblem, nextSlot, localParts, type Country, type Planning } from './voicePlan.js';
+import { PERSONAS, personaById, aiDisclosed, detectLang, parseTranscript, rubric, simAuto, simAutoStep, simStep, toTranscript, type Turn } from './voiceSim.js';
+import { sendErrorMail, ERR_MAIL_KEY } from './errors.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(__dirname, '../data');
@@ -134,10 +137,61 @@ const rid = (p: string) => `${p}_${crypto.randomBytes(8).toString('hex')}`;
 // "Do not call" list (phone keys, last 9 digits): set from the admin Leads drawer or by the agent (PATCH doNotCall). The queue and the API never return these numbers.
 const phoneKey = (p: unknown) => String(p ?? '').replace(/\D/g, '').replace(/^0+/, '').slice(-9);
 export const dncList = async () => new Set((await kGet<string[]>('voiceAgent.dnc')) ?? []);
-export async function dncSet(phone: unknown, on: boolean) {
+// Per-entry facts (reason, source, date, masked number) live beside the key list under an id = hash of the key; the full number is never stored.
+export interface DncMeta { id: string; masked: string; reason: string; source: 'call' | 'manual' | 'form'; at: string }
+const DNC_META = 'voiceAgent.dncMeta';
+const dncId = (k: string) => sha(`dnc|${k}`).slice(0, 16);
+export async function dncSet(phone: unknown, on: boolean, meta: { reason?: string; source?: DncMeta['source'] } = {}) {
   const k = phoneKey(phone); if (k.length < 7) return;
-  const s = await dncList(); if (on) s.add(k); else s.delete(k);
+  const s = await dncList(); const had = s.has(k); if (on) s.add(k); else s.delete(k);
   await kSet('voiceAgent.dnc', [...s].slice(-5000));
+  const m = (await kGet<Record<string, DncMeta>>(DNC_META)) ?? {}; const id = dncId(k);
+  if (!on) delete m[id]; else if (!had || !m[id]) m[id] = { id, masked: maskTail(k), reason: String(meta.reason ?? '').slice(0, 200), source: meta.source ?? 'manual', at: new Date().toISOString() };
+  await kSet(DNC_META, m);
+}
+
+// ── calling rules (voicePlan.ts): stored in kv, enforced before any simulated or live call starts ──
+const PLAN_KEY = 'voiceAgent.planning';
+const getPlanning = async (): Promise<Planning> => {
+  const s = (await kGet<Partial<Planning>>(PLAN_KEY)) ?? {};
+  return { ...DEF_PLANNING, ...s, hours: { DE: { ...DEF_PLANNING.hours.DE, ...s.hours?.DE }, TR: { ...DEF_PLANNING.hours.TR, ...s.hours?.TR }, GR: { ...DEF_PLANNING.hours.GR, ...s.hours?.GR } } };
+};
+export type RuleCheck = { ok: true; country: Country } | { ok: false; code: 'dnc' | 'attempts' | 'scheduled' | 'hours' | 'daily' | 'gap'; reason: string; country: Country; nextSlot?: string };
+/** Real = counted by the rules: outbound, not simulated, not a failed start. Simulation records never use up a lead's attempt or the daily budget. */
+const isReal = (x: Row) => !x.simulated && x.direction !== 'in' && !x.failed;
+export function checkRules(c: Row, p: Planning, calls: Row[], dnc: Set<string>, now = Date.now()): RuleCheck {
+  const country: Country = countryOf(String(c.phone ?? '')) ?? (['DE', 'TR', 'GR'].includes(c.country) ? c.country : 'DE');
+  const no = (code: Extract<RuleCheck, { ok: false }>['code'], reason: string, slot = false): RuleCheck => {
+    const ns = slot ? nextSlot(country, now, p) ?? undefined : undefined; const l = ns ? localParts(Date.parse(ns), TZS[country]) : null;
+    return { ok: false, code, reason: l ? `${reason} Sonraki uygun zaman: ${l.date} ${l.time} (${COUNTRY_TR[country]} yerel saati).` : reason, country, nextSlot: ns };
+  };
+  if (c.doNotCall === true || dnc.has(phoneKey(c.phone))) return no('dnc', 'Aranmasın listesinde.');
+  const real = calls.filter(isReal); const mine = real.filter((x) => x.customer_id === c.id);
+  if (mine.length >= p.maxAttempts) return no('attempts', `Bu kişi daha önce arandı (${mine.length}/${p.maxAttempts} deneme hakkı dolu); tekrar aranmaz.`);
+  if (c.scheduledAt && Date.parse(c.scheduledAt) > now) return no('scheduled', `Planlanan zaman henüz gelmedi (${berlinParts(Date.parse(c.scheduledAt)).date} ${berlinParts(Date.parse(c.scheduledAt)).time}, Berlin).`);
+  const hp = hoursProblem(country, now, p); if (hp) return no('hours', hp, true);
+  const today = berlinParts(now).date; const todayN = real.filter((x) => berlinParts(Date.parse(x.createdAt)).date === today).length;
+  if (todayN >= p.dailyMax) return no('daily', `Günlük arama sınırına ulaşıldı (${todayN}/${p.dailyMax}).`);
+  const last = real.reduce((m, x) => Math.max(m, Date.parse(x.createdAt) || 0), 0);
+  if (last && now - last < p.minGapMin * 60000) return no('gap', `Son aramadan bu yana ${Math.floor((now - last) / 60000)} dk geçti; en az ${p.minGapMin} dk gerekli.`);
+  return { ok: true, country };
+}
+
+// ── notifications: admin badge always; e-mail only through the existing error-notify address + mail setup ──
+type AlertKind = 'hot' | 'abuse' | 'booked';
+interface Alert { id: string; at: string; kind: AlertKind; ref: string; seen: boolean }
+const NOTIFY_KEY = 'voiceAgent.notify', ALERT_KEY = 'voiceAgent.alerts';
+const DEF_NOTIFY: Record<AlertKind, boolean> = { hot: true, abuse: true, booked: true };
+const ALERT_TEXT: Record<AlertKind, string> = { hot: 'Sıcak sonuç', abuse: 'Kötüye kullanım şüphesi', booked: 'Randevu alındı' };
+async function raise(kind: AlertKind, ref: string) {
+  try {
+    const n = { ...DEF_NOTIFY, ...((await kGet<Partial<Record<AlertKind, boolean>>>(NOTIFY_KEY)) ?? {}) }; if (!n[kind]) return;
+    const list = (await kGet<Alert[]>(ALERT_KEY)) ?? []; list.push({ id: rid('al'), at: new Date().toISOString(), kind, ref, seen: false }); await kSet(ALERT_KEY, list.slice(-100));
+    const to = (await kGet<{ email?: string }>(ERR_MAIL_KEY))?.email; if (!to) return;
+    const last = (await kGet<Record<string, number>>('voiceAgent.notifyLast')) ?? {}; if (Date.now() - (last[kind] ?? 0) < 600_000) return;
+    await kSet('voiceAgent.notifyLast', { ...last, [kind]: Date.now() });
+    await sendErrorMail(to, `Voice Agent: ${ALERT_TEXT[kind]}`, `${ALERT_TEXT[kind]} (kayıt ${ref}). Ayrıntı: yönetim paneli, Voice Agent. Bu iletide kişisel veri yoktur.`);
+  } catch { /* a notification must never break a call report */ }
 }
 const SCRIPT_LANGS: ScriptLang[] = ['tr', 'en', 'de', 'el'];
 const scriptNow = async (): Promise<Record<ScriptLang, Script>> => {
@@ -234,16 +288,20 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
       const abuse = ABUSE.test(summary);   // set by the summary prompt when the caller probed/attacked the assistant
       const base: Row = rec ?? { id: rid('call'), createdAt: new Date().toISOString(), customer_id: cust?.id ?? '', customer_name: cust?.name ?? '', callId, appointmentStart: '', simulated: false };
       const booked = cust?.status === 'booked';
+      const cost = Number(m.cost ?? m.call?.cost);   // Vapi end-of-call-report: `cost` = total USD (docs: ServerMessageEndOfCallReport.cost)
+      if (Number.isFinite(cost) && cost >= 0 && cost < 1000) base.costUsd = Math.round(cost * 10000) / 10000;
       Object.assign(base, { direction: m.call?.type === 'inboundPhoneCall' ? 'in' : 'out', transcript: String(m.artifact?.transcript ?? '').slice(0, 20000), callerMasked: m.call?.type === 'inboundPhoneCall' ? maskTail(String(m.call?.customer?.number ?? '')) : base.callerMasked, summary: abuse && !summary.startsWith('[abuse_suspected]') ? `[abuse_suspected] ${summary}` : summary, outcome: abuse ? 'abuse_suspected' : undefined, durationSec: secs, endedReason: ended, recordingUrl: rUrl.startsWith('https://') && rUrl.length <= 500 ? rUrl : '', status: booked ? 'booked' : noAns ? 'no_answer' : (cust?.status === 'calling' ? 'to_call' : base.status ?? 'to_call') });
       await tPut('calls', base);
+      if (abuse && !base.alertedAbuse) { base.alertedAbuse = true; await tPut('calls', base); await raise('abuse', base.id); }
       if (cust && cust.status === 'calling') { cust.status = booked ? 'booked' : noAns ? 'no_answer' : 'to_call'; await tPut('customers', cust); }
       if (cust && !base.signalled) {   // idempotent per call id: a Vapi retry of the same report does not repeat the calendar/score work
         base.signalled = true; await tPut('calls', base);
         const txt = `${summary} ${String(m.artifact?.transcript ?? '').slice(0, 3000)}`;
-        if (NOT_INTERESTED.test(txt) && !booked) { cust.doNotCall = true; await tPut('customers', cust); await dncSet(cust.phone, true); base.notInterested = true; await tPut('calls', base); }
+        if (NOT_INTERESTED.test(txt) && !booked) { cust.doNotCall = true; await tPut('customers', cust); await dncSet(cust.phone, true, { source: 'call', reason: 'Aramada ilgisiz olduğunu söyledi' }); base.notInterested = true; await tPut('calls', base); }
         else if (noAns || CALLBACK.test(txt)) await addCalendarEntry({ kind: 'recall', source: 'voice-agent', phone: cust.phone, refTab: 'voice', refId: cust.id, preferredChannel: 'phone', score: 'kararsız', inDays: 1 });
         else if (!abuse && (booked || secs >= 30)) {
           const score = booked ? 'sıcak' : leadScore({ hasContact: true, submitted: false, text: summary || txt });
+          if (score === 'sıcak' && !booked) await raise('hot', base.id);
           await signalLead({ source: 'voice-agent', phone: cust.phone, refTab: 'voice', refId: cust.id, preferredChannel: 'phone', score });
           await addCalendarEntry({ kind: 'send', source: 'voice-agent', phone: cust.phone, refTab: 'voice', refId: cust.id, preferredChannel: 'phone', score });
         }
@@ -266,9 +324,9 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
         } else if (name === 'book_appointment') {
           const start = String(a.start ?? '');
           if (!cust || Number.isNaN(Date.parse(start))) result = { error: 'invalid_request' };
-          else { const o = await bookAppt({ customer_id: cust.id, start, notes: String(a.notes ?? '').slice(0, 1000) }); result = o.code === 201 ? { booked: true, start: o.appt.start, end: o.appt.end } : { booked: false, error: o.code === 409 ? 'slot_taken' : 'not_found' }; }
+          else { const o = await bookAppt({ customer_id: cust.id, start, notes: String(a.notes ?? '').slice(0, 1000) }); if (o.code === 201) await raise('booked', o.appt.id); result = o.code === 201 ? { booked: true, start: o.appt.start, end: o.appt.end } : { booked: false, error: o.code === 409 ? 'slot_taken' : 'not_found' }; }
         } else if (name === 'mark_do_not_call') {
-          if (cust) { cust.doNotCall = true; await tPut('customers', cust); await dncSet(cust.phone, true); result = { ok: true }; } else result = { error: 'unknown_customer' };
+          if (cust) { cust.doNotCall = true; await tPut('customers', cust); await dncSet(cust.phone, true, { source: 'call', reason: 'Arayan aranmak istemedi (asistan işaretledi)' }); result = { ok: true }; } else result = { error: 'unknown_customer' };
         }
         results.push({ name, toolCallId: String(t?.id ?? ''), result: JSON.stringify(result) });
       }
@@ -307,7 +365,7 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
     const c = IDP.test(req.params.id) ? (await tList('customers')).find((x) => x.id === req.params.id) : null;
     if (!c) return res.status(404).json({ error: 'not_found' });
     if (b.data.status) c.status = b.data.status;
-    if (b.data.doNotCall !== undefined) { c.doNotCall = b.data.doNotCall; await dncSet(c.phone, b.data.doNotCall); }
+    if (b.data.doNotCall !== undefined) { c.doNotCall = b.data.doNotCall; await dncSet(c.phone, b.data.doNotCall, { source: 'call', reason: 'Dış araç (n8n) işaretledi' }); }
     if (b.data.note) c.notesHistory = [...(c.notesHistory ?? []), { at: new Date().toISOString(), text: b.data.note }].slice(-200);
     await tPut('customers', c); return res.json(pub(c));
   }));
@@ -406,7 +464,13 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
   }));
   app.delete(`${A}/script`, admin(async (_req, res) => { await kDel('voiceAgent.script'); return res.json({ ok: true }); }));
 
-  app.get(`${A}/queue`, admin(async (_req, res) => res.json({ customers: (await tList('customers')).reverse() })));
+  const PRIO_RANK: Record<string, number> = { high: 0, normal: 1, low: 2 };
+  app.get(`${A}/queue`, admin(async (_req, res) => {
+    const [cs, calls, p, dnc] = await Promise.all([tList('customers'), tList('calls'), getPlanning(), dncList()]);
+    const rows: Row[] = cs.reverse().map((c) => ({ ...c, country: countryOf(String(c.phone ?? '')) ?? c.country ?? 'DE', rule: c.status === 'booked' ? null : checkRules(c, p, calls, dnc) }));
+    rows.sort((a, b) => (PRIO_RANK[a.priority ?? 'normal'] - PRIO_RANK[b.priority ?? 'normal']) || ((a.scheduledAt ? Date.parse(a.scheduledAt) : Infinity) - (b.scheduledAt ? Date.parse(b.scheduledAt) : Infinity)) || 0);
+    return res.json({ customers: rows });
+  }));
   app.post(`${A}/queue`, admin(async (req, res) => {
     const b = z.object({ requestIds: z.array(z.string().max(80)).min(1).max(100) }).safeParse(req.body ?? {});
     if (!b.success) return bad(res, 'geçersiz istek');
@@ -425,10 +489,14 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
   }));
   app.patch(`${A}/queue/:id`, admin(async (req, res) => {
     const b = z.object({ status: z.enum(STATUS).optional(), name: z.string().trim().min(1).max(80).optional(), phone: z.string().trim().max(40).optional(), notes: z.string().max(500).optional(),
-      sector: z.string().max(60).optional(), preferred_time: z.enum(['morning', 'afternoon', 'any']).optional(), doNotCall: z.boolean().optional() }).safeParse(req.body ?? {});
+      sector: z.string().max(60).optional(), preferred_time: z.enum(['morning', 'afternoon', 'any']).optional(), doNotCall: z.boolean().optional(),
+      priority: z.enum(['high', 'normal', 'low']).optional(), scheduledAt: z.string().max(40).optional() }).safeParse(req.body ?? {});
     const c = IDP.test(req.params.id) ? (await tList('customers')).find((x) => x.id === req.params.id) : null;
     if (!b.success || !c) return b.success ? res.status(404).json({ error: 'not_found' }) : bad(res, 'geçersiz istek');
-    Object.assign(c, b.data); if (b.data.doNotCall !== undefined) await dncSet(c.phone, b.data.doNotCall); await tPut('customers', c); return res.json({ ok: true, customer: c });
+    const { scheduledAt, ...rest } = b.data; Object.assign(c, rest);
+    if (scheduledAt !== undefined) { if (scheduledAt && Number.isNaN(Date.parse(scheduledAt))) return bad(res, 'Zaman geçersiz.'); if (scheduledAt) c.scheduledAt = new Date(scheduledAt).toISOString(); else delete c.scheduledAt; }
+    if (b.data.doNotCall !== undefined) await dncSet(c.phone, b.data.doNotCall, { source: 'manual', reason: 'Aranacaklar listesinden işaretlendi' });
+    await tPut('customers', c); return res.json({ ok: true, customer: c });
   }));
   app.delete(`${A}/queue/:id`, admin(async (req, res) => { if (IDP.test(req.params.id)) await tDel('customers', req.params.id); return res.json({ ok: true }); }));
 
@@ -440,7 +508,7 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
   /** Vapi recordings only: https, no credentials, *.vapi.ai, not a private host. Anything else is linked, never fetched by the server. */
   const recHostOk = (u: string) => { try { const p = new URL(u); return p.protocol === 'https:' && !p.username && !p.password && !p.port && (p.hostname === 'vapi.ai' || p.hostname.endsWith('.vapi.ai')) && !hostBad(p.hostname); } catch { return false; } };
   const listRow = (c: Row, cu: Row | undefined) => ({ id: c.id, createdAt: c.createdAt, direction: c.direction === 'in' ? 'in' : 'out', person: c.customer_name || c.callerMasked || '', business: cu?.business || cu?.sector || '', phoneMasked: cu?.phone ? maskTail(String(cu.phone)) : c.callerMasked ?? '',
-    durationSec: Number(c.durationSec ?? 0), outcome: outcomeOf(c), summary: String(c.summary ?? ''), simulated: c.simulated === true, hasRecording: !!c.recordingUrl, hasTranscript: !!c.transcript, appointmentStart: c.appointmentStart ?? '' });
+    durationSec: Number(c.durationSec ?? 0), outcome: outcomeOf(c), summary: String(c.summary ?? ''), simulated: c.simulated === true, hasRecording: !!c.recordingUrl, hasTranscript: !!c.transcript, appointmentStart: c.appointmentStart ?? '', costUsd: typeof c.costUsd === 'number' ? c.costUsd : null });
   app.get(`${A}/calls`, admin(async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const q = z.object({ page: z.coerce.number().int().min(1).max(10000).default(1), limit: z.coerce.number().int().min(1).max(1000).default(25), from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -466,7 +534,8 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
     const keyReady = !!(s.vapiKeyEnc && s.vapiAssistantId && s.vapiPhoneNumberId && s.vapiSecretHash);
     return res.json({ mode: s.mode, vapiConnected: keyReady, liveReady: s.mode === 'live' && keyReady, today: all.filter((x) => dateOf(x.c) === today).length, week: all.filter((x) => dateOf(x.c) >= weekAgo).length,
       avgDurationSec: talked.length ? Math.round(talked.reduce((n, x) => n + Number(x.c.durationSec ?? 0), 0) / talked.length) : 0, positiveRate: answered.length ? Math.round((positive / answered.length) * 100) : null, answered: answered.length,
-      doNotCall: (await dncList()).size, inbound: all.filter((x) => x.c.direction === 'in').length });
+      doNotCall: (await dncList()).size, inbound: all.filter((x) => x.c.direction === 'in').length, callsTotal: all.length, simRuns: ((await kGet<unknown[]>('voiceAgent.simRuns')) ?? []).length,
+      alertsUnseen: ((await kGet<Alert[]>(ALERT_KEY)) ?? []).filter((a) => !a.seen).length });
   }));
   app.get(`${A}/calls/:id`, admin(async (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -508,12 +577,16 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
       try { key = decrypt(s.vapiKeyEnc); } catch { return bad(res, 'Vapi anahtarı çözülemedi, yeniden girin.'); }
     }
     const n8nOk = !live && s.n8nWebhookUrl ? await safeFetchUrl(s.n8nWebhookUrl) : false;
-    const base = baseUrl(req); const results: { id: string; ok: boolean; info: string }[] = [];
+    const base = baseUrl(req); const results: { id: string; ok: boolean; info: string; code?: string; nextSlot?: string }[] = [];
+    const [plan, calls, dnc] = await Promise.all([getPlanning(), tList('calls'), dncList()]);
     for (const id of b.data.customerIds) {
       const c = all.find((x) => x.id === id);
       if (!c) { results.push({ id, ok: false, info: 'bulunamadı' }); continue; }
+      const rc = checkRules(c, plan, calls, dnc);   // owner rules, simulated or live: hours, holidays, daily maximum, gap, one attempt
+      if (!rc.ok) { results.push({ id, ok: false, info: rc.reason, code: rc.code, nextSlot: rc.nextSlot }); continue; }
+      const lang = (SCRIPT_LANGS as string[]).includes(c.lang) ? (c.lang as ScriptLang) : 'de';
       c.status = 'calling'; await tPut('customers', c);
-      const call: Row = { id: rid('call'), createdAt: new Date().toISOString(), customer_id: c.id, customer_name: c.name, callId: '', summary: '', recordingUrl: '', appointmentStart: '', status: 'calling', durationSec: 0, simulated: !live };
+      const call: Row = { id: rid('call'), createdAt: new Date().toISOString(), customer_id: c.id, customer_name: c.name, callId: '', summary: '', recordingUrl: '', appointmentStart: '', status: 'calling', durationSec: 0, simulated: !live, lang, direction: 'out' };
       let info = '';
       if (!live) {
         call.summary = 'Simülasyon: arama yapılmadı';
@@ -528,16 +601,181 @@ export function registerVoiceAgent(app: Express, deps: VaDeps) {
         }
       } else {
         try {
-          const lang = (SCRIPT_LANGS as string[]).includes(c.lang) ? (c.lang as ScriptLang) : 'de'; const sc = (await scriptNow())[lang];
+          const sc = (await scriptNow())[lang];
           const r = await fetch(`${VAPI_API}/call`, { method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(vapiCallPayload(s, c, lang, sc)) });
           const j = (await r.json().catch(() => ({}))) as { id?: string };
           if (!r.ok) throw new Error('vapi');
           call.callId = String(j.id ?? ''); info = 'arama başlatıldı';
-        } catch { c.status = 'to_call'; await tPut('customers', c); call.status = 'to_call'; call.summary = 'Arama başlatılamadı'; info = 'Vapi aramayı başlatamadı'; }
+        } catch { c.status = 'to_call'; await tPut('customers', c); call.status = 'to_call'; call.failed = true; call.summary = 'Arama başlatılamadı'; info = 'Vapi aramayı başlatamadı'; }
       }
-      await tPut('calls', call); results.push({ id, ok: !info.includes('başlatamadı'), info });
+      await tPut('calls', call); calls.push(call); results.push({ id, ok: !info.includes('başlatamadı'), info });
     }
+    if (results.length && results.every((r) => r.code)) return res.status(409).json({ ok: false, error: 'rule_refused', message: `Arama kural nedeniyle başlatılmadı: ${results[0].info}`, results });
     return res.json({ ok: true, mode: s.mode, results, message: live ? 'Canlı arama isteği gönderildi.' : 'Simülasyon: gerçek arama yapılmadı.' });
+  }));
+  // ── analytics (real calls only; simulation records are excluded) ──
+  app.get(`${A}/analytics`, admin(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+    const all = (await tList('calls')).filter((c) => !c.simulated); const today = berlinParts(Date.now()).date; const since = new Date(new Date(`${today}T12:00:00Z`).getTime() - (days - 1) * 864e5).toISOString().slice(0, 10);
+    const win = all.map((c) => ({ c, o: outcomeOf(c), p: berlinParts(Date.parse(c.createdAt)) })).filter((x) => x.p.date >= since);
+    const pos = (o: Outcome) => o === 'booked' || o === 'interested'; const reached = (x: (typeof win)[number]) => x.o !== 'no_answer' && x.o !== 'calling' && Number(x.c.durationSec ?? 0) > 0;
+    const perDay = Array.from({ length: days }, (_, i) => { const d = new Date(new Date(`${today}T12:00:00Z`).getTime() - (days - 1 - i) * 864e5).toISOString().slice(0, 10); const r = win.filter((x) => x.p.date === d); return { date: d, calls: r.length, positive: r.filter((x) => pos(x.o)).length }; });
+    const out = win.filter((x) => x.c.direction !== 'in' && !x.c.failed);
+    const funnel = { dialed: out.length, reached: out.filter(reached).length, positive: out.filter((x) => reached(x) && pos(x.o)).length, booked: out.filter((x) => x.o === 'booked').length };
+    const talked = win.filter(reached);
+    const bucket = (n: number, key: (x: (typeof win)[number]) => number) => Array.from({ length: n }, (_, i) => { const r = talked.filter((x) => key(x) === i); const p = r.filter((x) => pos(x.o)).length; return { n: r.length, pos: p, rate: r.length ? Math.round((p / r.length) * 100) : null }; });
+    const langOf = (c: Row) => (SCRIPT_LANGS as string[]).includes(c.lang) ? String(c.lang) : detectLang(String(c.transcript ?? '')) || 'other';
+    const byLang: Record<string, { calls: number; positive: number }> = {};
+    for (const x of win) { const l = langOf(x.c); byLang[l] ??= { calls: 0, positive: 0 }; byLang[l].calls++; if (pos(x.o)) byLang[l].positive++; }
+    const costed = win.filter((x) => typeof x.c.costUsd === 'number'); const total = costed.reduce((n, x) => n + x.c.costUsd, 0);
+    const cu = new Map((await tList('customers')).map((c) => [c.id, c]));
+    return res.json({ days, total: win.length, allTime: all.length, perDay, funnel, avgDurationSec: talked.length ? Math.round(talked.reduce((n, x) => n + Number(x.c.durationSec ?? 0), 0) / talked.length) : 0,
+      byHour: bucket(24, (x) => Number(x.p.time.slice(0, 2))), byWeekday: bucket(7, (x) => new Date(`${x.p.date}T12:00:00Z`).getUTCDay()), byLang,
+      cost: { totalUsd: Math.round(total * 100) / 100, avgUsd: costed.length ? Math.round((total / costed.length) * 1000) / 1000 : 0, counted: costed.length, missing: win.length - costed.length,
+        top: costed.sort((a, b) => b.c.costUsd - a.c.costUsd).slice(0, 5).map((x) => ({ id: x.c.id, createdAt: x.c.createdAt, costUsd: x.c.costUsd, person: x.c.customer_name || x.c.callerMasked || cu.get(x.c.customer_id)?.name || '' })) },
+      abuse: win.filter((x) => x.o === 'abuse_suspected').length, notInterested: win.filter((x) => x.o === 'not_interested').length, inbound: win.filter((x) => x.c.direction === 'in').length });
+  }));
+
+  // ── planning: rules used by the queue and enforced in /start ──
+  const hoursS = z.object({ days: z.array(z.number().int().min(0).max(6)).min(1).max(7), start: z.string().regex(HM), end: z.string().regex(HM) }).refine((x) => hmMin(x.start) < hmMin(x.end));
+  const planS = z.object({
+    hours: z.object({ DE: hoursS, TR: hoursS, GR: hoursS }),
+    holidays: z.boolean(), dailyMax: z.number().int().min(1).max(500), minGapMin: z.number().int().min(0).max(240), maxAttempts: z.number().int().min(1).max(3), callbackSlots: z.array(z.string().regex(HM)).max(8),
+  });
+  app.get(`${A}/planning`, admin(async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const [p, calls] = await Promise.all([getPlanning(), tList('calls')]); const now = Date.now(); const today = berlinParts(now).date;
+    const real = calls.filter(isReal);
+    return res.json({ planning: p, defaults: DEF_PLANNING, now: Object.fromEntries((['DE', 'TR', 'GR'] as const).map((k) => [k, localParts(now, TZS[k])])),
+      holidays: Object.fromEntries((['DE', 'TR', 'GR'] as const).map((k) => [k, Object.entries(HOLIDAYS[k]).filter(([d]) => d >= localParts(now, TZS[k]).date).slice(0, 12).map(([date, name]) => ({ date, name }))])),
+      today: { calls: real.filter((x) => berlinParts(Date.parse(x.createdAt)).date === today).length, max: p.dailyMax }, countries: COUNTRY_TR });
+  }));
+  app.put(`${A}/planning`, admin(async (req, res) => {
+    const b = planS.safeParse(req.body ?? {}); if (!b.success) return bad(res, 'Kurallar geçersiz (saat, gün veya sayı aralığı).');
+    await kSet(PLAN_KEY, { ...b.data, callbackSlots: [...new Set(b.data.callbackSlots)].sort() }); return res.json({ ok: true, planning: await getPlanning() });
+  }));
+  app.post(`${A}/planning/check`, admin(async (req, res) => {
+    const b = z.object({ customerId: z.string().regex(IDP) }).safeParse(req.body ?? {}); if (!b.success) return bad(res, 'geçersiz istek');
+    const c = (await tList('customers')).find((x) => x.id === b.data.customerId); if (!c) return res.status(404).json({ error: 'not_found' });
+    const [p, calls, dnc] = await Promise.all([getPlanning(), tList('calls'), dncList()]); return res.json({ result: checkRules(c, p, calls, dnc) });
+  }));
+
+  // ── do-not-call list: masked numbers + reason/source/date; the full number is never returned or stored beside the meta ──
+  const e164 = (raw: string) => { let t = raw.trim().replace(/\(0\)/g, '').replace(/[\s().\-/]/g, ''); if (t.startsWith('00')) t = `+${t.slice(2)}`; return /^\+[1-9]\d{6,14}$/.test(t) ? t : null; };
+  app.get(`${A}/dnc`, admin(async (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const [set, meta] = await Promise.all([dncList(), kGet<Record<string, DncMeta>>(DNC_META)]);
+    const items = [...set].map((k) => meta?.[dncId(k)] ?? { id: dncId(k), masked: maskTail(k), reason: '', source: 'unknown', at: '' }).sort((a, b) => b.at.localeCompare(a.at));
+    return res.json({ items, total: items.length, log: ((await kGet<unknown[]>('voiceAgent.dncLog')) ?? []).slice(-20).reverse() });
+  }));
+  app.post(`${A}/dnc`, admin(async (req, res) => {
+    const b = z.object({ phone: z.string().trim().min(5).max(40), reason: z.string().trim().max(200).default(''), source: z.enum(['manual', 'form', 'call']).default('manual') }).safeParse(req.body ?? {});
+    if (!b.success) return bad(res, 'geçersiz istek');
+    const n = e164(b.data.phone); if (!n) return bad(res, 'Numara ülke koduyla girilmeli, örneğin +49 170 1234567 (7-15 hane).');
+    const k = phoneKey(n); if ((await dncList()).has(k)) return res.json({ ok: true, existed: true });
+    await dncSet(n, true, { reason: b.data.reason, source: b.data.source });
+    for (const c of (await tList('customers')).filter((x) => phoneKey(x.phone) === k && x.doNotCall !== true)) { c.doNotCall = true; await tPut('customers', c); }
+    return res.status(201).json({ ok: true, existed: false });
+  }));
+  app.delete(`${A}/dnc/:id`, admin(async (req, res) => {
+    const b = z.object({ note: z.string().trim().min(3).max(300) }).safeParse(req.body ?? {}); if (!b.success) return bad(res, 'Kaldırmak için kısa bir not yazın (en az 3 karakter).');
+    if (!/^[a-f0-9]{16}$/.test(req.params.id)) return res.status(404).json({ error: 'not_found' });
+    const set = await dncList(); const k = [...set].find((x) => dncId(x) === req.params.id); if (!k) return res.status(404).json({ error: 'not_found' });
+    const m = (await kGet<Record<string, DncMeta>>(DNC_META))?.[req.params.id];
+    await dncSet(k, false);
+    for (const c of (await tList('customers')).filter((x) => phoneKey(x.phone) === k && x.doNotCall === true)) { c.doNotCall = false; await tPut('customers', c); }
+    const log = (await kGet<unknown[]>('voiceAgent.dncLog')) ?? []; log.push({ at: new Date().toISOString(), masked: m?.masked ?? maskTail(k), note: b.data.note }); await kSet('voiceAgent.dncLog', log.slice(-200));
+    console.log('[voice-agent] dnc entry removed');   // no number in the log
+    return res.json({ ok: true });
+  }));
+
+  // ── compliance log: per real call, proof for GDPR / UWG questions ──
+  app.get(`${A}/compliance`, admin(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const q = z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), flag: z.enum(['issue']).optional(), direction: z.enum(['in', 'out']).optional() }).safeParse(req.query);
+    if (!q.success) return bad(res, 'geçersiz filtre'); const f = q.data;
+    const [calls, cs, reqs] = await Promise.all([tList('calls'), tList('customers'), deps.listRequests()]); const cu = new Map(cs.map((c) => [c.id, c])); const rq = new Map(reqs.map((r) => [r.id, r]));
+    const rows = calls.filter((c) => !c.simulated).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((c) => {
+      const cust = cu.get(c.customer_id); const turns = parseTranscript(String(c.transcript ?? '')); const first = turns.find((t) => t.who === 'ai');
+      const disclosure = !turns.length ? 'unknown' : first && aiDisclosed(first.text) ? 'yes' : 'no';
+      const inbound = c.direction === 'in'; const recOn = !!c.recordingUrl;
+      const asked = turns.some((t) => t.who === 'ai' && /aufzeichn|record|kayıt|καταγραφ|ηχογράφ/i.test(t.text));
+      let proof: { kind: string; ok: boolean | null; refId: string; at: string; note: string };
+      if (inbound) proof = { kind: 'inbound', ok: null, refId: '', at: '', note: 'Arayan kendisi aradı; kanal kanıtı gerekmez.' };
+      else if (cust?.sourceRequestId) { const r = rq.get(cust.sourceRequestId); proof = !r ? { kind: 'request', ok: false, refId: cust.sourceRequestId.slice(0, 12), at: '', note: 'Talep kaydı bulunamadı (silinmiş olabilir).' }
+        : r.replyPreference === 'phone' ? { kind: 'request', ok: true, refId: r.id.slice(0, 12), at: r.createdAt, note: 'Formda "Telefon" tercih edildi.' } : { kind: 'request', ok: false, refId: r.id.slice(0, 12), at: r.createdAt, note: 'Talepte telefon tercihi kayıtlı değil.' }; }
+      else if (cust?.sourceLeadId) proof = { kind: 'lead', ok: false, refId: String(cust.sourceLeadId).slice(0, 12), at: cust.createdAt ?? '', note: 'Satış adayı: telefon tercihi kanıtı yok (makul sebep kaydı gerekir).' };
+      else proof = { kind: 'manual', ok: false, refId: '', at: cust?.createdAt ?? '', note: 'Elle eklendi: tercih kanıtı yok.' };
+      const recording = { on: recOn, consent: !recOn ? 'n/a' : asked ? 'asked' : 'not_asked' };
+      const issue = disclosure === 'no' || (!inbound && proof.ok === false) || recording.consent === 'not_asked';
+      return { id: c.id, createdAt: c.createdAt, direction: inbound ? 'in' : 'out', person: c.customer_name || c.callerMasked || '', phoneMasked: cust?.phone ? maskTail(String(cust.phone)) : c.callerMasked ?? '', outcome: outcomeOf(c), durationSec: Number(c.durationSec ?? 0), disclosure, recording, proof, issue };
+    }).filter((r) => { const d = berlinParts(Date.parse(r.createdAt)).date; return (!f.from || d >= f.from) && (!f.to || d <= f.to) && (!f.direction || r.direction === f.direction) && (f.flag !== 'issue' || r.issue); });
+    return res.json({ rows: rows.slice(0, 2000), total: rows.length, issues: rows.filter((r) => r.issue).length });
+  }));
+
+  // ── notifications ──
+  app.get(`${A}/notify`, admin(async (_req, res) => {
+    const n = { ...DEF_NOTIFY, ...((await kGet<Partial<Record<AlertKind, boolean>>>(NOTIFY_KEY)) ?? {}) }; const al = ((await kGet<Alert[]>(ALERT_KEY)) ?? []);
+    const mail = !!((await kGet<{ email?: string }>(ERR_MAIL_KEY))?.email && process.env.RESEND_API_KEY && process.env.DEMO_EMAIL_FROM);
+    return res.json({ settings: n, mailConfigured: mail, alerts: [...al].reverse().slice(0, 30).map((a) => ({ ...a, label: ALERT_TEXT[a.kind] })), unseen: al.filter((a) => !a.seen).length });
+  }));
+  app.put(`${A}/notify`, admin(async (req, res) => {
+    const b = z.object({ hot: z.boolean(), abuse: z.boolean(), booked: z.boolean() }).safeParse(req.body ?? {}); if (!b.success) return bad(res, 'geçersiz istek');
+    await kSet(NOTIFY_KEY, b.data); return res.json({ ok: true });
+  }));
+  app.post(`${A}/notify/seen`, admin(async (_req, res) => { await kSet(ALERT_KEY, ((await kGet<Alert[]>(ALERT_KEY)) ?? []).map((a) => ({ ...a, seen: true }))); return res.json({ ok: true }); }));
+
+  // ── test lab: text-only role play against the saved system prompt (no phone, no Vapi); Groq via server/llm.ts ──
+  const simLimiter = rateLimit({ store: rlStore('vaSim'), windowMs: 60_000, max: 40, standardHeaders: true, legacyHeaders: false, message: { ok: false, error: 'rate_limited', message: 'Çok sık deneme; bir dakika bekleyin.' } });
+  const SIM_KEY = 'voiceAgent.simRuns';
+  const turnS = z.array(z.object({ who: z.enum(['ai', 'caller']), text: z.string().max(500) })).max(30);
+  const langS = z.enum(['tr', 'en', 'de', 'el']);
+  const simBudget = async () => {   // cost guard: at most 150 simulated assistant/caller exchanges per day
+    const d = berlinParts(Date.now()).date; const u = (await kGet<{ d: string; n: number }>('voiceAgent.simDaily')) ?? { d, n: 0 }; const cur = u.d === d ? u : { d, n: 0 };
+    if (cur.n >= 150) return false; await kSet('voiceAgent.simDaily', { d, n: cur.n + 1 }); return true;
+  };
+  const promptOf = async (lang: ScriptLang) => { const sc = (await scriptNow())[lang]; return { system: String(sc.system ?? VAPI_SYSTEM_PROMPT[lang]), callScript: `${sc.steps}\n\n${sc.style}\n\n${sc.branches}`.slice(0, 12000) }; };
+  const simFail = (res: Response, e: unknown) => { const m = (e as Error)?.message ?? ''; console.error('[voice-agent] sim failed', m.slice(0, 80)); if (m === 'rate_limited' || /status 429/.test(m)) return res.status(429).json({ ok: false, error: 'rate_limited', retryAfter: 20, message: 'Sağlayıcı dakika sınırında; birkaç saniye sonra yeniden denenir.' }); return res.status(502).json({ ok: false, error: 'llm', message: m === 'llm_not_configured' ? 'Yapay zekâ sağlayıcı anahtarı tanımlı değil.' : 'Model şu an yanıt vermedi; biraz sonra tekrar deneyin.' }); };
+  const saveRun = async (run: Record<string, unknown>) => { const l = (await kGet<unknown[]>(SIM_KEY)) ?? []; l.push(run); await kSet(SIM_KEY, l.slice(-60)); };
+  app.get(`${A}/sim/personas`, admin(async (_req, res) => res.json({ personas: PERSONAS.map((p) => ({ id: p.id, label: p.label })) })));
+  app.get(`${A}/sim/runs`, admin(async (_req, res) => { res.set('Cache-Control', 'no-store'); return res.json({ runs: [...((await kGet<unknown[]>(SIM_KEY)) ?? [])].reverse() }); }));
+  app.delete(`${A}/sim/runs/:id`, admin(async (req, res) => { await kSet(SIM_KEY, ((await kGet<Row[]>(SIM_KEY)) ?? []).filter((r) => r.id !== req.params.id)); return res.json({ ok: true }); }));
+  app.post(`${A}/sim/run`, simLimiter, admin(async (req, res) => {
+    const b = z.object({ lang: langS, persona: z.string().max(30).optional(), custom: z.string().trim().max(300).optional(), batchId: z.string().regex(IDP).optional() }).safeParse(req.body ?? {});
+    const per = b.success && b.data.persona ? personaById(b.data.persona) : undefined;
+    if (!b.success || (!per && !b.data.custom)) return bad(res, 'Bir arayan tipi seçin veya kendi tarifinizi yazın.');
+    if (!(await simBudget())) return res.status(429).json({ ok: false, error: 'budget', message: 'Günlük test sınırına ulaşıldı (maliyet koruması).' });
+    const { lang } = b.data; const pr = await promptOf(lang);
+    try {
+      const turns = await simAuto({ lang, ...pr, brief: per?.brief ?? `Behave like this: ${b.data.custom}`, maxTurns: 8 });
+      const rb = rubric(turns, lang, pr.system);
+      const run = { id: rid('sim'), at: new Date().toISOString(), lang, persona: per?.id ?? 'custom', label: per?.label ?? 'Özel', mode: 'auto', batchId: b.data.batchId ?? '', turns, rules: rb.rules, pass: rb.pass };
+      await saveRun(run); return res.json({ ok: true, run });
+    } catch (e) { return simFail(res, e); }
+  }));
+  app.post(`${A}/sim/auto-step`, simLimiter, admin(async (req, res) => {   // one short request per turn: works within serverless time limits and lets the UI show the live transcript
+    const b = z.object({ lang: langS, persona: z.string().max(30).optional(), custom: z.string().trim().max(300).optional(), turns: turnS, max: z.number().int().min(2).max(8).optional() }).safeParse(req.body ?? {});
+    const per = b.success && b.data.persona ? personaById(b.data.persona) : undefined;
+    if (!b.success || (!per && !b.data.custom)) return bad(res, 'Bir arayan tipi seçin veya kendi tarifinizi yazın.');
+    if (!(await simBudget())) return res.status(429).json({ ok: false, error: 'budget', message: 'Günlük test sınırına ulaşıldı (maliyet koruması).' });
+    const pr = await promptOf(b.data.lang);
+    try { const o = await simAutoStep({ lang: b.data.lang, ...pr, brief: per?.brief ?? `Behave like this: ${b.data.custom}`, turns: b.data.turns as Turn[], maxTurns: b.data.max }); return res.json({ ok: true, ...o }); }
+    catch (e) { return simFail(res, e); }
+  }));
+  app.post(`${A}/sim/step`, simLimiter, admin(async (req, res) => {
+    const b = z.object({ lang: langS, turns: turnS, line: z.string().trim().min(1).max(400).optional() }).safeParse(req.body ?? {}); if (!b.success) return bad(res, 'geçersiz istek');
+    if (b.data.turns.length && !b.data.line) return bad(res, 'Arayan olarak bir cümle yazın.');
+    if (!(await simBudget())) return res.status(429).json({ ok: false, error: 'budget', message: 'Günlük test sınırına ulaşıldı (maliyet koruması).' });
+    const pr = await promptOf(b.data.lang);
+    try { const turns = await simStep({ lang: b.data.lang, ...pr, turns: b.data.turns as Turn[], line: b.data.line }); const rb = rubric(turns, b.data.lang, pr.system); return res.json({ ok: true, turns, rules: rb.rules, pass: rb.pass }); }
+    catch (e) { return simFail(res, e); }
+  }));
+  app.post(`${A}/sim/save`, admin(async (req, res) => {
+    const b = z.object({ lang: langS, turns: turnS.min(2), persona: z.string().max(30).optional(), batchId: z.string().regex(IDP).optional() }).safeParse(req.body ?? {}); if (!b.success) return bad(res, 'geçersiz istek');
+    const pr = await promptOf(b.data.lang); const rb = rubric(b.data.turns as Turn[], b.data.lang, pr.system); const per = b.data.persona ? personaById(b.data.persona) : undefined;
+    const run = { id: rid('sim'), at: new Date().toISOString(), lang: b.data.lang, persona: per?.id ?? (b.data.persona ? 'custom' : 'manual'), label: per?.label ?? (b.data.persona ? 'Özel' : 'Elle yazılan'), mode: b.data.persona ? 'auto' : 'manual', batchId: b.data.batchId ?? '', turns: b.data.turns, rules: rb.rules, pass: rb.pass };
+    await saveRun(run); return res.status(201).json({ ok: true, run, transcript: toTranscript(b.data.turns as Turn[]) });
   }));
 }

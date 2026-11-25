@@ -73,3 +73,108 @@ html[data-mode='light'] .vo-tile b[data-state] { color: color-mix(in srgb, var(-
 .vo-filters .adm-input { min-width: 0; max-width: 100%; }
 .vo-filters input[type='date'] { padding: 10px 8px; }
 @media (max-width: 899px) { .vo-stack { overflow-x: clip; } .vo-pager { flex-wrap: wrap; } }
+
+/* ── sekme çubuğu: masaüstünde kaydırılır + solma ipuçları, telefonda seçim menüsü ── */
+.vo-tabbar { position: relative; margin-bottom: 16px; }
+.vo-tabbar .vo-tabs { margin-bottom: 0; }
+.vo-tabbar::before, .vo-tabbar::after { content: ''; position: absolute; top: 0; bottom: 1px; width: 44px; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 1; }
+.vo-tabbar::before { left: 0; background: linear-gradient(to right, var(--c-void), transparent); }
+.vo-tabbar::after { right: 0; background: linear-gradient(to left, var(--c-void), transparent); }
+.vo-tabbar[data-l='1']::before, .vo-tabbar[data-r='1']::after { opacity: 1; }
+.vo-tabsel { display: none; margin-bottom: 16px; gap: 6px; }
+.vo-alert { margin: 0 0 12px; }
+.adm button.vo-alert:not(#_) { cursor: pointer; }
+/* ── analiz ── */
+.vo-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.vo-chart { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--c-hairline); border-radius: var(--r-card); background: var(--c-inkline); min-width: 0; }
+.vo-chart h3, .vo-plan h3 { margin: 0; font: 500 14px/1.2 var(--font-display); color: var(--c-quartz); }
+.vo-cols { display: flex; align-items: stretch; gap: 4px; height: 168px; }
+.vo-cols[data-dense] { gap: 2px; }
+.vo-col { flex: 1 1 0; min-width: 0; display: grid; grid-template-rows: 1fr 20px; }
+.vo-colbar { align-self: end; display: flex; align-items: flex-end; background: color-mix(in srgb, var(--c-signal) 34%, transparent); border-radius: 3px 3px 0 0; min-height: 0; }
+.vo-colbar[data-rate='1'] { background: var(--c-signal); }
+.vo-colbar[data-zero='1'] { background: var(--c-hairline); height: 2px !important; }
+.vo-colbar b { display: block; width: 100%; background: var(--c-pulse); border-radius: 3px 3px 0 0; }
+.vo-col span { display: block; margin: 6px -14px 0; text-align: center; white-space: nowrap; font: 10px/14px var(--font-mono); color: var(--c-ash); }
+.vo-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0; }
+.vo-sw { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; background: color-mix(in srgb, var(--c-signal) 34%, transparent); vertical-align: -1px; }
+.vo-sw.p { background: var(--c-pulse); margin-left: 6px; }
+.vo-funnel { display: grid; gap: 8px; }
+.vo-frow { display: grid; grid-template-columns: 78px minmax(0, 1fr) 40px minmax(0, 160px); gap: 10px; align-items: center; font-size: 13px; color: var(--c-mist); }
+.vo-frow .adm-bar { margin-top: 0; height: 10px; }
+.vo-frow b { color: var(--c-quartz); text-align: right; }
+.vo-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.vo-two2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vo-costline { margin: 0; font-size: 14px; color: var(--c-mist); }
+.vo-costline b { color: var(--c-quartz); font: 500 17px/1.2 var(--font-display); }
+.vo-emptyx { display: grid; gap: 8px; text-align: left; }
+.vo-emptyx b { color: var(--c-quartz); }
+/* ── planlama ── */
+.vo-plan { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--c-hairline); border-radius: var(--r-card); background: var(--c-inkline); }
+.vo-countries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.vo-ccard { display: grid; gap: 10px; align-content: start; padding: 12px; border: 1px solid var(--c-edge); border-radius: var(--r-input); background: var(--c-void); min-width: 0; }
+.vo-limits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.vo-limits label, .vo-two2 label { display: grid; gap: 4px; }
+.vo-slot { gap: 6px; }
+.adm button.vo-x:not(#_) { border: 0; background: transparent; color: var(--c-ash); font: 600 15px/1 var(--font-body); padding: 0 2px; cursor: pointer; border-radius: 50% !important; }
+.adm button.vo-x:not(#_):hover { color: var(--c-quartz); }
+.vo-addrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vo-addrow .adm-input { flex: 1 1 200px; width: auto; min-width: 0; }
+.vo-holidays > summary { cursor: pointer; font-size: 14px; color: var(--c-quartz); padding: 4px 0; }
+.vo-holidays[open] > summary { margin-bottom: 10px; }
+.vo-edit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; align-items: end; }
+.vo-edit label { display: grid; gap: 4px; }
+.vo-edit .vo-qact { grid-column: 1 / -1; justify-content: flex-start; max-width: none; }
+.vo-rule { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--c-mist); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.vo-qmeta .adm-chip[data-prio='high'] { border-color: color-mix(in srgb, var(--adm-warn) 55%, transparent); }
+/* ── test laboratuvarı ── */
+.vo-testbar { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 14px; }
+.vo-result { display: grid; gap: 14px; margin-top: 16px; }
+.vo-result .vo-sec:last-child { border-bottom: 0; }
+.vo-rubric { display: grid; gap: 10px; }
+.vo-rubric p { margin: 0; }
+.vo-rubric ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.vo-rubric li { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 13px; color: var(--c-mist); }
+.vo-rubric li b { display: block; color: var(--c-quartz); font-weight: 500; }
+.vo-rubric li div { display: grid; gap: 2px; overflow-wrap: anywhere; }
+.vo-rubric .adm-chip { justify-content: center; }
+.vo-matrix th, .vo-matrix td { text-align: center; white-space: nowrap; }
+.vo-matrix th:first-child, .vo-matrix td:first-child { text-align: left; }
+.vo-mark { display: inline-block; min-width: 22px; font-weight: 600; color: var(--c-ash); }
+.vo-mark[data-s='pass'] { color: var(--adm-ok); }
+.vo-mark[data-s='fail'] { color: var(--adm-bad); }
+.vo-runs { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.vo-runs li { display: flex; gap: 8px; align-items: center; }
+.adm button.vo-run:not(#_) { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; text-align: left; padding: 10px 12px; border: 1px solid var(--c-hairline); border-radius: 12px !important; background: var(--c-inkline); color: var(--c-mist); cursor: pointer; font: inherit; }
+.adm button.vo-run:not(#_):hover { border-color: var(--c-lilac); }
+.vo-run b { color: var(--c-quartz); font-weight: 500; }
+/* ── aranmasın listesi, uyum kaydı ── */
+.vo-dncform { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(200px, 2fr) 120px auto; gap: 10px; align-items: end; margin-bottom: 14px; }
+.vo-dncform label { display: grid; gap: 4px; }
+.vo-rm { display: grid; gap: 8px; }
+.vo-dcard, .vo-ccrd { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--c-hairline); border-radius: 12px; background: var(--c-inkline); color: var(--c-mist); min-width: 0; }
+.vo-kv { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.vo-kv .adm-label { margin: 0; }
+tr[data-issue='1'] td:first-child, .vo-ccrd[data-issue='1'] { box-shadow: inset 3px 0 0 var(--adm-bad); }
+.vo-ccrd[data-issue='1'] { box-shadow: inset 3px 0 0 var(--adm-bad); }
+.adm-table td code { font-family: var(--font-mono); font-size: 13px; }
+@media (max-width: 1099px) { .vo-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .vo-countries { grid-template-columns: 1fr; } }
+@media (max-width: 899px) {
+  .vo-tabbar { display: none; }
+  .vo-tabsel { display: grid; }
+  .vo-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .vo-two, .vo-limits, .vo-dncform { grid-template-columns: 1fr; }
+  .vo-two2 { grid-template-columns: 1fr 1fr; }
+  .vo-frow { grid-template-columns: 64px minmax(0, 1fr) 32px; }
+  .vo-frow .adm-meta { grid-column: 1 / -1; padding-left: 74px; margin-top: -4px; }
+  .vo-cols { height: 140px; }
+  .vo-chart, .vo-plan { padding: 12px; }
+  .vo-edit { grid-template-columns: 1fr; }
+  .vo-rubric li { grid-template-columns: 1fr; gap: 4px; }
+  .vo-rubric .adm-chip { justify-self: start; }
+  .vo-testbar { gap: 10px; }
+  .vo-chat { max-height: 420px; }
+}
+@media (min-width: 900px) { .vo-dcard, .vo-ccrd { display: none; } }
+.vo-plan .vo-rec { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--c-mist); }
+.vo-addrow .adm-input[type='time'] { flex: 0 0 150px; }

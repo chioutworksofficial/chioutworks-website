@@ -2,8 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, fmtDate, type Req } from './api';
 import { useNote } from './bulk';
 import CallScript from './CallScript';
+import AnalyticsTab from './voice/AnalyticsTab';
 import CallsTab from './voice/CallsTab';
+import ComplianceTab from './voice/ComplianceTab';
+import DncTab from './voice/DncTab';
+import NotifyBlock from './voice/NotifyBlock';
+import PlanningTab from './voice/PlanningTab';
 import QueueTab from './voice/QueueTab';
+import TestLab from './voice/TestLab';
 import StatusStrip from './voice/StatusStrip';
 import { msgOf } from './voice/shared';
 import type { Appt, Cust, Summary } from './voice/types';
@@ -13,8 +19,8 @@ import './voice/voice.css';
 const DAYS = [[1, 'Pzt'], [2, 'Sal'], [3, 'Çar'], [4, 'Per'], [5, 'Cum'], [6, 'Cmt'], [0, 'Paz']] as const;
 interface Sched { days: number[]; start: string; end: string; slotMinutes: number; buffer: number }
 interface Cfg { mode: 'simulation' | 'live'; vapiAssistantId: string; vapiPhoneNumberId: string; n8nWebhookUrl: string; schedule: Sched; vapiKey: { configured: boolean; last4: string }; vapiSecret: { configured: boolean; last4: string }; webhookUrl: string; token: { exists: boolean; createdAt: string | null; revealable: boolean; last4: string }; baseUrl: string; endpoints: string[] }
-type Sub = 'queue' | 'inbound' | 'log' | 'appts' | 'script';
-const SUBS: [Sub, string][] = [['queue', 'Aranacaklar'], ['inbound', 'Gelen aramalar'], ['log', 'Arama kayıtları'], ['appts', 'Randevular'], ['script', 'Senaryo']];
+type Sub = 'queue' | 'inbound' | 'log' | 'appts' | 'stats' | 'plan' | 'lab' | 'dnc' | 'comp' | 'script';
+const SUBS: [Sub, string][] = [['queue', 'Aranacaklar'], ['inbound', 'Gelen aramalar'], ['log', 'Arama kayıtları'], ['appts', 'Randevular'], ['stats', 'Analiz'], ['plan', 'Planlama'], ['lab', 'Test'], ['dnc', 'Aranmasın listesi'], ['comp', 'Uyum kaydı'], ['script', 'Senaryo']];
 
 export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
   const [sub, setSub] = useState<Sub>('queue');
@@ -31,7 +37,15 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
   const [appts, setAppts] = useState<Appt[]>([]);
   const [busy, setBusy] = useState(false);
   const setNote = useNote(); const pNote = useNote();
+  const barRef = useRef<HTMLDivElement>(null);
+  const setRef = useRef<HTMLDetailsElement>(null);
+  const [fade, setFade] = useState({ l: false, r: false });
 
+  const countOf = (k: Sub): number | null => k === 'queue' ? queue.filter((c) => !c.doNotCall && c.status !== 'booked').length : k === 'appts' ? appts.length : !sum ? null
+    : k === 'inbound' ? sum.inbound : k === 'log' ? sum.callsTotal ?? null : k === 'lab' ? sum.simRuns ?? null : k === 'dnc' ? sum.doNotCall : null;
+  const updFade = useCallback(() => { const b = barRef.current; if (b) setFade({ l: b.scrollLeft > 4, r: b.scrollLeft + b.clientWidth < b.scrollWidth - 4 }); }, []);
+  useEffect(() => { updFade(); const b = barRef.current; b?.addEventListener('scroll', updFade, { passive: true }); window.addEventListener('resize', updFade); return () => { b?.removeEventListener('scroll', updFade); window.removeEventListener('resize', updFade); }; }, [updFade, sum, queue.length]);
+  useEffect(() => { document.getElementById(`vo-t-${sub}`)?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, [sub]);
   const loadSum = useCallback(() => api<Summary>('/api/admin/voice-agent/summary').then(setSum).catch(() => {}), []);
   const loadAll = useCallback(async () => {
     const [q, a] = await Promise.all([api<{ customers: Cust[] }>('/api/admin/voice-agent/queue'), api<{ appointments: Appt[] }>('/api/admin/voice-agent/appointments')]);
@@ -119,9 +133,14 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
       <h1 className="adm-h1">Voice Agent</h1>
       <p className="adm-sub">Telefonda arayan yapay zekâ asistanı: kuyruk, gelen aramalar, kayıtlar ve randevular. Simülasyon modunda gerçek arama yapılmaz; otomasyon hazır tutulur, çalıştırılmaz.</p>
       <StatusStrip s={sum} />
-      <div className="vo-tabs" role="tablist" aria-label="Voice Agent bölümleri">
-        {SUBS.map(([k, l]) => <button key={k} type="button" role="tab" id={`vo-t-${k}`} aria-selected={sub === k} aria-controls="vo-panel" className="vo-tab" onClick={() => setSub(k)}>{l}{k === 'queue' && <small>{queue.filter((c) => !c.doNotCall && c.status !== 'booked').length}</small>}{k === 'inbound' && sum ? <small>{sum.inbound}</small> : null}</button>)}
+      {!!sum?.alertsUnseen && <button type="button" className="adm-chip vo-alert" data-state="bad" onClick={() => { if (setRef.current) { setRef.current.open = true; setRef.current.scrollIntoView({ block: 'start' }); } }}>{sum.alertsUnseen} yeni bildirim</button>}
+      <div className="vo-tabbar" data-l={fade.l ? '1' : undefined} data-r={fade.r ? '1' : undefined}>
+        <div className="vo-tabs" ref={barRef} role="tablist" aria-label="Voice Agent bölümleri">
+          {SUBS.map(([k, l]) => { const n = countOf(k); return <button key={k} type="button" role="tab" id={`vo-t-${k}`} aria-selected={sub === k} aria-controls="vo-panel" className="vo-tab" onClick={() => setSub(k)}>{l}{n !== null && <small>{n}</small>}</button>; })}
+        </div>
       </div>
+      <label className="vo-tabsel adm-label">Bölüm
+        <select className="adm-input" value={sub} onChange={(e) => setSub(e.target.value as Sub)} aria-label="Voice Agent bölümü">{SUBS.map(([k, l]) => { const n = countOf(k); return <option key={k} value={k}>{l}{n !== null ? ` (${n})` : ''}</option>; })}</select></label>
       <div id="vo-panel" role="tabpanel" aria-labelledby={`vo-t-${sub}`} className="vo-stack">
         {sub === 'queue' && <QueueTab queue={queue} reqs={reqs} sum={sum} reload={reload} />}
         {sub === 'inbound' && <CallsTab inbound version={ver} />}
@@ -133,9 +152,14 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
           {!appts.length ? <div className="adm-empty">Voice Agent randevusu yok</div> : <div className="adm-table-wrap"><table className="adm-table"><thead><tr><th>Başlangıç</th><th>Bitiş</th><th>Müşteri</th><th>Not</th><th /></tr></thead><tbody>{appts.map((a) => (
             <tr key={a.id}><td>{fmtSlot(a.start)}</td><td>{a.end.slice(11, 16)}</td><td>{a.name}</td><td style={{ whiteSpace: 'normal' }}>{a.notes || '-'}</td><td><button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => delAppt(a.id)}>Sil</button></td></tr>))}</tbody></table></div>}
         </div>}
+        {sub === 'stats' && <AnalyticsTab version={ver} />}
+        {sub === 'plan' && <PlanningTab onSaved={reload} />}
+        {sub === 'lab' && <TestLab onChange={loadSum} />}
+        {sub === 'dnc' && <DncTab onChange={reload} />}
+        {sub === 'comp' && <ComplianceTab version={ver} />}
         {sub === 'script' && <CallScript />}
 
-        <details className="lq-card adm-card vo-settings">
+        <details className="lq-card adm-card vo-settings" ref={setRef}>
           <summary><h2>Ayarlar ve bağlantı</h2><span className="adm-chip" data-state={live ? 'bad' : 'paid'}>{live ? 'CANLI' : 'SİMÜLASYON'}</span></summary>
           {settingsInner}
           {cfg && <div className="vo-stack" style={{ marginTop: 16 }}>
@@ -172,6 +196,7 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
         <p className="adm-meta" style={{ margin: '10px 0 0' }}>Bearer token'lı REST uçları (n8n için): her istekte <code style={{ fontFamily: 'var(--font-mono)' }}>Authorization: Bearer &lt;token&gt;</code> gönderilir.</p>
             </section>
           </div>}
+          <div style={{ marginTop: 16 }}><NotifyBlock version={ver} onChange={loadSum} /></div>
         </details>
       </div>
     </>
