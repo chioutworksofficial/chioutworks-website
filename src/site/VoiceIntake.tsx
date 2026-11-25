@@ -85,6 +85,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   const cardRef = useRef<'none' | 'gate' | 'done'>('none');   // 'gate': call waits (mic muted, no model turns, timers paused)
   const gateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gateWait = useRef(false);
+  const earlyGate = useRef(false);
   const gateForce = useRef(false);   // the model called offer_summary
   const enCorr = useRef(0);
   const [dl, setDl] = useState(false);
@@ -234,7 +235,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       visitorRef.current = NO_VISITOR; setVFirst(''); setVLast(''); setVSal('none'); setNameDone(false); voiceId.current = null; deletedRef.current = false;
       deadlineRef.current = 0; endReasonRef.current = ''; endedAtRef.current = 0; talkStart.current = 0; wrapSent.current = false; goAway.current = false; limitAt.current = 0; endingRef.current = false; finishPending.current = false; abuseRef.current = false; spokeRef.current = false; draining.current = false; softSent.current = false; reconnected.current = false; voiceStarted.current = false; setGraceUi(false);
       liveRole.current = null; liveCut.current = false; outBuf.current = ''; corrections.current = 0; setReconnecting(false); setCard(null); setCardSent(false); setCardErr(''); setCardBusy(false);
-      preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false); offeredRef.current = false; closingSaid.current = false; gateForce.current = false; enCorr.current = 0; setOffer(false); setGate(false); setCaptured(null);
+      preConsent.current = hasConsent('voice'); setDl(false); setConfirmDel(false); offeredRef.current = false; closingSaid.current = false; gateForce.current = false; earlyGate.current = false; enCorr.current = 0; setOffer(false); setGate(false); setCaptured(null);
       goPhase('consent'); startedAt.current = Date.now(); setOpen(true);
       if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('voicedemo')) {
         const n = Date.now();
@@ -507,6 +508,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   };
 
   const silenceEnd = () => {
+    if (turnsRef.current.some((x) => x.role === 'user') && tryEarlyGate()) return;
     endReasonRef.current ||= 'error:silence';
     setNotice(t.silenceEnd);
     if (turnsRef.current.some((x) => x.role === 'user')) { endCall(); return; }
@@ -514,13 +516,12 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
   };
   silenceEndRef.current = silenceEnd;
 
-  /** Contact-card gate (owner 2026-11-24): after the visitor's 3rd substantive turn (or offer_summary), once the assistant's turn and audio ended:
+  /** Contact-card gate (owner 2026-11-24): only on offer_summary (undecided/testing visitor) or an early end without contact or clear request (tryEarlyGate), once the assistant's turn and audio ended:
    *  mute the mic, show the card and have the assistant say the scripted sentence. Deterministic on the client, not up to the model. */
   const gateStart = () => {
     const c = callRef.current;
     if (!c || phaseRef.current !== 'live' || offeredRef.current || gateWait.current || finishPending.current || endingRef.current || closingTimer.current || softSent.current || wrapSent.current) return;
-    const n = turnsRef.current.filter((x) => x.role === 'user' && (x.text.match(/\p{L}+/gu) ?? []).length >= 2).length;
-    if (!gateForce.current && n < 3) return;
+    if (!gateForce.current) return;
     gateWait.current = true;
     void c.whenPlaybackDone(15000).then(() => {
       gateWait.current = false;
@@ -530,6 +531,14 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       c.sendText(`CARD_SCRIPT: say exactly this sentence, word for word, nothing else: "${CAPTURE_UI[lang].gate}"`);
       gateTimer.current = setTimeout(() => declineGate(), 60000);
     });
+  };
+  /** Early end (goodbye / silence close) with no card shown yet and no closing form notice: show the gate once before ending. */
+  const tryEarlyGate = () => {
+    if (earlyGate.current || offeredRef.current || closingSaid.current || abuseRef.current || !callRef.current || phaseRef.current !== 'live') return false;
+    earlyGate.current = true; gateForce.current = true; gateStart();
+    if (!gateWait.current && !offeredRef.current) return false;
+    setTimeout(() => { if (!offeredRef.current && !endingRef.current) { finishPending.current = true; drain(); } }, 20000);
+    return true;
   };
   /** "Not now" or 60 s without action: short goodbye, end the call, open the request form prefilled with everything gathered. */
   const declineGate = () => {
@@ -599,6 +608,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
           return;
         }
         if (reason === 'abuse') { abuseRef.current = true; endReasonRef.current = 'abuse'; } else if (reason === 'language') endReasonRef.current = 'language'; else endReasonRef.current ||= 'finish_tool';
+        if (reason === 'done' && tryEarlyGate()) return;
         finishPending.current = true; if (reason === 'abuse') setTimeout(drain, 3000); else drain();
       },
       onOffer: () => { gateForce.current = true; gateStart(); },
@@ -860,6 +870,7 @@ export default function VoiceIntake({ lang }: { lang: Lang }) {
       callRef.current?.pauseMic(false); watchRef.current?.heard();
       setTimeout(() => { setOffer(false); setGate(false); }, 4000);
     }
+    closingSaid.current = true;   // the thanks line already carries the form notice: the closing is farewell-only
     if (phaseRef.current === 'live') callRef.current?.sendText(`CARD_SENT: say exactly this sentence, word for word, nothing else: "${CAPTURE_UI[lang].thanks}"`);
   };
 

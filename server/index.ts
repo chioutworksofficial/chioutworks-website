@@ -1455,7 +1455,7 @@ app.post('/api/voice/live-token', liveLimiter, v(liveTokS), async (req, res) => 
   if (slot.ok === false) return res.status(503).json({ error: 'full', ticket: slot.ticket, position: slot.position, retryAfter: 5 });
   if (!resumed && !mintAllowed([`ip:${req.ip ?? 'anon'}`, ...(typeof b.bid === 'string' && b.bid ? [`bid:${b.bid.slice(0, 64)}`] : [])])) { pool.release(slot.id); return res.status(429).json({ error: 'rate_limited' }); }
   const vin = b.visitor ?? {};
-  const visitor = { firstName: personName(vin.firstName), salutation: (vin.salutation === 'm' || vin.salutation === 'f' ? vin.salutation : 'none') as 'm' | 'f' | 'none', hasLastName: Boolean(personName(vin.lastName)), hour: Number.isInteger(vin.hour) && vin.hour >= 0 && vin.hour <= 23 ? (vin.hour as number) : undefined };
+  const visitor = { firstName: personName(vin.firstName), salutation: (vin.salutation === 'm' || vin.salutation === 'f' ? vin.salutation : 'none') as 'm' | 'f' | 'none', hasLastName: Boolean(personName(vin.lastName)), lastName: personName(vin.lastName), hour: Number.isInteger(vin.hour) && vin.hour >= 0 && vin.hour <= 23 ? (vin.hour as number) : undefined };
   try {
     const instruction = buildLiveInstruction(lang, loadKnowledge(), loadPersona(), visitor, resumed ? cleanTurns(b.transcript) : []);
     const t = await mintToken(lang, instruction);

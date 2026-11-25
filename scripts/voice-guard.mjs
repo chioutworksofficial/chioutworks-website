@@ -9,8 +9,8 @@ const cli = fs.readFileSync(new URL('../src/lib/geminiLive.ts', import.meta.url)
 const must = [
   ['brand spoken map', srv, "const SPOKEN: Record<string, string> = { en: 'Shee-oot works', de: 'Schiut-Works', tr: 'Şiut-vörks', el: 'Σιούτ-γουόρκς' };"],
   ['tr greeting (Bey/Hanım + spoken brand)', srv, "ben ${SPOKEN.tr}'ün sesli yapay zekâ asistanıyım. Size nasıl yardımcı olabilirim?"],
-  ['de greeting', srv, 'Guten Tag, ich bin der KI-Sprachassistent von ${SPOKEN.de}. Wie kann ich Ihnen helfen?'],
-  ['en greeting', srv, "Hello, I'm the AI voice assistant of ${SPOKEN.en}. How can I help you?"],
+  ['de greeting', srv, 'Guten Tag${deName(v)}, ich bin der KI-Sprachassistent von ${SPOKEN.de}. Wie kann ich Ihnen helfen?'],
+  ['en greeting', srv, "Hello${enName(v)}, I'm the AI voice assistant of ${SPOKEN.en}. How can I help you?"],
   ['el greeting', srv, 'είμαι ο φωνητικός βοηθός τεχνητής νοημοσύνης της'],
   ['VAD explicitly enabled', srv + cli, 'disabled: false'],
 ];
