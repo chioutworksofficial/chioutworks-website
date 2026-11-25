@@ -1,14 +1,16 @@
-## ▶ RESUME P — 2026-11-25 gece (buradan devam)
-**Devam eden iş (yarım kaldıysa yeniden başlat):** Voice Agent canlı denetim + düzeltme.
-1. Canlı admin'de (#voiceAgent) her sekmeyi dene, hata veren /api isteklerini listele, hepsini düzelt.
-2. Aranmasın: sayaç eski DNC anahtar listesinden sayıyor, sekme yalnızca yeni kayıtları gösteriyor → eski kayıtları da maskeli + eşleşen kişiyle listele, "Geri al" (not zorunlu, loglu), sayaç = liste.
-3. Analiz formu/talep → "Aranacaklar" (Telefon seçenler, tekilleştir, kaynak rozeti).
-4. Voice Agent üstüne "Hazırlık" paneli (Vapi anahtar/asistan/numara/webhook secret, Server URL, {{system_prompt}}, PUBLIC_ORIGIN, mail, CRON_SECRET, SETTINGS_ENC_KEY, Supabase, mod, planlama, gizlilik) + "Uçtan uca deneme (simülasyon)" düğmesi.
-5. Anahtarlar/alan adı bağlanınca kod değişmeden canlı çalışsın.
-Kontrol: `node scripts/voice-guard.mjs` (sitedeki sesli asistana dokunma), iki tsc, temiz worktree tsc, sonra push.
+## ▶ RESUME P — 2026-11-25 (buradan devam)
+**Son yayın:** Voice Agent canlı denetim + Hazırlık paneli yayına alındı (10 sekme sorunsuz, 0 hata). Aranmasın listesi eski kayıtları da gösteriyor + "Geri al" (not zorunlu, loglu); analiz formu/talep (Telefon seçenler) → Aranacaklar otomatik, kaynak rozetleriyle; Hazırlık paneli 18 kontrol + "Uçtan uca deneme (simülasyon)"; PUBLIC_ORIGIN tüm linklerde.
+**İlk iş (resume p):** canlı admin → Voice Agent → "Uçtan uca deneme" düğmesine sahip basacak; sonucu sor.
+**Not:** ilk açılışta mevcut uygun talepler bir kerede kuyruğa düşer (beklenen).
 
-**Sahipten beklenenler:** APIFY_TOKEN, YOUTUBE_API_KEY (.env'e; Vercel'e ben eklerim) · Vapi kurulunca asistan talimatına `{{system_prompt}}` · telefonda sesli asistan denemesi (de/en isimli selamlama, kararsız kişide kart) · kararlar: Trend Radar'da fal.ai A seçeneği mi; rapor e-postası "arayayım/arayalım"; "teklif linki gelecek" sözü; form/asistan kişilerine rapor; gizlilik ekleri.
-**Kurallar:** çalışanı elleme (memory: feedback_chioutworks_dont_touch_working); deploy yalnızca sahip isteyince/onaylayınca; Admin.tsx'te erken return'den sonra hook yok; admin buton köşesi için `.adm button.x:not(#_)`.
+**Sahipten beklenenler:**
+- APIFY_TOKEN, YOUTUBE_API_KEY (.env'e; Vercel'e ben eklerim).
+- Vapi: private key, assistant ID, phone number ID, webhook secret (Vapi'de Custom Credential, header X-Vapi-Secret); Hazırlık'taki Server URL'yi asistana gir; asistan system prompt = `{{system_prompt}}`; "Vapi'yi test et" → Canlı.
+- Alan adı: PUBLIC_ORIGIN (Vercel) + RESEND DNS + DEMO_EMAIL_FROM; Hatalar'da bildirim alıcısı; Planlama kurallarını kaydet.
+- Gizlilik politikasına telefon/yapay zekâ arama bölümü (id `phone-calls`, 4 dil, sağlayıcı adı yok) — onay verirse yazarım; avukat kontrolü.
+- Telefonda sesli asistan denemesi (de/en isimli selamlama, kararsız kişide kart; vedadan sonra kart açılması garip gelirse söylesin).
+- Kararlar: Trend Radar'da fal.ai A seçeneği mi (fikirlerden görsel/video); rapor e-postası "arayayım/arayalım"; "teklif linki gelecek" sözü; form/asistan kişilerine rapor; gizlilik ekleri; Kurban/Ramazan Bayramı tarihlerini Diyanet ile karşılaştır.
+**Kurallar:** çalışanı elleme (memory: feedback_chioutworks_dont_touch_working; `node scripts/voice-guard.mjs`); deploy sahip isteyince; Admin.tsx'te erken return'den sonra hook yok; admin buton köşesi için `.adm button.x:not(#_)`; Groq ücretsiz katman yavaş (Test lab).
 
 ## 2026-11-25 — yayında
 - Voice Agent (Vapi): sekmeler Aranacaklar / Gelen aramalar / Arama kayıtları (transkript, kayıt varsa dinle-indir, CSV) / Randevular / Senaryo; Ayarlar en altta. 4 dilde sistem talimatı (context/vapi-asistan-talimati.md). Vapi asistanının talimat alanına `{{system_prompt}}` yazılmalı.

@@ -9,6 +9,7 @@ import DncTab from './voice/DncTab';
 import NotifyBlock from './voice/NotifyBlock';
 import PlanningTab from './voice/PlanningTab';
 import QueueTab from './voice/QueueTab';
+import Readiness from './voice/Readiness';
 import TestLab from './voice/TestLab';
 import StatusStrip from './voice/StatusStrip';
 import { msgOf } from './voice/shared';
@@ -62,7 +63,7 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
     setBusy(true);
     try {
       await api('/api/admin/voice-agent/settings', 'PUT', { vapiApiKey: form.key, vapiServerSecret: form.secret, vapiAssistantId: form.agent, vapiPhoneNumberId: form.phone, n8nWebhookUrl: form.n8n, mode: form.mode, schedule: form.sc });
-      await loadCfg(); await loadSum(); setNote.show({ ok: true, text: 'Kaydedildi.' });
+      await loadCfg(); await loadSum(); setVer((v) => v + 1); setNote.show({ ok: true, text: 'Kaydedildi.' });
     } catch (x) { setNote.show({ ok: false, text: msgOf(x, 'Kaydedilemedi, tekrar deneyin.') }); }
     setBusy(false);
   };
@@ -83,7 +84,7 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
   const delAppt = async (id: string) => { try { await api(`/api/admin/voice-agent/appointments/${id}`, 'DELETE'); await loadAll(); } catch (x) { pNote.show({ ok: false, text: msgOf(x, 'Silinemedi.') }); } };
 
   const testConn = async () => {
-    try { const r = await api<{ ok: boolean; message: string }>('/api/admin/voice-agent/test-connection', 'POST'); setNote.show({ ok: r.ok, text: r.message }); }
+    try { const r = await api<{ ok: boolean; message: string }>('/api/admin/voice-agent/test-connection', 'POST'); setNote.show({ ok: r.ok, text: r.message }); setVer((v) => v + 1); }
     catch (x) { setNote.show({ ok: false, text: msgOf(x, 'Önce Vapi private API key girip kaydedin.') }); }
   };
   const live = form.mode === 'live';
@@ -132,6 +133,7 @@ export default function VoiceAgentView({ reqs }: { reqs: Req[] | null }) {
     <>
       <h1 className="adm-h1">Voice Agent</h1>
       <p className="adm-sub">Telefonda arayan yapay zekâ asistanı: kuyruk, gelen aramalar, kayıtlar ve randevular. Simülasyon modunda gerçek arama yapılmaz; otomasyon hazır tutulur, çalıştırılmaz.</p>
+      <Readiness version={ver} onChange={reload} />
       <StatusStrip s={sum} />
       {!!sum?.alertsUnseen && <button type="button" className="adm-chip vo-alert" data-state="bad" onClick={() => { if (setRef.current) { setRef.current.open = true; setRef.current.scrollIntoView({ block: 'start' }); } }}>{sum.alertsUnseen} yeni bildirim</button>}
       <div className="vo-tabbar" data-l={fade.l ? '1' : undefined} data-r={fade.r ? '1' : undefined}>

@@ -10,7 +10,7 @@ export interface CallDetail {
 }
 export interface Summary { mode: 'simulation' | 'live'; vapiConnected: boolean; liveReady: boolean; today: number; week: number; avgDurationSec: number; positiveRate: number | null; answered: number; doNotCall: number; inbound: number; callsTotal?: number; simRuns?: number; alertsUnseen?: number }
 export type St = 'to_call' | 'calling' | 'booked' | 'no_answer';
-export interface Cust { id: string; name: string; phone: string; sector: string; preferred_time: string; status: St; notes?: string; doNotCall?: boolean; priority?: 'high' | 'normal' | 'low'; scheduledAt?: string; sourceLeadId?: string; sourceRequestId?: string; country?: string; rule?: RuleState | null }
+export interface Cust { id: string; name: string; phone: string; sector: string; preferred_time: string; status: St; notes?: string; source?: string; doNotCall?: boolean; priority?: 'high' | 'normal' | 'low'; scheduledAt?: string; sourceLeadId?: string; sourceRequestId?: string; country?: string; rule?: RuleState | null }
 export interface RuleState { ok: boolean; code?: string; reason?: string; nextSlot?: string; country?: string }
 export interface Appt { id: string; name: string; start: string; end: string; notes: string }
 export const fmtDur = (s: number) => (s > 0 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '-');
@@ -35,7 +35,10 @@ export interface Analytics {
   cost: { totalUsd: number; avgUsd: number; counted: number; missing: number; top: { id: string; createdAt: string; costUsd: number; person: string }[] };
   abuse: number; notInterested: number; inbound: number;
 }
-export interface DncItem { id: string; masked: string; reason: string; source: 'call' | 'manual' | 'form' | 'unknown'; at: string }
+export interface DncItem { id: string; masked: string; reason: string; source: 'call' | 'manual' | 'form' | 'unknown'; at: string; legacy: boolean; name: string; business: string; matched: string }
+export interface ReadyItem { id: string; label: string; status: 'ok' | 'missing' | 'info'; detail: string; how: string }
+export interface ReadyRes { items: ReadyItem[]; ready: boolean; missing: number; mode: 'simulation' | 'live'; webhookUrl: string }
+export interface SelfStep { label: string; ok: boolean; detail: string }
 export interface DncRes { items: DncItem[]; total: number; log: { at: string; masked: string; note: string }[] }
 export interface CompRow {
   id: string; createdAt: string; direction: 'in' | 'out'; person: string; phoneMasked: string; outcome: Outcome; durationSec: number; disclosure: 'yes' | 'no' | 'unknown';

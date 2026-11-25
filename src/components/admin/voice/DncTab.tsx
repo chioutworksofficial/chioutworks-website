@@ -4,7 +4,8 @@ import { useNote } from '../bulk';
 import { msgOf } from './shared';
 import type { DncItem, DncRes } from './types';
 
-const SRC: Record<DncItem['source'], string> = { call: 'Aramada', manual: 'Elle', form: 'Form', unknown: 'Eski kayıt' };
+const SRC: Record<DncItem['source'], string> = { call: 'Aramada', manual: 'Elle', form: 'Form', unknown: 'eski kayıt' };
+const who = (i: DncItem) => [i.name, i.business].filter(Boolean).join(' · ');
 
 export default function DncTab({ onChange }: { onChange: () => void }) {
   const [d, setD] = useState<DncRes | null>(null);
@@ -23,18 +24,18 @@ export default function DncTab({ onChange }: { onChange: () => void }) {
   };
   const remove = async () => {
     if (!rm) return; setBusy(true);
-    try { await api(`/api/admin/voice-agent/dnc/${rm.id}`, 'DELETE', { note: rm.note }); setRm(null); await load(); onChange(); note.show({ ok: true, text: 'Listeden kaldırıldı; not kayda yazıldı.' }); }
+    try { await api(`/api/admin/voice-agent/dnc/${rm.id}`, 'DELETE', { note: rm.note }); setRm(null); await load(); onChange(); note.show({ ok: true, text: 'Geri alındı; not kayda yazıldı.' }); }
     catch (x) { note.show({ ok: false, text: msgOf(x, 'Kaldırılamadı.') }); }
     setBusy(false);
   };
   const confirm = (id: string) => rm?.id === id && (
-    <div className="vo-confirm vo-rm" role="alert"><span>Bu numara tekrar aranabilir hale gelir. Neden kaldırıyorsunuz?</span>
+    <div className="vo-confirm vo-rm" role="alert"><span>Bu numara tekrar aranabilir hale gelir (liste ve aday işareti birlikte güncellenir). Neden geri alıyorsunuz?</span>
       <input className="adm-input" aria-label="Kaldırma notu" placeholder="Kısa not (en az 3 karakter)" maxLength={300} value={rm.note} onChange={(e) => setRm({ id, note: e.target.value })} />
-      <div className="vo-qact"><button type="button" className="lq-btn-ghost adm-btn sm adm-pri" disabled={busy || rm.note.trim().length < 3} onClick={remove}>Evet, kaldır</button><button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setRm(null)}>Vazgeç</button></div></div>);
+      <div className="vo-qact"><button type="button" className="lq-btn-ghost adm-btn sm adm-pri" disabled={busy || rm.note.trim().length < 3} onClick={remove}>Evet, geri al</button><button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setRm(null)}>Vazgeç</button></div></div>);
   return (
     <div className="lq-card adm-card">
       <div className="adm-head"><h2>Aranmasın listesi</h2><span className="adm-chip tag">{d ? d.total : '…'} numara</span></div>
-      <p className="adm-sub">Bu numaralar kuyruğa girmez ve aranmaz. Numaralar maskeli gösterilir; tam numara arayüze dönmez. Ret aramada, formda veya elle kaydedilebilir.</p>
+      <p className="adm-sub">Bu numaralar kuyruğa girmez ve aranmaz. Numaralar maskeli gösterilir (son 4 hane); tam numara arayüze dönmez. Eşleşen bir aday varsa adı yanında görünür. "Geri al" numarayı listeden ve adayın işaretinden çıkarır.</p>
       {note.el}
       <form className="vo-dncform" onSubmit={add}>
         <label className="adm-label">Numara (ülke koduyla)<input className="adm-input" inputMode="tel" autoComplete="off" placeholder="+49 170 1234567" value={phone} onChange={(e) => setPhone(e.target.value)} required /></label>
@@ -43,13 +44,13 @@ export default function DncTab({ onChange }: { onChange: () => void }) {
         <button type="submit" className="lq-btn-ghost adm-btn adm-pri" disabled={busy || phone.trim().length < 6}>Ekle</button>
       </form>
       {!d ? <div className="adm-skel" style={{ height: 140 }} /> : !d.items.length ? <div className="adm-empty">Listede numara yok</div> : <>
-        <div className="adm-table-wrap vo-desk"><table className="adm-table"><thead><tr><th>Numara</th><th>Neden</th><th>Tarih</th><th>Kaynak</th><th /></tr></thead><tbody>{d.items.map((i) => (
-          <tr key={i.id}><td><code>{i.masked}</code></td><td className="vo-sum">{i.reason || '-'}</td><td>{i.at ? fmtDate(i.at) : '-'}</td><td>{SRC[i.source]}</td>
-            <td>{rm?.id === i.id ? confirm(i.id) : <button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setRm({ id: i.id, note: '' })}>Kaldır</button>}</td></tr>))}</tbody></table></div>
+        <div className="adm-table-wrap vo-desk"><table className="adm-table"><thead><tr><th>Numara</th><th>Kim</th><th>Neden</th><th>Tarih</th><th>Kaynak</th><th /></tr></thead><tbody>{d.items.map((i) => (
+          <tr key={i.id}><td><code>{i.masked}</code></td><td className="vo-sum">{who(i) || <span className="adm-meta">eşleşen aday yok</span>}{i.matched && <span className="adm-meta"> ({i.matched})</span>}</td><td className="vo-sum">{i.reason || '-'}</td><td>{i.at ? fmtDate(i.at) : '-'}</td><td>{SRC[i.source]}</td>
+            <td>{rm?.id === i.id ? confirm(i.id) : <button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setRm({ id: i.id, note: '' })}>Geri al</button>}</td></tr>))}</tbody></table></div>
         <ul className="vo-cards">{d.items.map((i) => (
           <li key={i.id} className="vo-card vo-dcard"><span className="vo-card-top"><b><code>{i.masked}</code></b><span className="adm-chip tag">{SRC[i.source]}</span></span>
-            <span className="adm-meta">{i.at ? fmtDate(i.at) : 'Tarih yok'}</span>{i.reason && <span className="vo-card-sum">{i.reason}</span>}
-            {rm?.id === i.id ? confirm(i.id) : <button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setRm({ id: i.id, note: '' })}>Kaldır</button>}</li>))}</ul></>}
+            {who(i) && <span className="vo-card-sum"><b>{who(i)}</b></span>}<span className="adm-meta">{i.at ? fmtDate(i.at) : 'Tarih yok'}</span>{i.reason && <span className="vo-card-sum">{i.reason}</span>}
+            {rm?.id === i.id ? confirm(i.id) : <button type="button" className="lq-btn-ghost adm-btn sm" onClick={() => setRm({ id: i.id, note: '' })}>Geri al</button>}</li>))}</ul></>}
       {d && d.log.length > 0 && <details className="vo-holidays"><summary>Son kaldırmalar ({d.log.length})</summary><ul className="vo-links">{d.log.map((l, k) => <li key={k}>{fmtDate(l.at)} · {l.masked} · {l.note}</li>)}</ul></details>}
     </div>
   );

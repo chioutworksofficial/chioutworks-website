@@ -444,6 +444,7 @@ export function registerIntake(app: Express, d: Deps) {
     i.status = 'submitted'; i.submittedAt = now; i.consentAt = now;
     await saveIntake(i);
     await syncStyle(i);
+    await import('./voiceAgent.js').then((m) => m.vaSyncForms()).catch(() => 0);   // phone-consent forms into the Voice Agent queue (dynamic import: no module cycle)
     return res.json({ ok: true });
   });
 

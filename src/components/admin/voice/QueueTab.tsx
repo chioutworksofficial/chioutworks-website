@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, fmtDate, type Req } from '../api';
 import { useNote } from '../bulk';
-import { PT, ST, mask, msgOf } from './shared';
+import { PT, SRC_BADGE, ST, mask, msgOf } from './shared';
 import type { Cust, Summary } from './types';
 
 const PRIO = { high: 'Yüksek', normal: 'Normal', low: 'Düşük' } as const;
@@ -45,7 +45,7 @@ export default function QueueTab({ queue, reqs, sum, reload }: { queue: Cust[]; 
       {!rows.length ? <div className="adm-empty">Kuyrukta kimse yok</div> : <ul className="vo-q">{rows.map((c) => (
         <li key={c.id} className="vo-qrow">
           <div className="vo-qmain">
-            <div className="vo-qtop"><b>{c.name}</b><span className="adm-meta">{mask(c.phone)} · {c.sector}</span><span className="adm-chip" data-state={c.status}>{ST[c.status]}</span></div>
+            <div className="vo-qtop"><b>{c.name}</b><span className="adm-meta">{mask(c.phone)} · {c.sector}</span><span className="adm-chip" data-state={c.status}>{ST[c.status]}</span>{c.source && SRC_BADGE[c.source] && <span className="adm-chip tag vo-src">{SRC_BADGE[c.source]}</span>}</div>
             <p className="vo-reason"><span className="adm-label">Makul sebep</span>{c.notes || 'Belirtilmemiş'}</p>
             <div className="vo-qmeta"><span className="adm-chip tag" data-prio={c.priority ?? 'normal'}>Öncelik: {PRIO[c.priority ?? 'normal']}</span><span className="adm-meta">Zaman: {c.scheduledAt ? fmtDate(c.scheduledAt) : PT[c.preferred_time] ?? '-'}</span>
               {c.rule && (c.rule.ok ? <span className="adm-chip" data-state="paid">Şimdi aranabilir</span> : <span className="adm-chip" data-state="calling">Şimdi aranamaz</span>)}</div>

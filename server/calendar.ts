@@ -58,6 +58,13 @@ export function dropCalendarEntry(kind: EntryKind, email?: string, phone?: strin
   return chain as Promise<void>;
 }
 
+/** Self-test helpers: entries of one record, and removal of them. */
+export const calendarEntriesFor = async (refId: string) => (await load()).filter((e) => e.refId === refId);
+export function dropCalendarByRef(refId: string): Promise<void> {
+  chain = chain.then(async () => { const list = await load(); const keep = list.filter((e) => e.refId !== refId); if (keep.length !== list.length) await save(keep); }).catch(() => { console.error('[calendar] drop failed'); });
+  return chain as Promise<void>;
+}
+
 export function registerCalendar(app: Express, d: { requireAdmin: (req: Request, res: Response) => Promise<boolean> }) {
   const limit = rateLimit({ store: rlStore('adminCalendar'), windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false, message: { error: 'rate_limited' } });
   app.get('/api/admin/calendar-entries', limit, async (req, res) => {

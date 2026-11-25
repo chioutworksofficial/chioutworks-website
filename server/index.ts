@@ -31,7 +31,7 @@ import { recordContactConsent, sendSummaryMail, sendDueReminders, needOf, CAPTUR
 import { confirmMail } from './mail.js';
 import { registerAnalytics } from './analytics.js';
 import { registerAffiliates } from './affiliates.js';
-import { registerVoiceAgent } from './voiceAgent.js';
+import { registerVoiceAgent, vaSyncForms } from './voiceAgent.js';
 import { registerSales } from './sales.js';
 import { registerMarketing } from './marketing.js';
 import { registerTrendRadar } from './trendRadar.js';
@@ -823,6 +823,7 @@ app.post('/api/contact', quoteLimiter, botGate, v(contactS), async (req, res) =>
       if (vs) { vs.contactSubmitted = true; vs.contactId = rec.id; delete vs.draft; vs.contact = { name: rec.name, email: rec.email, phone: rec.phone, message: rec.message }; await saveVoice(vs); }
     }
     notifyOwnerOfRequest(rec, 'Contact');
+    if (channel === 'phone') await vaSyncForms();   // phone choice + number: into the Voice Agent queue (idempotent, DNC respected)
     if (channel !== 'email') void recordContactConsent({ source, lang: rec.lang, preferredChannel: channel, ref: rec.id, textVersion: str(req.body?.textVersion, 40) });
     const capSess = voiceLink ?? await sessionByToken(str(req.body?.capToken, 80));
     if (capSess) { if (capSess.capture) capSess.capture.formSubmittedAt = rec.createdAt; if (!capSess.contactId) { capSess.contactId = rec.id; capSess.contactSubmitted = true; } await saveVoice(capSess); }
